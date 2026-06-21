@@ -2,9 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  // Keep `pg` (and its optional native deps) out of the bundle so the Node
-  // driver loads correctly in the serverless/Fluid Compute runtime.
-  serverExternalPackages: ["pg"],
+  // The dashboard has no backend of its own anymore — it talks to the C# API via
+  // src/lib/api-client.ts (NEXT_PUBLIC_API_BASE_URL). No server-side DB driver to
+  // externalize.
+  //
   // Artifact screenshots written by the runner may live on arbitrary hosts
   // (blob storage, Azure, etc.). They are rendered with plain <img>, so no
   // next/image remote allow-list is required, but we keep this here as the

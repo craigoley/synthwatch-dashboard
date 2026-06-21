@@ -1,15 +1,12 @@
 /**
- * API response types — the JSON shapes the /api/* route handlers return and the
- * client components consume. These differ from the raw DB row types in
- * `db-types.ts` in two ways:
- *  1. timestamps are serialized to ISO strings over JSON (pg returns `Date`,
- *     `NextResponse.json` stringifies them);
- *  2. enum-like columns are typed as plain `string` in the generated db-types,
- *     but the runner constrains them — so we narrow them to unions HERE for the
- *     UI, since these literals drive colors/labels/segmented controls.
+ * API response types — the snake_case JSON shapes the components consume. The
+ * api-client (src/lib/api-client.ts) adapts the C# API's camelCase responses
+ * into these shapes. Notes:
+ *  1. timestamps are ISO strings over JSON;
+ *  2. enum-like columns are narrowed to unions HERE for the UI, since these
+ *     literals drive colors/labels/segmented controls.
  *
- * Components import ONLY from here (and never from `db-types.ts` / `db.ts`),
- * which keeps the database client out of the React bundle.
+ * Components import their data types ONLY from here.
  */
 
 // ─── UI enums (runner-constrained; generated db-types calls these `string`) ────

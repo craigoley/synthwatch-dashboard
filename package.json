@@ -11,13 +11,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "tsc --noEmit",
-    "gen:types": "pg-to-ts generate -c \"$DATABASE_URL\" -t checks runs run_steps run_metrics incidents -o src/db-types.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@vercel/functions": "^3.7.2",
     "next": "16.2.9",
-    "pg": "^8.13.1",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "recharts": "^3.8.1",
@@ -28,21 +25,18 @@
     "@eslint/js": "^9.18.0",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^26.0.0",
-    "@types/pg": "^8.11.10",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.18.0",
     "eslint-config-next": "16.2.9",
     "eslint-plugin-security": "^4.0.1",
-    "pg-to-ts": "^4.1.1",
     "tailwindcss": "^4.0.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.20.0"
   },
   "pnpm": {
     "overrides": {
-      "postcss@<8.5.10": ">=8.5.10",
-      "pg-promise@<11.5.5": ">=11.5.5"
+      "postcss@<8.5.10": ">=8.5.10"
     }
   }
 }
