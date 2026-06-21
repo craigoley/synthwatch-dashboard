@@ -11,7 +11,7 @@
 
 // ─── UI enums (runner-constrained; generated db-types calls these `string`) ────
 
-export type CheckKind = "http" | "browser";
+export type CheckKind = "http" | "browser" | "ssl";
 export type RunStatus = "running" | "pass" | "warn" | "fail" | "error";
 export type RunStepStatus = "pass" | "fail" | "skip";
 export type IncidentSeverity = "warning" | "critical";
@@ -41,6 +41,8 @@ export interface Check {
   lighthouse_form_factor: string;
   perf_budget_lcp_ms: number | null;
   perf_budget_transfer_bytes: number | null;
+  /** SSL checks only: warn when the cert has <= this many days remaining. */
+  cert_expiry_warn_days: number | null;
 }
 
 /** One point in a card sparkline: recent run duration + outcome. */

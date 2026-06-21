@@ -6,7 +6,7 @@ import { z } from "zod";
  * Everything else is read-only. Column names mirror the generated db-types.ts.
  */
 
-const kind = z.enum(["http", "browser"]);
+const kind = z.enum(["http", "browser", "ssl"]);
 const formFactor = z.enum(["mobile", "desktop"]);
 const method = z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]);
 const severity = z.enum(["warning", "critical"]);
@@ -44,6 +44,8 @@ export const createCheckSchema = z.object({
   lighthouse_form_factor: formFactor.default("desktop"),
   perf_budget_lcp_ms: positiveInt.nullable().optional().default(null),
   perf_budget_transfer_bytes: nonNegativeInt.nullable().optional().default(null),
+  // SSL checks: warn when the cert has <= this many days remaining.
+  cert_expiry_warn_days: positiveInt.nullable().optional().default(null),
 });
 
 export type CreateCheckInput = z.infer<typeof createCheckSchema>;
@@ -68,6 +70,7 @@ export const updateCheckSchema = z
     lighthouse_form_factor: formFactor,
     perf_budget_lcp_ms: positiveInt.nullable(),
     perf_budget_transfer_bytes: nonNegativeInt.nullable(),
+    cert_expiry_warn_days: positiveInt.nullable(),
   })
   .partial()
   .refine((data) => Object.keys(data).length > 0, {
