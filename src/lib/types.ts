@@ -149,10 +149,10 @@ export interface IncidentsResponse {
 export type SlaWindow = "24h" | "7d" | "30d";
 
 /**
- * One row from `sla_availability_<window>` (and the `sla_availability()`
- * function) — per-check availability over a rolling window. Columns mirror the
- * live DB exactly. `availability_pct` is `numeric` in PG (cast to float in the
- * route); it is null when there are no completed runs in the window.
+ * One row from the SLA endpoint — per-check availability over a rolling window.
+ * `availability_pct` is null when the API marks the window `insufficient_data`
+ * (not enough completed runs yet to report a meaningful number — distinct from a
+ * real breach).
  */
 export interface SlaRow {
   check_id: number;
@@ -164,6 +164,27 @@ export interface SlaRow {
   up_runs: number;
   down_runs: number;
   availability_pct: number | null;
+  insufficient_data: boolean;
+}
+
+/**
+ * Server-computed (run-weighted) fleet rollup for a window. Replaces the old
+ * client-side count summation. `availability_pct` is null when
+ * `insufficient_data` is true.
+ */
+export interface SlaFleet {
+  completed_runs: number;
+  up_runs: number;
+  down_runs: number;
+  availability_pct: number | null;
+  insufficient_data: boolean;
+}
+
+/** Full SLA response for one window. */
+export interface SlaResponse {
+  window: SlaWindow;
+  items: SlaRow[];
+  fleet: SlaFleet | null;
 }
 
 export interface ApiError {

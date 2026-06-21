@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { CheckWithStatus } from "@/lib/types";
 import { StatusBadge, TONE_VAR } from "@/components/status-badge";
 import { Sparkline } from "@/components/sparkline";
-import { SlaPercent } from "@/components/sla";
+import { AvailabilityValue } from "@/components/sla";
 import { runStatusMeta } from "@/lib/status";
 import { formatDuration, formatRelative } from "@/lib/format";
 
@@ -12,9 +12,11 @@ const RAIL: Record<string, string> = TONE_VAR;
 export function CheckCard({
   check,
   availability = null,
+  availabilityInsufficient = false,
 }: {
   check: CheckWithStatus;
   availability?: number | null;
+  availabilityInsufficient?: boolean;
 }) {
   const meta = runStatusMeta(check.current_status);
   const rail = check.open_incident_count > 0 ? TONE_VAR.fail : RAIL[meta.token];
@@ -53,7 +55,12 @@ export function CheckCard({
           </span>
           <span className="flex items-center gap-1.5">
             <span className="text-[9px] uppercase tracking-wider text-[var(--color-ink-faint)]">24h avail</span>
-            <SlaPercent pct={availability} className="text-[11px]" />
+            <AvailabilityValue
+              pct={availability}
+              insufficient={availabilityInsufficient}
+              compact
+              className="text-[11px]"
+            />
           </span>
         </div>
       </div>

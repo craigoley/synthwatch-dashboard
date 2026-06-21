@@ -32,6 +32,8 @@ import type {
   RunStep,
   RunStepStatus,
   RunsPage,
+  SlaFleet,
+  SlaResponse,
   SlaRow,
   SlaWindow,
   SparkPoint,
@@ -229,11 +231,21 @@ interface RawSlaItem {
   upRuns: number;
   downRuns: number;
   availabilityPct: number | null;
+  insufficientData: boolean;
+}
+
+interface RawSlaFleet {
+  completedRuns: number;
+  upRuns: number;
+  downRuns: number;
+  availabilityPct: number | null;
+  insufficientData: boolean;
 }
 
 interface RawSlaResponse {
   window: string;
   items: RawSlaItem[];
+  fleet: RawSlaFleet | null;
 }
 
 // ─── mappers (camelCase → the snake_case shapes components read) ──────────────
@@ -356,6 +368,18 @@ function mapSla(raw: RawSlaItem): SlaRow {
     up_runs: raw.upRuns,
     down_runs: raw.downRuns,
     availability_pct: raw.availabilityPct,
+    insufficient_data: raw.insufficientData ?? false,
+  };
+}
+
+function mapFleet(raw: RawSlaFleet | null | undefined): SlaFleet | null {
+  if (!raw) return null;
+  return {
+    completed_runs: raw.completedRuns,
+    up_runs: raw.upRuns,
+    down_runs: raw.downRuns,
+    availability_pct: raw.availabilityPct,
+    insufficient_data: raw.insufficientData ?? false,
   };
 }
 
@@ -425,10 +449,14 @@ export async function listFlows(): Promise<string[]> {
   return request<string[]>("/flows");
 }
 
-/** GET /api/sla?window= — per-check availability over a rolling window. */
-export async function getSla(window: SlaWindow = "24h"): Promise<SlaRow[]> {
+/** GET /api/sla?window= — per-check availability + server fleet rollup. */
+export async function getSla(window: SlaWindow = "24h"): Promise<SlaResponse> {
   const raw = await request<RawSlaResponse>("/sla", { window });
-  return (raw.items ?? []).map(mapSla);
+  return {
+    window,
+    items: (raw.items ?? []).map(mapSla),
+    fleet: mapFleet(raw.fleet),
+  };
 }
 
 // ─── writes (outgoing body snake→camel) ──────────────────────────────────────
