@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 
-import { useChecks, updateCheck, deleteCheck, ApiRequestError } from "@/lib/client";
+import { useChecks, updateCheck, deleteCheck } from "@/lib/client";
+import { ApiRequestError } from "@/lib/api-client";
 import { StatusDot } from "@/components/status-badge";
 import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";

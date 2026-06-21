@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 
-import { createCheck, updateCheck, useFlows, ApiRequestError } from "@/lib/client";
+import { createCheck, updateCheck, useFlows } from "@/lib/client";
+import { ApiRequestError } from "@/lib/api-client";
 import type { Check, CheckKind, HttpMethod, LighthouseFormFactor } from "@/lib/types";
 
 interface Props {
