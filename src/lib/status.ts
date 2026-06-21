@@ -46,6 +46,17 @@ export function severityMeta(sev: IncidentSeverity): StatusMeta {
     : { label: "Warning", token: "warn", dotClass: "sw-dot-warn" };
 }
 
+/**
+ * SLA availability % → status token. Calm thresholds (not alarmist):
+ * ≥ 99.9 pass (green), ≥ 99 warn (amber), below fail (red). Null = no data.
+ */
+export function availabilityTone(pct: number | null | undefined): StatusMeta["token"] {
+  if (pct === null || pct === undefined || Number.isNaN(pct)) return "idle";
+  if (pct >= 99.9) return "pass";
+  if (pct >= 99) return "warn";
+  return "fail";
+}
+
 /** Order used when sorting/grouping by run status severity (worst first). */
 export function statusRank(status: RunStatus | null): number {
   switch (status) {

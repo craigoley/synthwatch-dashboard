@@ -32,6 +32,8 @@ import type {
   MetricPoint,
   RunStep,
   RunsPage,
+  SlaRow,
+  SlaWindow,
 } from "@/lib/types";
 import type { CreateCheckInput, UpdateCheckInput } from "@/lib/schemas";
 
@@ -160,6 +162,11 @@ export function listIncidents(): Promise<IncidentsResponse> {
 /** GET /api/flows — distinct non-null flow_name values. */
 export function listFlows(): Promise<string[]> {
   return request<string[]>("/api/flows");
+}
+
+/** GET /api/sla?window= — per-check availability over a rolling window. */
+export function getSla(window: SlaWindow = "24h"): Promise<SlaRow[]> {
+  return request<SlaRow[]>("/api/sla", undefined, { window });
 }
 
 // ─── writes ──────────────────────────────────────────────────────────────────

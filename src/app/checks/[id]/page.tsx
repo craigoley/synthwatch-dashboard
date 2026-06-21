@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 
 import { useCheck, useMetrics, updateCheck, revalidateChecks } from "@/lib/client";
 import { LatencyChart, MetricsCharts } from "@/components/charts";
+import { CheckSlaPanel } from "@/components/sla";
 import { FunnelBar } from "@/components/funnel-bar";
 import { StatusBadge, StatusDot } from "@/components/status-badge";
 import { Modal } from "@/components/modal";
@@ -209,6 +210,8 @@ export default function CheckDetailPage() {
           <ConfigChip label="Body has" value={check.body_must_contain} />
         )}
       </div>
+
+      <CheckSlaPanel checkId={check.id} />
 
       <LatencyChart runs={recent_runs} />
 

@@ -4,8 +4,9 @@ import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { useChecks } from "@/lib/client";
+import { useChecks, useSla } from "@/lib/client";
 import { CheckCard } from "@/components/check-card";
+import { FleetSlaSummary } from "@/components/sla";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import type { CheckWithStatus } from "@/lib/types";
 
@@ -60,6 +61,14 @@ function StatusGrid() {
   const router = useRouter();
   const params = useSearchParams();
   const { data, error, isLoading } = useChecks();
+  const { data: sla24h } = useSla("24h");
+
+  // 24h availability per check, for the small badge on each card.
+  const availabilityByCheck = useMemo(() => {
+    const map = new Map<number, number | null>();
+    for (const row of sla24h ?? []) map.set(row.check_id, row.availability_pct);
+    return map;
+  }, [sla24h]);
 
   const status = (params.get("status") as StatusFilter) || "all";
   const kind = (params.get("kind") as KindFilter) || "all";
@@ -88,6 +97,8 @@ function StatusGrid() {
           + New monitor
         </Link>
       </header>
+
+      <FleetSlaSummary />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-0.5">
@@ -146,7 +157,7 @@ function StatusGrid() {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((c) => (
-            <CheckCard key={c.id} check={c} />
+            <CheckCard key={c.id} check={c} availability={availabilityByCheck.get(c.id) ?? null} />
           ))}
         </div>
       )}
