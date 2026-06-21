@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { createCheck, updateCheck, useFlows, ApiRequestError } from "@/lib/client";
-import type { Check, CheckKind, LighthouseFormFactor } from "@/lib/types";
+import type { Check, CheckKind, HttpMethod, LighthouseFormFactor } from "@/lib/types";
 
 interface Props {
   initial?: Check | null;
@@ -11,15 +11,20 @@ interface Props {
   onCancel: () => void;
 }
 
+type SeverityOpt = "warning" | "critical";
+
 interface FormState {
   name: string;
   kind: CheckKind;
   target_url: string;
-  flow: string;
+  flow_name: string;
+  method: HttpMethod;
+  expected_status: string;
+  body_must_contain: string;
   interval_seconds: string;
   timeout_ms: string;
-  latency_warn_ms: string;
   failure_threshold: string;
+  severity: SeverityOpt;
   enabled: boolean;
   lighthouse_enabled: boolean;
   lighthouse_interval_seconds: string;
@@ -35,21 +40,37 @@ function numOrNull(s: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function asMethod(m: string | undefined): HttpMethod {
+  const allowed: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"];
+  return allowed.includes(m as HttpMethod) ? (m as HttpMethod) : "GET";
+}
+
+function asFormFactor(f: string | undefined): LighthouseFormFactor {
+  return f === "mobile" ? "mobile" : "desktop";
+}
+
+function asSeverity(s: string | undefined): SeverityOpt {
+  return s === "warning" ? "warning" : "critical";
+}
+
 function fromCheck(c: Check | null | undefined): FormState {
   return {
     name: c?.name ?? "",
     kind: c?.kind ?? "http",
     target_url: c?.target_url ?? "",
-    flow: c?.flow ?? "",
+    flow_name: c?.flow_name ?? "",
+    method: asMethod(c?.method),
+    expected_status: String(c?.expected_status ?? 200),
+    body_must_contain: c?.body_must_contain ?? "",
     interval_seconds: String(c?.interval_seconds ?? 300),
     timeout_ms: String(c?.timeout_ms ?? 30000),
-    latency_warn_ms: c?.latency_warn_ms != null ? String(c.latency_warn_ms) : "",
-    failure_threshold: String(c?.failure_threshold ?? 1),
+    failure_threshold: String(c?.failure_threshold ?? 3),
+    severity: asSeverity(c?.severity),
     enabled: c?.enabled ?? true,
     lighthouse_enabled: c?.lighthouse_enabled ?? false,
     lighthouse_interval_seconds:
       c?.lighthouse_interval_seconds != null ? String(c.lighthouse_interval_seconds) : "",
-    lighthouse_form_factor: c?.lighthouse_form_factor ?? "mobile",
+    lighthouse_form_factor: asFormFactor(c?.lighthouse_form_factor),
     perf_budget_lcp_ms: c?.perf_budget_lcp_ms != null ? String(c.perf_budget_lcp_ms) : "",
     perf_budget_transfer_bytes:
       c?.perf_budget_transfer_bytes != null ? String(c.perf_budget_transfer_bytes) : "",
@@ -102,9 +123,7 @@ function Toggle({
     >
       <span
         className="relative h-5 w-9 rounded-full transition"
-        style={{
-          background: checked ? "var(--color-brand)" : "var(--color-border-strong)",
-        }}
+        style={{ background: checked ? "var(--color-brand)" : "var(--color-border-strong)" }}
       >
         <span
           className="absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all"
@@ -152,26 +171,30 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
       setError("Name is required.");
       return;
     }
-    if (form.kind === "http" && form.target_url.trim() === "") {
-      setError("HTTP checks require a target URL.");
+    // target_url is NOT NULL in the schema — required for every check.
+    if (form.target_url.trim() === "") {
+      setError("A target URL is required.");
       return;
     }
 
     const payload = {
       name: form.name.trim(),
       kind: form.kind,
-      target_url: form.target_url.trim() || null,
-      flow: form.kind === "browser" ? form.flow.trim() || null : null,
+      target_url: form.target_url.trim(),
+      flow_name: form.kind === "browser" ? form.flow_name.trim() || null : null,
+      method: form.method,
+      expected_status: numOrNull(form.expected_status) ?? 200,
+      body_must_contain: form.kind === "http" ? form.body_must_contain.trim() || null : null,
       interval_seconds: numOrNull(form.interval_seconds) ?? 300,
       timeout_ms: numOrNull(form.timeout_ms) ?? 30000,
-      latency_warn_ms: numOrNull(form.latency_warn_ms),
-      failure_threshold: numOrNull(form.failure_threshold) ?? 1,
+      failure_threshold: numOrNull(form.failure_threshold) ?? 3,
+      severity: form.severity,
       enabled: form.enabled,
       lighthouse_enabled: form.lighthouse_enabled,
       lighthouse_interval_seconds: form.lighthouse_enabled
         ? numOrNull(form.lighthouse_interval_seconds)
         : null,
-      lighthouse_form_factor: form.lighthouse_enabled ? form.lighthouse_form_factor : null,
+      lighthouse_form_factor: form.lighthouse_form_factor,
       perf_budget_lcp_ms: numOrNull(form.perf_budget_lcp_ms),
       perf_budget_transfer_bytes: numOrNull(form.perf_budget_transfer_bytes),
     };
@@ -230,6 +253,17 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
             ]}
           />
         </div>
+        <div>
+          <span className="sw-label">Severity</span>
+          <Segmented
+            value={form.severity}
+            onChange={(v) => set("severity", v)}
+            options={[
+              { value: "warning", label: "Warning" },
+              { value: "critical", label: "Critical" },
+            ]}
+          />
+        </div>
         <div className="pt-5">
           <Toggle
             checked={form.enabled}
@@ -241,7 +275,7 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
 
       <Field
         label="Target URL"
-        hint={form.kind === "browser" ? "Optional for browser flows." : "Required for HTTP checks."}
+        hint={form.kind === "browser" ? "Entry URL for the browser flow." : "Endpoint to probe."}
       >
         <input
           className="sw-input"
@@ -260,8 +294,8 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
           <input
             className="sw-input"
             list="sw-flows"
-            value={form.flow}
-            onChange={(e) => set("flow", e.target.value)}
+            value={form.flow_name}
+            onChange={(e) => set("flow_name", e.target.value)}
             placeholder="signup_to_paid"
           />
           <datalist id="sw-flows">
@@ -272,7 +306,44 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
         </Field>
       )}
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      {form.kind === "http" && (
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+          <div className="mb-3 sw-eyebrow">HTTP assertion</div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <span className="sw-label">Method</span>
+              <Segmented
+                value={form.method}
+                onChange={(v) => set("method", v)}
+                options={[
+                  { value: "GET", label: "GET" },
+                  { value: "POST", label: "POST" },
+                  { value: "HEAD", label: "HEAD" },
+                ]}
+              />
+            </div>
+            <Field label="Expected status">
+              <input
+                className="sw-input sw-mono"
+                value={form.expected_status}
+                onChange={(e) => set("expected_status", e.target.value)}
+                inputMode="numeric"
+                placeholder="200"
+              />
+            </Field>
+            <Field label="Body must contain">
+              <input
+                className="sw-input"
+                value={form.body_must_contain}
+                onChange={(e) => set("body_must_contain", e.target.value)}
+                placeholder="ok"
+              />
+            </Field>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-4">
         <Field label="Interval (s)">
           <input
             className="sw-input sw-mono"
@@ -286,15 +357,6 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
             className="sw-input sw-mono"
             value={form.timeout_ms}
             onChange={(e) => set("timeout_ms", e.target.value)}
-            inputMode="numeric"
-          />
-        </Field>
-        <Field label="Warn at (ms)">
-          <input
-            className="sw-input sw-mono"
-            value={form.latency_warn_ms}
-            onChange={(e) => set("latency_warn_ms", e.target.value)}
-            placeholder="—"
             inputMode="numeric"
           />
         </Field>

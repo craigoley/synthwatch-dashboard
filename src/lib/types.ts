@@ -1,45 +1,47 @@
 /**
  * API response types — the JSON shapes the /api/* route handlers return and the
  * client components consume. These differ from the raw DB row types in
- * `db-types.ts` in one important way: timestamps are serialized to ISO strings
- * over JSON (pg returns `Date`, `NextResponse.json` stringifies them).
+ * `db-types.ts` in two ways:
+ *  1. timestamps are serialized to ISO strings over JSON (pg returns `Date`,
+ *     `NextResponse.json` stringifies them);
+ *  2. enum-like columns are typed as plain `string` in the generated db-types,
+ *     but the runner constrains them — so we narrow them to unions HERE for the
+ *     UI, since these literals drive colors/labels/segmented controls.
  *
  * Components import ONLY from here (and never from `db-types.ts` / `db.ts`),
  * which keeps the database client out of the React bundle.
  */
 
-import type {
-  CheckKind,
-  IncidentSeverity,
-  LighthouseFormFactor,
-  RunStatus,
-  RunStepStatus,
-} from "@/db-types";
+// ─── UI enums (runner-constrained; generated db-types calls these `string`) ────
 
-export type {
-  CheckKind,
-  IncidentSeverity,
-  LighthouseFormFactor,
-  RunStatus,
-  RunStepStatus,
-};
+export type CheckKind = "http" | "browser";
+export type RunStatus = "running" | "pass" | "warn" | "fail" | "error";
+export type RunStepStatus = "pass" | "fail" | "skip";
+export type IncidentSeverity = "warning" | "critical";
+export type IncidentStatus = "open" | "resolved";
+export type LighthouseFormFactor = "mobile" | "desktop";
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD";
 
 /** A check as configured (timestamps as ISO strings). */
 export interface Check {
   id: number;
   name: string;
   kind: CheckKind;
-  target_url: string | null;
-  flow: string | null;
+  target_url: string;
+  flow_name: string | null;
+  method: string;
+  expected_status: number;
+  body_must_contain: string | null;
   interval_seconds: number;
-  timeout_ms: number;
-  latency_warn_ms: number | null;
-  enabled: boolean;
-  failure_threshold: number;
   last_run_at: string | null;
+  timeout_ms: number;
+  failure_threshold: number;
+  severity: string;
+  enabled: boolean;
+  created_at: string;
   lighthouse_enabled: boolean;
   lighthouse_interval_seconds: number | null;
-  lighthouse_form_factor: LighthouseFormFactor | null;
+  lighthouse_form_factor: string;
   perf_budget_lcp_ms: number | null;
   perf_budget_transfer_bytes: number | null;
 }
@@ -71,13 +73,14 @@ export interface CheckWithStatus extends Check {
 export interface Run {
   id: number;
   check_id: number;
+  status: RunStatus;
   started_at: string;
   finished_at: string | null;
-  status: RunStatus;
   duration_ms: number | null;
-  runner_id: string | null;
+  http_status: number | null;
   error_message: string | null;
-  artifact_url: string | null;
+  failed_step: string | null;
+  screenshot_url: string | null;
 }
 
 /** Check detail payload: the check plus its most recent runs. */
@@ -90,16 +93,17 @@ export interface RunStep {
   id: number;
   run_id: number;
   step_index: number;
-  label: string;
+  name: string;
   status: RunStepStatus;
-  duration_ms: number | null;
-  detail: string | null;
+  duration_ms: number;
+  error_message: string | null;
+  started_at: string;
 }
 
 /** A run_metrics row joined with its run timestamp, for time-series charts. */
 export interface MetricPoint {
   run_id: number;
-  captured_at: string | null;
+  captured_at: string;
   started_at: string;
   status: RunStatus;
   ttfb_ms: number | null;
@@ -119,9 +123,13 @@ export interface MetricPoint {
 export interface IncidentWithCheck {
   id: number;
   check_id: number;
+  status: string;
+  severity: IncidentSeverity;
   opened_at: string;
   resolved_at: string | null;
-  severity: IncidentSeverity;
+  opened_run_id: number | null;
+  resolved_run_id: number | null;
+  consecutive_failures: number;
   summary: string | null;
   check_name: string;
   check_kind: CheckKind;

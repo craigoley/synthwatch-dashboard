@@ -50,7 +50,7 @@ React bundle. Fluid Compute closes idle connections before suspend via
 | GET | `/api/checks/[id]/metrics` | `run_metrics` time series for charts |
 | GET | `/api/runs/[id]/steps` | `run_steps` for the funnel stage-bar |
 | GET | `/api/incidents` | open + resolved incidents, joined to their check |
-| GET | `/api/flows` | distinct non-null `checks.flow` values |
+| GET | `/api/flows` | distinct non-null `checks.flow_name` values |
 
 Writes are validated (zod, `src/lib/schemas.ts`). Errors return proper status
 codes; raw DB errors are logged server-side and **never** leaked to the client.

@@ -89,15 +89,16 @@ export async function POST(req: NextRequest): Promise<Response> {
     const body: unknown = await req.json().catch(() => ({}));
     const data = createCheckSchema.parse(body);
 
+    // `id` and `created_at` are GENERATED/defaulted by the DB — never inserted.
     const result = await query(
       `
       INSERT INTO checks (
-        name, kind, target_url, flow, interval_seconds, timeout_ms,
-        latency_warn_ms, enabled, failure_threshold, lighthouse_enabled,
-        lighthouse_interval_seconds, lighthouse_form_factor,
-        perf_budget_lcp_ms, perf_budget_transfer_bytes
+        name, kind, target_url, flow_name, method, expected_status,
+        body_must_contain, interval_seconds, timeout_ms, failure_threshold,
+        severity, enabled, lighthouse_enabled, lighthouse_interval_seconds,
+        lighthouse_form_factor, perf_budget_lcp_ms, perf_budget_transfer_bytes
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
       )
       RETURNING *
       `,
@@ -105,12 +106,15 @@ export async function POST(req: NextRequest): Promise<Response> {
         data.name,
         data.kind,
         data.target_url,
-        data.flow,
+        data.flow_name,
+        data.method,
+        data.expected_status,
+        data.body_must_contain,
         data.interval_seconds,
         data.timeout_ms,
-        data.latency_warn_ms,
-        data.enabled,
         data.failure_threshold,
+        data.severity,
+        data.enabled,
         data.lighthouse_enabled,
         data.lighthouse_interval_seconds,
         data.lighthouse_form_factor,

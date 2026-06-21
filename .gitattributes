@@ -1,0 +1,9 @@
+# Normalize line endings to LF across the repo. pg-to-ts emits CRLF on some
+# platforms; this keeps the committed, generated src/db-types.ts diff clean.
+* text=auto eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.css text eol=lf
+pnpm-lock.yaml text eol=lf
