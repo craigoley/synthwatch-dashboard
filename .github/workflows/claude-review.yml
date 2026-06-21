@@ -76,12 +76,18 @@ jobs:
                 `pnpm typecheck` / `pnpm build` where relevant), then squash-merge:
                 `gh pr merge --squash --delete-branch`.
               - Otherwise leave the comments for the author and do not merge.
-          # --allowedTools value is intentionally UNQUOTED: quotes inside a block
-          # scalar become part of the argument and Claude would match no tools.
-          # Bash(gh pr:*) already covers gh pr comment/diff/view/merge; the explicit
-          # entries are listed too for unambiguous intent.
+          # --allowedTools MUST be a single QUOTED value. claude_args is parsed with
+          # shell-quote, which splits on UNQUOTED whitespace (it escapes () but not
+          # spaces). So any tool pattern containing a space — Bash(gh pr:*),
+          # Bash(gh pr merge:*), Bash(gh api:*), Bash(npx tsc:*) — gets shredded into
+          # invalid fragments ("Bash(gh", "pr:*)", ...) and silently dropped. That was
+          # the root cause of the earlier no-op: gh pr comment/merge were never allowed,
+          # so the review posted nothing and never merged (17 permission denials).
+          # Wrapping the whole comma-list in double quotes keeps it one token; the action
+          # then comma-splits it, so each pattern survives intact. Bash(gh pr:*) already
+          # covers gh pr comment/diff/view/merge.
           # --model belongs in claude_args (there is no valid top-level --model input).
           claude_args: |
             --model claude-opus-4-8
             --max-turns 50
-            --allowedTools Edit,Write,Read,Bash(git:*),Bash(gh pr:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr merge:*),Bash(gh api:*),Bash(pnpm:*),Bash(npx tsc:*),mcp__github_inline_comment__create_inline_comment
+            --allowedTools "Edit,Write,Read,Bash(git:*),Bash(gh pr:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr merge:*),Bash(gh api:*),Bash(pnpm:*),Bash(npx tsc:*),mcp__github_inline_comment__create_inline_comment"
