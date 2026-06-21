@@ -15,7 +15,7 @@
     "gen:types": "pg-to-ts generate -c \"$DATABASE_URL\" -t checks runs run_steps run_metrics incidents -o src/db-types.ts"
   },
   "dependencies": {
-    "@vercel/functions": "^2.0.0",
+    "@vercel/functions": "^3.7.2",
     "next": "15.5.18",
     "pg": "^8.13.1",
     "react": "19.1.1",
