@@ -200,3 +200,5 @@ src/
 
 Next.js (App Router) · TypeScript (strict) · Tailwind CSS v4 · recharts · SWR ·
 `pg` · `@vercel/functions` · zod · pnpm.
+
+<!-- claude-review end-to-end validation: trivial docs touch, safe to merge. -->
