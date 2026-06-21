@@ -25,9 +25,9 @@ function ConfigChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** SSL-only: the cert's days-remaining, parsed from the latest run's message. */
+/** SSL-only: the cert's days-remaining from the latest run's structured field. */
 function CertPanel({ check, latest }: { check: Check; latest: Run | null }) {
-  const expiry = formatCertExpiry(latest?.error_message);
+  const expiry = formatCertExpiry(latest?.cert_days_remaining);
   const tone = TONE_VAR[runStatusMeta(latest?.status ?? null).token];
   return (
     <div className="sw-panel p-4">

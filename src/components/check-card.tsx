@@ -5,7 +5,7 @@ import { StatusBadge, TONE_VAR } from "@/components/status-badge";
 import { Sparkline } from "@/components/sparkline";
 import { AvailabilityValue } from "@/components/sla";
 import { runStatusMeta } from "@/lib/status";
-import { formatDuration, formatRelative } from "@/lib/format";
+import { formatCertExpiry, formatDuration, formatRelative } from "@/lib/format";
 
 const RAIL: Record<string, string> = TONE_VAR;
 
@@ -45,6 +45,11 @@ export function CheckCard({
               </span>
             )}
           </div>
+          {check.kind === "ssl" && (
+            <div className="mt-1.5 sw-mono text-[12px]" style={{ color: TONE_VAR[meta.token] }}>
+              {formatCertExpiry(check.last_cert_days_remaining) ?? "no cert reading"}
+            </div>
+          )}
         </div>
         {/* Two distinct facts, labeled so they don't read as contradictory:
             the badge is the LATEST run's state; the % is 24h historical uptime. */}
