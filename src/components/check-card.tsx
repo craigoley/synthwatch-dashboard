@@ -44,11 +44,16 @@ export function CheckCard({
             )}
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <StatusBadge status={check.current_status} />
-          <span className="flex items-center gap-1">
+        {/* Two distinct facts, labeled so they don't read as contradictory:
+            the badge is the LATEST run's state; the % is 24h historical uptime. */}
+        <div className="flex flex-col items-end gap-1.5">
+          <span className="flex items-center gap-1.5">
+            <span className="text-[9px] uppercase tracking-wider text-[var(--color-ink-faint)]">latest</span>
+            <StatusBadge status={check.current_status} />
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="text-[9px] uppercase tracking-wider text-[var(--color-ink-faint)]">24h avail</span>
             <SlaPercent pct={availability} className="text-[11px]" />
-            <span className="text-[9px] uppercase tracking-wider text-[var(--color-ink-faint)]">24h</span>
           </span>
         </div>
       </div>
