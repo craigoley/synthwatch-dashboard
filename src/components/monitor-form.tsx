@@ -1,0 +1,377 @@
+"use client";
+
+import { useState } from "react";
+
+import { createCheck, updateCheck, useFlows, ApiRequestError } from "@/lib/client";
+import type { Check, CheckKind, LighthouseFormFactor } from "@/lib/types";
+
+interface Props {
+  initial?: Check | null;
+  onDone: () => void;
+  onCancel: () => void;
+}
+
+interface FormState {
+  name: string;
+  kind: CheckKind;
+  target_url: string;
+  flow: string;
+  interval_seconds: string;
+  timeout_ms: string;
+  latency_warn_ms: string;
+  failure_threshold: string;
+  enabled: boolean;
+  lighthouse_enabled: boolean;
+  lighthouse_interval_seconds: string;
+  lighthouse_form_factor: LighthouseFormFactor;
+  perf_budget_lcp_ms: string;
+  perf_budget_transfer_bytes: string;
+}
+
+function numOrNull(s: string): number | null {
+  const t = s.trim();
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+function fromCheck(c: Check | null | undefined): FormState {
+  return {
+    name: c?.name ?? "",
+    kind: c?.kind ?? "http",
+    target_url: c?.target_url ?? "",
+    flow: c?.flow ?? "",
+    interval_seconds: String(c?.interval_seconds ?? 300),
+    timeout_ms: String(c?.timeout_ms ?? 30000),
+    latency_warn_ms: c?.latency_warn_ms != null ? String(c.latency_warn_ms) : "",
+    failure_threshold: String(c?.failure_threshold ?? 1),
+    enabled: c?.enabled ?? true,
+    lighthouse_enabled: c?.lighthouse_enabled ?? false,
+    lighthouse_interval_seconds:
+      c?.lighthouse_interval_seconds != null ? String(c.lighthouse_interval_seconds) : "",
+    lighthouse_form_factor: c?.lighthouse_form_factor ?? "mobile",
+    perf_budget_lcp_ms: c?.perf_budget_lcp_ms != null ? String(c.perf_budget_lcp_ms) : "",
+    perf_budget_transfer_bytes:
+      c?.perf_budget_transfer_bytes != null ? String(c.perf_budget_transfer_bytes) : "",
+  };
+}
+
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+            value === o.value
+              ? "bg-[var(--color-panel-2)] text-[var(--color-ink)]"
+              : "text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="flex items-center gap-2.5 text-sm"
+    >
+      <span
+        className="relative h-5 w-9 rounded-full transition"
+        style={{
+          background: checked ? "var(--color-brand)" : "var(--color-border-strong)",
+        }}
+      >
+        <span
+          className="absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all"
+          style={{ left: checked ? "18px" : "2px" }}
+        />
+      </span>
+      <span className="text-[var(--color-ink-dim)]">{label}</span>
+    </button>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="sw-label">{label}</span>
+      {children}
+      {hint && <span className="mt-1 block text-[11px] text-[var(--color-ink-faint)]">{hint}</span>}
+    </label>
+  );
+}
+
+export function MonitorForm({ initial, onDone, onCancel }: Props) {
+  const [form, setForm] = useState<FormState>(() => fromCheck(initial));
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { data: flows } = useFlows();
+
+  const isEdit = Boolean(initial);
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (form.name.trim() === "") {
+      setError("Name is required.");
+      return;
+    }
+    if (form.kind === "http" && form.target_url.trim() === "") {
+      setError("HTTP checks require a target URL.");
+      return;
+    }
+
+    const payload = {
+      name: form.name.trim(),
+      kind: form.kind,
+      target_url: form.target_url.trim() || null,
+      flow: form.kind === "browser" ? form.flow.trim() || null : null,
+      interval_seconds: numOrNull(form.interval_seconds) ?? 300,
+      timeout_ms: numOrNull(form.timeout_ms) ?? 30000,
+      latency_warn_ms: numOrNull(form.latency_warn_ms),
+      failure_threshold: numOrNull(form.failure_threshold) ?? 1,
+      enabled: form.enabled,
+      lighthouse_enabled: form.lighthouse_enabled,
+      lighthouse_interval_seconds: form.lighthouse_enabled
+        ? numOrNull(form.lighthouse_interval_seconds)
+        : null,
+      lighthouse_form_factor: form.lighthouse_enabled ? form.lighthouse_form_factor : null,
+      perf_budget_lcp_ms: numOrNull(form.perf_budget_lcp_ms),
+      perf_budget_transfer_bytes: numOrNull(form.perf_budget_transfer_bytes),
+    };
+
+    setSubmitting(true);
+    try {
+      if (isEdit && initial) {
+        await updateCheck(initial.id, payload);
+      } else {
+        await createCheck(payload);
+      }
+      onDone();
+    } catch (err) {
+      const msg =
+        err instanceof ApiRequestError ? err.message : "Failed to save monitor. Please try again.";
+      setError(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-5">
+      {error && (
+        <div
+          className="rounded-lg px-3 py-2 text-sm"
+          style={{
+            background: "color-mix(in srgb, var(--color-fail) 12%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--color-fail) 40%, transparent)",
+            color: "var(--color-fail)",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      <Field label="Name">
+        <input
+          className="sw-input"
+          value={form.name}
+          onChange={(e) => set("name", e.target.value)}
+          placeholder="Checkout flow — production"
+          autoFocus
+        />
+      </Field>
+
+      <div className="flex flex-wrap items-center gap-6">
+        <div>
+          <span className="sw-label">Kind</span>
+          <Segmented
+            value={form.kind}
+            onChange={(v) => set("kind", v)}
+            options={[
+              { value: "http", label: "HTTP" },
+              { value: "browser", label: "Browser" },
+            ]}
+          />
+        </div>
+        <div className="pt-5">
+          <Toggle
+            checked={form.enabled}
+            onChange={(v) => set("enabled", v)}
+            label={form.enabled ? "Enabled" : "Paused"}
+          />
+        </div>
+      </div>
+
+      <Field
+        label="Target URL"
+        hint={form.kind === "browser" ? "Optional for browser flows." : "Required for HTTP checks."}
+      >
+        <input
+          className="sw-input"
+          value={form.target_url}
+          onChange={(e) => set("target_url", e.target.value)}
+          placeholder="https://example.com/health"
+          inputMode="url"
+        />
+      </Field>
+
+      {form.kind === "browser" && (
+        <Field
+          label="Flow"
+          hint="Pick a known flow or type a new one. TODO: source flows from the runner-emitted manifest, not the checks table."
+        >
+          <input
+            className="sw-input"
+            list="sw-flows"
+            value={form.flow}
+            onChange={(e) => set("flow", e.target.value)}
+            placeholder="signup_to_paid"
+          />
+          <datalist id="sw-flows">
+            {(flows ?? []).map((f) => (
+              <option key={f} value={f} />
+            ))}
+          </datalist>
+        </Field>
+      )}
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <Field label="Interval (s)">
+          <input
+            className="sw-input sw-mono"
+            value={form.interval_seconds}
+            onChange={(e) => set("interval_seconds", e.target.value)}
+            inputMode="numeric"
+          />
+        </Field>
+        <Field label="Timeout (ms)">
+          <input
+            className="sw-input sw-mono"
+            value={form.timeout_ms}
+            onChange={(e) => set("timeout_ms", e.target.value)}
+            inputMode="numeric"
+          />
+        </Field>
+        <Field label="Warn at (ms)">
+          <input
+            className="sw-input sw-mono"
+            value={form.latency_warn_ms}
+            onChange={(e) => set("latency_warn_ms", e.target.value)}
+            placeholder="—"
+            inputMode="numeric"
+          />
+        </Field>
+        <Field label="Fail threshold">
+          <input
+            className="sw-input sw-mono"
+            value={form.failure_threshold}
+            onChange={(e) => set("failure_threshold", e.target.value)}
+            inputMode="numeric"
+          />
+        </Field>
+      </div>
+
+      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="sw-eyebrow">Lighthouse</span>
+          <Toggle
+            checked={form.lighthouse_enabled}
+            onChange={(v) => set("lighthouse_enabled", v)}
+            label={form.lighthouse_enabled ? "On" : "Off"}
+          />
+        </div>
+        {form.lighthouse_enabled && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="LH interval (s)">
+              <input
+                className="sw-input sw-mono"
+                value={form.lighthouse_interval_seconds}
+                onChange={(e) => set("lighthouse_interval_seconds", e.target.value)}
+                inputMode="numeric"
+                placeholder="3600"
+              />
+            </Field>
+            <div>
+              <span className="sw-label">Form factor</span>
+              <Segmented
+                value={form.lighthouse_form_factor}
+                onChange={(v) => set("lighthouse_form_factor", v)}
+                options={[
+                  { value: "mobile", label: "Mobile" },
+                  { value: "desktop", label: "Desktop" },
+                ]}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Perf budget — LCP (ms)" hint="Optional regression budget.">
+          <input
+            className="sw-input sw-mono"
+            value={form.perf_budget_lcp_ms}
+            onChange={(e) => set("perf_budget_lcp_ms", e.target.value)}
+            inputMode="numeric"
+            placeholder="2500"
+          />
+        </Field>
+        <Field label="Perf budget — transfer (bytes)" hint="Optional page-weight budget.">
+          <input
+            className="sw-input sw-mono"
+            value={form.perf_budget_transfer_bytes}
+            onChange={(e) => set("perf_budget_transfer_bytes", e.target.value)}
+            inputMode="numeric"
+            placeholder="1500000"
+          />
+        </Field>
+      </div>
+
+      <div className="flex items-center justify-end gap-2 border-t border-[var(--color-border)] pt-4">
+        <button type="button" onClick={onCancel} className="sw-btn">
+          Cancel
+        </button>
+        <button type="submit" disabled={submitting} className="sw-btn sw-btn-primary">
+          {submitting ? "Saving…" : isEdit ? "Save changes" : "Create monitor"}
+        </button>
+      </div>
+    </form>
+  );
+}
