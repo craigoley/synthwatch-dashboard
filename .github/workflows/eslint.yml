@@ -1,0 +1,35 @@
+name: ESLint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  eslint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Use the repo-pinned pnpm (packageManager: pnpm@10.x) via corepack so the
+      # security workflows never drift from the version Vercel uses.
+      - name: Enable corepack (pinned pnpm)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: ESLint (zero warnings)
+        run: pnpm lint

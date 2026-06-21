@@ -1,0 +1,20 @@
+name: OSV-Scanner (scheduled)
+
+# Full-tree scan on main + weekly schedule: runs the OSV reporter and uploads
+# SARIF to code scanning. Uses Google's official reusable scan workflow.
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, off-peak (Mon 06:17 UTC — not :00/:30).
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  scan-scheduled:
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.8
