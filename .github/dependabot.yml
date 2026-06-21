@@ -1,0 +1,30 @@
+version: 2
+updates:
+  # npm dependencies — grouped minor/patch to reduce PR noise; majors separate.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 10
+    groups:
+      npm-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # GitHub Actions used by the workflows above — grouped minor/patch.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    groups:
+      actions-minor-and-patch:
+        update-types:
+          - minor
+          - patch

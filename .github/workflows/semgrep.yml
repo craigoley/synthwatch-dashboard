@@ -1,0 +1,51 @@
+name: Semgrep
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, off-peak (Mon 05:23 UTC — not :00/:30).
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to code scanning
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Semgrep CE
+        run: pip install --quiet semgrep
+
+      - name: Run Semgrep (Next.js + security rulesets)
+        # Standalone Semgrep CE — no token / no app connection.
+        # Non-blocking here: findings are surfaced via SARIF in the Security tab.
+        continue-on-error: true
+        run: >-
+          semgrep scan
+          --config p/default
+          --config p/security-audit
+          --config p/nextjs
+          --sarif --output semgrep.sarif
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
