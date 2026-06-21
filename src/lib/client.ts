@@ -1,47 +1,42 @@
 "use client";
 
 /**
- * Client-side data layer. Components fetch the app's OWN /api/* endpoints with
- * SWR (relative URLs in the browser) — they NEVER touch Postgres. Auto-refresh
- * is what makes this a live monitoring console; all state is server state +
- * URL params, no browser storage.
+ * React/SWR data layer. This is the caching + auto-refresh layer that the live
+ * monitoring UI uses. It owns NO transport details: every request is delegated
+ * to the typed functions in src/lib/api-client.ts (the single API seam). There
+ * are deliberately no `/api/...` URLs or `fetch` calls here — only api-client.ts
+ * builds URLs. SWR cache keys are logical identifiers, not URLs, so they survive
+ * the future base-URL swap unchanged.
+ *
+ * All state is server state + URL params (no browser storage).
  */
 
 import useSWR, { type SWRConfiguration, mutate as globalMutate } from "swr";
 
-import type {
-  CheckDetail,
-  CheckWithStatus,
-  IncidentsResponse,
-  MetricPoint,
-  RunStep,
-  RunsPage,
-} from "@/lib/types";
+import {
+  listChecks,
+  getCheck,
+  getRuns,
+  getSteps,
+  getMetrics,
+  listIncidents,
+  listFlows,
+  createCheck as apiCreateCheck,
+  updateCheck as apiUpdateCheck,
+  deleteCheck as apiDeleteCheck,
+} from "@/lib/api-client";
 import type { CreateCheckInput, UpdateCheckInput } from "@/lib/schemas";
 
-export class ApiRequestError extends Error {
-  status: number;
-  details: unknown;
-  constructor(message: string, status: number, details?: unknown) {
-    super(message);
-    this.status = status;
-    this.details = details;
-  }
-}
-
-async function fetcher<T>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: { accept: "application/json" } });
-  if (!res.ok) {
-    let body: { error?: string; details?: unknown } = {};
-    try {
-      body = await res.json();
-    } catch {
-      /* non-JSON error body */
-    }
-    throw new ApiRequestError(body.error ?? `Request failed (${res.status})`, res.status, body.details);
-  }
-  return res.json() as Promise<T>;
-}
+// Logical SWR cache keys (NOT URLs). Centralized so reads and revalidation agree.
+const keys = {
+  checks: ["checks"] as const,
+  check: (id: number) => ["check", id] as const,
+  runs: (id: number, limit: number, offset: number) => ["runs", id, limit, offset] as const,
+  steps: (runId: number) => ["steps", runId] as const,
+  metrics: (id: number) => ["metrics", id] as const,
+  incidents: ["incidents"] as const,
+  flows: ["flows"] as const,
+};
 
 // Live dashboards: refresh on an interval, revalidate when the tab refocuses.
 const live: SWRConfiguration = {
@@ -50,88 +45,65 @@ const live: SWRConfiguration = {
   keepPreviousData: true,
 };
 
+// ─── read hooks ────────────────────────────────────────────────────────────────
+
 export function useChecks() {
-  return useSWR<CheckWithStatus[]>("/api/checks", fetcher, live);
+  return useSWR(keys.checks, () => listChecks(), live);
 }
 
 export function useCheck(id: number | null) {
-  return useSWR<CheckDetail>(id ? `/api/checks/${id}` : null, fetcher, live);
+  return useSWR(id ? keys.check(id) : null, () => getCheck(id as number), live);
 }
 
 export function useRuns(id: number | null, limit = 50, offset = 0) {
-  return useSWR<RunsPage>(
-    id ? `/api/checks/${id}/runs?limit=${limit}&offset=${offset}` : null,
-    fetcher,
+  return useSWR(
+    id ? keys.runs(id, limit, offset) : null,
+    () => getRuns(id as number, { limit, offset }),
     live,
   );
 }
 
 export function useRunSteps(runId: number | null) {
-  return useSWR<RunStep[]>(runId ? `/api/runs/${runId}/steps` : null, fetcher);
+  return useSWR(runId ? keys.steps(runId) : null, () => getSteps(runId as number));
 }
 
 export function useMetrics(id: number | null) {
-  return useSWR<MetricPoint[]>(id ? `/api/checks/${id}/metrics` : null, fetcher, live);
+  return useSWR(id ? keys.metrics(id) : null, () => getMetrics(id as number), live);
 }
 
 export function useIncidents() {
-  return useSWR<IncidentsResponse>("/api/incidents", fetcher, live);
+  return useSWR(keys.incidents, () => listIncidents(), live);
 }
 
 export function useFlows() {
-  return useSWR<string[]>("/api/flows", fetcher, { revalidateOnFocus: false });
+  return useSWR(keys.flows, () => listFlows(), { revalidateOnFocus: false });
 }
 
-// ─── mutations ───────────────────────────────────────────────────────────────
-
-async function mutateRequest<T>(url: string, method: string, body?: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method,
-    headers: { "content-type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!res.ok) {
-    let payload: { error?: string; details?: unknown } = {};
-    try {
-      payload = await res.json();
-    } catch {
-      /* ignore */
-    }
-    throw new ApiRequestError(
-      payload.error ?? `Request failed (${res.status})`,
-      res.status,
-      payload.details,
-    );
-  }
-  return res.json() as Promise<T>;
-}
+// ─── mutations (transport via api-client, then refresh affected caches) ─────────
 
 /** Revalidate the lists/detail that a write affects. */
 export async function revalidateChecks(id?: number) {
   await Promise.all([
-    globalMutate("/api/checks"),
-    globalMutate("/api/flows"),
-    id ? globalMutate(`/api/checks/${id}`) : Promise.resolve(),
+    globalMutate(keys.checks),
+    globalMutate(keys.flows),
+    id != null ? globalMutate(keys.check(id)) : Promise.resolve(),
   ]);
 }
 
 export async function createCheck(input: CreateCheckInput) {
-  const result = await mutateRequest("/api/checks", "POST", input);
+  const result = await apiCreateCheck(input);
   await revalidateChecks();
   return result;
 }
 
 export async function updateCheck(id: number, input: UpdateCheckInput) {
-  const result = await mutateRequest(`/api/checks/${id}`, "PATCH", input);
+  const result = await apiUpdateCheck(id, input);
   await revalidateChecks(id);
   return result;
 }
 
 export async function deleteCheck(id: number, hard = false) {
-  const result = await mutateRequest(
-    `/api/checks/${id}${hard ? "?hard=true" : ""}`,
-    "DELETE",
-  );
+  const result = await apiDeleteCheck(id, hard);
   await revalidateChecks(id);
   return result;
 }
