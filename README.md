@@ -37,6 +37,16 @@ component is a build-time error — that is the guard that keeps Postgres out of
 React bundle. Fluid Compute closes idle connections before suspend via
 `attachDatabasePool` from `@vercel/functions`.
 
+### API-client seam
+
+Components never call `fetch` directly either — every request goes through
+`src/lib/api-client.ts`, the single typed transport layer that owns the base URL,
+fetching, error handling, and JSON parsing. Today it targets the same-origin
+`/api/*` route handlers, so there is no behavior change. This is a strangler-fig
+seam for moving the backend to a standalone C# API on Azure: that migration
+becomes a one-env-var change (`NEXT_PUBLIC_API_BASE_URL`) plus deleting the route
+handlers, with no component edits.
+
 ### API routes (all server-side, Node runtime, `force-dynamic`)
 
 | Method | Route | Purpose |
