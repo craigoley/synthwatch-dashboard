@@ -6,7 +6,7 @@ import { useSla } from "@/lib/client";
 import { TONE_VAR } from "@/components/status-badge";
 import { availabilityTone } from "@/lib/status";
 import { formatCount, formatPct } from "@/lib/format";
-import type { SlaRow, SlaWindow } from "@/lib/types";
+import type { SlaFleet, SlaWindow } from "@/lib/types";
 
 const WINDOWS: SlaWindow[] = ["24h", "7d", "30d"];
 
@@ -26,40 +26,65 @@ export function SlaPercent({
   );
 }
 
-/** Run-weighted availability across a set of SLA rows (null if no runs). */
-function fleetPct(rows: SlaRow[] | undefined): number | null {
-  if (!rows || rows.length === 0) return null;
-  let up = 0;
-  let total = 0;
-  for (const r of rows) {
-    up += r.up_runs;
-    total += r.completed_runs;
+/**
+ * Renders availability for a window. When the API marks the window
+ * `insufficient_data` (not enough completed runs yet), show a calm
+ * "building baseline" label — neutral, NOT a red breach and NOT a number.
+ * Otherwise show the real percentage.
+ */
+export function AvailabilityValue({
+  pct,
+  insufficient,
+  className = "",
+  compact = false,
+}: {
+  pct: number | null;
+  insufficient: boolean;
+  className?: string;
+  compact?: boolean;
+}) {
+  if (insufficient) {
+    return (
+      <span
+        className={`sw-mono ${className} text-[var(--color-ink-faint)]`}
+        title="Building baseline — not enough completed runs in this window yet"
+      >
+        {compact ? "building…" : "building baseline"}
+      </span>
+    );
   }
-  if (total === 0) return null;
-  return (up / total) * 100;
+  return <SlaPercent pct={pct} className={className} />;
 }
 
-/** Top-line rolled-up fleet availability for each window (status grid header). */
+/**
+ * Top-line fleet availability per window. Consumes the API's server-computed
+ * (run-weighted) `fleet` object — no client-side count summation — so windows
+ * without enough history read "building baseline" instead of a misleading %.
+ */
 export function FleetSlaSummary() {
   const w24 = useSla("24h");
   const w7 = useSla("7d");
   const w30 = useSla("30d");
-  const byWindow: Record<SlaWindow, SlaRow[] | undefined> = {
-    "24h": w24.data,
-    "7d": w7.data,
-    "30d": w30.data,
+  const fleetByWindow: Record<SlaWindow, SlaFleet | null | undefined> = {
+    "24h": w24.data?.fleet,
+    "7d": w7.data?.fleet,
+    "30d": w30.data?.fleet,
   };
 
   return (
     <div className="sw-panel grid grid-cols-3 divide-x divide-[var(--color-border)] overflow-hidden">
       {WINDOWS.map((win) => {
-        const pct = fleetPct(byWindow[win]);
+        const fleet = fleetByWindow[win];
         return (
           <div key={win} className="px-4 py-3">
             <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
               Availability · {win}
             </div>
-            <SlaPercent pct={pct} className="mt-1 text-2xl font-medium" />
+            <AvailabilityValue
+              pct={fleet?.availability_pct ?? null}
+              insufficient={fleet?.insufficient_data ?? false}
+              className="mt-1 text-2xl font-medium"
+            />
           </div>
         );
       })}
@@ -74,13 +99,12 @@ export function CheckSlaPanel({ checkId }: { checkId: number }) {
   const w7 = useSla("7d");
   const w30 = useSla("30d");
 
-  const rowFor = (rows: SlaRow[] | undefined): SlaRow | undefined =>
-    rows?.find((r) => r.check_id === checkId);
-  const byWindow: Record<SlaWindow, SlaRow | undefined> = {
-    "24h": rowFor(w24.data),
-    "7d": rowFor(w7.data),
-    "30d": rowFor(w30.data),
-  };
+  const find = (resp: typeof w24.data) => resp?.items.find((r) => r.check_id === checkId);
+  const byWindow = {
+    "24h": find(w24.data),
+    "7d": find(w7.data),
+    "30d": find(w30.data),
+  } as const;
   const loading = w24.isLoading && w7.isLoading && w30.isLoading;
   const selected = byWindow[active];
 
@@ -123,13 +147,18 @@ export function CheckSlaPanel({ checkId }: { checkId: number }) {
               }}
             >
               <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">{win}</div>
-              <SlaPercent pct={row?.availability_pct ?? null} className="mt-0.5 text-lg font-medium" />
+              <AvailabilityValue
+                pct={row?.availability_pct ?? null}
+                insufficient={row?.insufficient_data ?? false}
+                className="mt-0.5 text-lg font-medium"
+              />
             </button>
           );
         })}
       </div>
 
-      {/* up / down / total for the selected window */}
+      {/* up / down / total for the selected window (counts exist even when the
+          percentage is still building a baseline) */}
       <div className="mt-3 grid grid-cols-3 gap-3 border-t border-[var(--color-border)] pt-3">
         <Stat label="Up" value={formatCount(selected?.up_runs)} tone="pass" />
         <Stat label="Down" value={formatCount(selected?.down_runs)} tone={selected && selected.down_runs > 0 ? "fail" : "idle"} />

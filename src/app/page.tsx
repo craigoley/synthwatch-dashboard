@@ -65,8 +65,9 @@ function StatusGrid() {
 
   // 24h availability per check, for the small badge on each card.
   const availabilityByCheck = useMemo(() => {
-    const map = new Map<number, number | null>();
-    for (const row of sla24h ?? []) map.set(row.check_id, row.availability_pct);
+    const map = new Map<number, { pct: number | null; insufficient: boolean }>();
+    for (const row of sla24h?.items ?? [])
+      map.set(row.check_id, { pct: row.availability_pct, insufficient: row.insufficient_data });
     return map;
   }, [sla24h]);
 
@@ -156,9 +157,17 @@ function StatusGrid() {
         />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((c) => (
-            <CheckCard key={c.id} check={c} availability={availabilityByCheck.get(c.id) ?? null} />
-          ))}
+          {filtered.map((c) => {
+            const sla = availabilityByCheck.get(c.id);
+            return (
+              <CheckCard
+                key={c.id}
+                check={c}
+                availability={sla?.pct ?? null}
+                availabilityInsufficient={sla?.insufficient ?? false}
+              />
+            );
+          })}
         </div>
       )}
     </div>
