@@ -20,7 +20,7 @@ jobs:
 
       - name: Dependency review
         # Pinned to the v4 line (no moving `v4` tag is published for this action).
-        uses: actions/dependency-review-action@v4.9.0
+        uses: actions/dependency-review-action@v5.0.0
         with:
           # Warn-only: never block the PR; surface a summary comment instead.
           warn-only: true
