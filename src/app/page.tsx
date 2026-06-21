@@ -11,7 +11,7 @@ import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import type { CheckWithStatus } from "@/lib/types";
 
 type StatusFilter = "all" | "attention" | "pass" | "paused";
-type KindFilter = "all" | "http" | "browser";
+type KindFilter = "all" | "http" | "browser" | "ssl";
 
 function matches(check: CheckWithStatus, status: StatusFilter, kind: KindFilter, q: string): boolean {
   if (kind !== "all" && check.kind !== kind) return false;
@@ -125,6 +125,9 @@ function StatusGrid() {
           </FilterTab>
           <FilterTab active={kind === "browser"} onClick={() => setParam("kind", "browser")}>
             Browser
+          </FilterTab>
+          <FilterTab active={kind === "ssl"} onClick={() => setParam("kind", "ssl")}>
+            SSL
           </FilterTab>
         </div>
         <input
