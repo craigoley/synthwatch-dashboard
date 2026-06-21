@@ -1,94 +1,41 @@
 # SynthWatch — dashboard
 
 Operator console for the self-hosted **SynthWatch** synthetic monitoring system.
-A Next.js (App Router, TypeScript) app deployed on Vercel that reads the data the
-SynthWatch **runner** writes to a shared Azure Postgres, and does CRUD on the
-`checks` table.
-
-This repo is the **dashboard MVP** (UI + API layer) only. The security stack and
-`claude-review.yml` are a separate follow-up (Phase 2a).
+A Next.js (App Router, TypeScript) app deployed on Vercel that reads from — and
+does CRUD against — the standalone **SynthWatch C# API** on Azure.
 
 ---
 
-## Architecture — an API layer, never direct DB access
+## Architecture — a thin client over the C# API
 
-React components **never** query Postgres. They fetch the app's own Next.js route
-handlers under `/api/*`, and **only** those route handlers touch the database,
-through **one shared pooled `pg` client** (`src/lib/db.ts`).
+The dashboard has **no backend of its own**. Every read/write goes through one
+typed transport layer, `src/lib/api-client.ts`, to the C# API:
 
 ```
- React components ──fetch──▶ /api/* route handlers ──pg Pool──▶ Azure Postgres
- (browser, no DB)            (server-only)            (one small pool)
+ React components ──▶ src/lib/api-client.ts ──HTTPS──▶ C# API (Azure) ──▶ Postgres
+ (no fetch, no URLs)   (the only fetch/URL builder)     (managed identity)
 ```
 
-Why this matters:
+- **Single seam.** Components never call `fetch` or build a URL; they call
+  api-client functions (directly or via the SWR hooks in `src/lib/client.ts`).
+  Re-pointing the whole app is a one-env-var change (`NEXT_PUBLIC_API_BASE_URL`).
+- **Casing/shape adapter.** The C# API speaks camelCase and wraps some
+  collections (`{items,…}`, `{window,items}`). `api-client.ts` maps those to the
+  snake_case shapes the components read, and maps outgoing write bodies
+  snake→camel. This is the only place that knows the wire format.
+- **Framework-agnostic.** `api-client.ts` has no React/SWR imports, so it can also
+  back a status page, exporter, or CLI.
 
-- **Connection exhaustion.** The Postgres is an Azure **Burstable B1ms** with a
-  low max-connection ceiling. Serverless functions scale out without bound, so an
-  unpooled/per-request client would exhaust connections and break the **runner's
-  writes**. The single small pool behind the API is the gatekeeper.
-- **Security.** `DATABASE_URL` stays server-side, behind a narrow API. It is
-  never shipped to the browser.
-- **Reuse.** A status page, a Prometheus exporter, or a CLI can reuse the same
-  HTTP endpoints instead of re-implementing DB access.
+> **History:** the dashboard previously ran its own Next.js `/api/*` route
+> handlers + a pooled `pg` client. Those were removed when the C# API went live;
+> the api-client seam made it a contained change with zero component edits.
 
-The DB client is marked `import "server-only"`, so importing it into a client
-component is a build-time error — that is the guard that keeps Postgres out of the
-React bundle. Fluid Compute closes idle connections before suspend via
-`attachDatabasePool` from `@vercel/functions`.
+### Endpoints (served by the C# API)
 
-### API-client seam
-
-Components never call `fetch` directly either — every request goes through
-`src/lib/api-client.ts`, the single typed transport layer that owns the base URL,
-fetching, error handling, and JSON parsing. Today it targets the same-origin
-`/api/*` route handlers, so there is no behavior change. This is a strangler-fig
-seam for moving the backend to a standalone C# API on Azure: that migration
-becomes a one-env-var change (`NEXT_PUBLIC_API_BASE_URL`) plus deleting the route
-handlers, with no component edits.
-
-### API routes (all server-side, Node runtime, `force-dynamic`)
-
-| Method | Route | Purpose |
-| --- | --- | --- |
-| GET | `/api/checks` | list checks + derived current status, 24h p50/p95, sparkline, open incidents |
-| POST | `/api/checks` | create a check (zod-validated) |
-| GET | `/api/checks/[id]` | one check + recent runs |
-| PATCH | `/api/checks/[id]` | edit / pause (`enabled`) |
-| DELETE | `/api/checks/[id]` | **soft delete** (`enabled=false`) by default; `?hard=true` for a real delete |
-| GET | `/api/checks/[id]/runs` | paginated run history (`?limit=&offset=`) |
-| GET | `/api/checks/[id]/metrics` | `run_metrics` time series for charts |
-| GET | `/api/runs/[id]/steps` | `run_steps` for the funnel stage-bar |
-| GET | `/api/incidents` | open + resolved incidents, joined to their check |
-| GET | `/api/flows` | distinct non-null `checks.flow_name` values |
-
-Writes are validated (zod, `src/lib/schemas.ts`). Errors return proper status
-codes; raw DB errors are logged server-side and **never** leaked to the client.
-
----
-
-## Data contract — the runner owns the schema
-
-The runner owns these tables (read-only truth for the dashboard; do not redesign):
-`checks`, `runs`, `run_steps`, `run_metrics`, `incidents`.
-
-TypeScript types for the schema live in **`src/db-types.ts`**, which is
-**committed** and is the contract the API route handlers import.
-
-### `gen:types` workflow (commit-time, NOT build-time)
-
-Regenerate the types from the live DB whenever the runner changes the schema:
-
-```bash
-export DATABASE_URL='postgres://…?sslmode=require'
-pnpm gen:types         # runs pg-to-ts, writes src/db-types.ts
-git add src/db-types.ts && git commit -m "chore: regen db types"
-```
-
-> **The Vercel build must never require a database connection.** This is a
-> monitoring tool — its dashboard build cannot hinge on DB reachability. Type
-> generation is therefore a manual, commit-time step. The committed
-> `db-types.ts` is the contract; `next build` does not run `gen:types`.
+`GET /checks` · `POST /checks` · `GET|PATCH|DELETE /checks/{id}` (`?hard=true`
+for a real delete) · `GET /checks/{id}/runs` · `GET /checks/{id}/metrics` ·
+`GET /runs/{id}/steps` · `GET /incidents` · `GET /flows` ·
+`GET /sla?window=24h|7d|30d` — all under `NEXT_PUBLIC_API_BASE_URL`.
 
 ---
 
@@ -96,36 +43,12 @@ git add src/db-types.ts && git commit -m "chore: regen db types"
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `DATABASE_URL` | runtime only | Azure Postgres connection string. Server-side only; **not** required to build. Keep `sslmode=require`. |
+| `NEXT_PUBLIC_API_BASE_URL` | yes (build + runtime) | Base URL of the C# API, **including** `/api` (e.g. `https://synthwatch-api.azurewebsites.net/api`). Inlined into the client bundle (`NEXT_PUBLIC_*`). |
 
-Copy `.env.example` to `.env.local` for local development.
-
-### Vercel Postgres firewall requirement
-
-Azure Postgres Flexible Server blocks inbound connections by default. For the
-Vercel deployment to reach it at **runtime**, you must allow Vercel's egress:
-
-- In the Azure portal → your Flexible Server → **Networking** → firewall rules,
-  add the IP ranges your Vercel functions egress from, **or**
-- enable **"Allow public access from any Azure service / trusted ranges"** as
-  appropriate for your security posture, **or**
-- front the database with a static-egress proxy and allow that IP.
-
-Because the build does not touch the DB, a missing/incorrect firewall rule does
-**not** break deploys — only runtime data fetching. If `/api/*` returns 500s
-right after deploy, the firewall is the first thing to check.
-
-### PgBouncer escalation (connection exhaustion)
-
-The pooled API layer keeps us under the B1ms connection ceiling. If it is ever
-not enough:
-
-1. Enable **PgBouncer** on the Azure Postgres Flexible Server.
-2. Point `DATABASE_URL` at the **pooled port `6432`** instead of the direct
-   `5432`.
-
-No application changes are required — the connection string alone moves us behind
-PgBouncer. (Also noted inline in `src/lib/db.ts`.)
+Set it in Vercel (Production + Preview) and, for local dev, copy `.env.example`
+to `.env.local`. The C# API's CORS (`Cors__AllowedOrigin`) must list the origin
+the browser calls from (the Vercel origin in prod; a local browser on
+`localhost` is blocked unless that origin is also allowed).
 
 ---
 
@@ -148,7 +71,7 @@ Vercel installs with a matching pnpm and a frozen lockfile.
 | `pnpm build` | Production build (no DB connection required) |
 | `pnpm start` | Run the production build |
 | `pnpm typecheck` | `tsc --noEmit` (strict) |
-| `pnpm gen:types` | Regenerate `src/db-types.ts` from `$DATABASE_URL` (commit the result) |
+| `pnpm lint` | ESLint, `--max-warnings 0` |
 
 ---
 
@@ -178,27 +101,22 @@ state is server state + URL params — **no browser storage APIs**.
 
 ```
 src/
-  db-types.ts            # committed schema contract (pg-to-ts shape)
   lib/
-    db.ts                # the ONE shared pooled pg client (server-only)
-    schemas.ts           # zod validation for writes
-    types.ts             # API response types (JSON shapes for components)
+    api-client.ts        # the ONLY fetch/URL builder — adapter over the C# API
+    client.ts            # SWR hooks + mutations (delegates to api-client)
+    schemas.ts           # zod input types for writes (CreateCheckInput, …)
+    types.ts             # API response types (snake_case shapes for components)
     status.ts            # status → color/label metadata
-    format.ts            # date / latency / bytes formatting
-    api-helpers.ts       # route handler envelopes + error handling
-    client.ts            # SWR hooks + mutations (client-only data layer)
+    format.ts            # date / latency / bytes / pct formatting
   app/
-    api/…                # route handlers — the ONLY place that imports db.ts
     page.tsx             # status grid
     checks/[id]/page.tsx # check detail
     incidents/page.tsx
     monitors/page.tsx
-  components/…           # UI (charts, funnel bar, cards, forms, …)
+  components/…           # UI (charts, funnel bar, cards, forms, SLA, …)
 ```
 
 ## Stack
 
 Next.js (App Router) · TypeScript (strict) · Tailwind CSS v4 · recharts · SWR ·
-`pg` · `@vercel/functions` · zod · pnpm.
-
-<!-- claude-review end-to-end validation: trivial docs touch, safe to merge. -->
+zod · pnpm. No server-side DB driver — the C# API owns data access.
