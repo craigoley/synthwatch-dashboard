@@ -67,6 +67,8 @@ export interface CheckWithStatus extends Check {
   open_incident_count: number;
   max_open_severity: IncidentSeverity | null;
   spark: SparkPoint[];
+  /** SSL checks: days until cert expiry from the latest run (null otherwise). */
+  last_cert_days_remaining: number | null;
 }
 
 export interface Run {
@@ -80,6 +82,8 @@ export interface Run {
   error_message: string | null;
   failed_step: string | null;
   screenshot_url: string | null;
+  /** SSL runs: structured days-until-expiry (negative if expired; null otherwise). */
+  cert_days_remaining: number | null;
 }
 
 /** Check detail payload: the check plus its most recent runs. */

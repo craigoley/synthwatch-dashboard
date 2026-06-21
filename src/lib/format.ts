@@ -68,28 +68,12 @@ export function formatBytes(bytes: number | null | undefined): string {
 }
 
 /**
- * Parse cert days-remaining from the runner's SSL `error_message`, recorded on
- * every ssl run. Formats the runner writes (see runner/sslCheck.ts):
- *   pass:    "cert valid, expires <date> (<N>d)"
- *   warn:    "cert expires <date> (<N>d) — within <W>d warn window"
- *   invalid: "cert invalid: <code> — expires <date> (<N>d)"
- *   expired: "cert EXPIRED <M>d ago — <date>"
- *   error:   "TLS connect failed/timed out…" (no cert → null)
- * Returns days remaining (negative if expired), or null when no cert was read.
+ * Human cert-expiry string from the structured days-remaining the API now
+ * exposes (run.cert_days_remaining / check.last_cert_days_remaining). Negative =
+ * expired. Returns null when there is no cert reading.
  */
-export function parseCertDaysRemaining(message: string | null | undefined): number | null {
-  if (!message) return null;
-  const expired = message.match(/EXPIRED\s+(\d+)\s*d\s+ago/i);
-  if (expired) return -Number(expired[1]);
-  const m = message.match(/\((-?\d+)\s*d\)/);
-  if (m) return Number(m[1]);
-  return null;
-}
-
-/** Human cert-expiry string from an ssl run's error_message, or null. */
-export function formatCertExpiry(message: string | null | undefined): string | null {
-  const days = parseCertDaysRemaining(message);
-  if (days === null) return null;
+export function formatCertExpiry(days: number | null | undefined): string | null {
+  if (days === null || days === undefined) return null;
   if (days < 0) return `cert expired ${Math.abs(days)}d ago`;
   if (days === 0) return "cert expires today";
   return `cert expires in ${days}d`;

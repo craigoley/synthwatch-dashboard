@@ -149,6 +149,7 @@ interface RawCheckListItem extends RawCheck {
   spark: SparkPoint[];
   openIncidentCount: number;
   maxOpenSeverity: IncidentSeverity | null;
+  lastCertDaysRemaining: number | null;
 }
 
 interface RawRun {
@@ -162,6 +163,7 @@ interface RawRun {
   errorMessage: string | null;
   failedStep: string | null;
   screenshotUrl: string | null;
+  certDaysRemaining: number | null;
 }
 
 interface RawCheckDetail extends RawCheck {
@@ -290,6 +292,7 @@ function mapCheckWithStatus(raw: RawCheckListItem): CheckWithStatus {
     open_incident_count: raw.openIncidentCount,
     max_open_severity: raw.maxOpenSeverity,
     spark: raw.spark ?? [],
+    last_cert_days_remaining: raw.lastCertDaysRemaining ?? null,
   };
 }
 
@@ -305,6 +308,7 @@ function mapRun(raw: RawRun): Run {
     error_message: raw.errorMessage,
     failed_step: raw.failedStep,
     screenshot_url: raw.screenshotUrl,
+    cert_days_remaining: raw.certDaysRemaining ?? null,
   };
 }
 
