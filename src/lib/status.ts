@@ -28,13 +28,14 @@ export function runStatusMeta(status: RunStatus | null): StatusMeta {
   return RUN_STATUS[status];
 }
 
-export function stepStatusToken(status: RunStepStatus): StatusMeta["token"] {
+// run_steps.status is a plain string in the DB; map known values, default idle.
+export function stepStatusToken(status: RunStepStatus | string): StatusMeta["token"] {
   switch (status) {
     case "pass":
       return "pass";
     case "fail":
       return "fail";
-    case "skip":
+    default:
       return "idle";
   }
 }

@@ -14,7 +14,7 @@ type KindFilter = "all" | "http" | "browser";
 
 function matches(check: CheckWithStatus, status: StatusFilter, kind: KindFilter, q: string): boolean {
   if (kind !== "all" && check.kind !== kind) return false;
-  if (q && !`${check.name} ${check.flow ?? ""} ${check.target_url ?? ""}`.toLowerCase().includes(q))
+  if (q && !`${check.name} ${check.flow_name ?? ""} ${check.target_url ?? ""}`.toLowerCase().includes(q))
     return false;
   switch (status) {
     case "attention":

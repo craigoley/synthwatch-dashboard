@@ -14,7 +14,8 @@ export async function GET(): Promise<Response> {
     const result = await query(
       `
       SELECT
-        i.id, i.check_id, i.opened_at, i.resolved_at, i.severity, i.summary,
+        i.id, i.check_id, i.status, i.severity, i.opened_at, i.resolved_at,
+        i.opened_run_id, i.resolved_run_id, i.consecutive_failures, i.summary,
         c.name AS check_name, c.kind AS check_kind
       FROM incidents i
       JOIN checks c ON c.id = i.check_id

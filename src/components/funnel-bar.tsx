@@ -47,7 +47,7 @@ export function FunnelBarStatic({ steps }: { steps: RunStep[] }) {
                 background: `color-mix(in srgb, ${tone} ${s.status === "skip" ? 14 : 26}%, transparent)`,
                 borderTop: `2px solid ${tone}`,
               }}
-              title={`${s.label} · ${s.status} · ${formatDuration(s.duration_ms)}`}
+              title={`${s.name} · ${s.status} · ${formatDuration(s.duration_ms)}`}
             >
               <span className="sw-mono truncate px-1 text-[10px]" style={{ color: tone }}>
                 {s.step_index + 1}
@@ -62,7 +62,7 @@ export function FunnelBarStatic({ steps }: { steps: RunStep[] }) {
           return (
             <li key={s.id} className="flex items-center gap-1.5 text-xs">
               <span className="sw-dot" style={{ background: tone, boxShadow: `0 0 8px -2px ${tone}` }} />
-              <span className="text-[var(--color-ink-dim)]">{s.label}</span>
+              <span className="text-[var(--color-ink-dim)]">{s.name}</span>
               <span className="sw-mono text-[10px] text-[var(--color-ink-faint)]">
                 {formatDuration(s.duration_ms)}
               </span>
@@ -70,10 +70,10 @@ export function FunnelBarStatic({ steps }: { steps: RunStep[] }) {
           );
         })}
       </ol>
-      {steps.some((s) => s.status === "fail" && s.detail) && (
+      {steps.some((s) => s.status === "fail" && s.error_message) && (
         <div className="mt-1 space-y-1">
           {steps
-            .filter((s) => s.status === "fail" && s.detail)
+            .filter((s) => s.status === "fail" && s.error_message)
             .map((s) => (
               <p
                 key={s.id}
@@ -84,7 +84,7 @@ export function FunnelBarStatic({ steps }: { steps: RunStep[] }) {
                   color: "var(--color-fail)",
                 }}
               >
-                {s.label}: {s.detail}
+                {s.name}: {s.error_message}
               </p>
             ))}
         </div>

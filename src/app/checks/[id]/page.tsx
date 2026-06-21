@@ -42,8 +42,15 @@ function RunRow({
         <StatusDot status={run.status} />
         <div className="min-w-0">
           <span className="text-sm text-[var(--color-ink)]">{formatLocalDateTime(run.started_at)}</span>
-          {run.runner_id && (
-            <span className="sw-mono ml-2 text-[11px] text-[var(--color-ink-faint)]">{run.runner_id}</span>
+          {run.http_status !== null && (
+            <span className="sw-mono ml-2 text-[11px] text-[var(--color-ink-faint)]">
+              HTTP {run.http_status}
+            </span>
+          )}
+          {run.failed_step && (
+            <span className="sw-mono ml-2 text-[11px]" style={{ color: "var(--color-fail)" }}>
+              ✕ {run.failed_step}
+            </span>
           )}
         </div>
         <span className="sw-mono text-sm text-[var(--color-ink-dim)]">{formatDuration(run.duration_ms)}</span>
@@ -70,15 +77,15 @@ function RunRow({
               {run.error_message}
             </p>
           )}
-          {failed && run.artifact_url && (
+          {failed && run.screenshot_url && (
             <div className="mt-3">
-              <div className="mb-2 sw-eyebrow">Artifact</div>
+              <div className="mb-2 sw-eyebrow">Screenshot</div>
               {/* Runner-written screenshot. Plain <img> so any blob host works. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <a href={run.artifact_url} target="_blank" rel="noreferrer">
+              <a href={run.screenshot_url} target="_blank" rel="noreferrer">
                 <img
-                  src={run.artifact_url}
-                  alt={`Failure artifact for run ${run.id}`}
+                  src={run.screenshot_url}
+                  alt={`Failure screenshot for run ${run.id}`}
                   className="max-h-80 rounded-lg border border-[var(--color-border)]"
                 />
               </a>
@@ -148,7 +155,10 @@ export default function CheckDetailPage() {
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-[var(--color-ink-dim)]">
             <span className="sw-mono uppercase">{check.kind}</span>
-            {check.flow && <span className="sw-mono">· {check.flow}</span>}
+            {check.kind === "http" && (
+              <span className="sw-mono">· {check.method} → {check.expected_status}</span>
+            )}
+            {check.flow_name && <span className="sw-mono">· {check.flow_name}</span>}
             {check.target_url && (
               <a
                 href={check.target_url}
@@ -175,16 +185,29 @@ export default function CheckDetailPage() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <ConfigChip label="Interval" value={`${check.interval_seconds}s`} />
         <ConfigChip label="Timeout" value={`${check.timeout_ms}ms`} />
-        <ConfigChip label="Warn at" value={check.latency_warn_ms ? `${check.latency_warn_ms}ms` : "—"} />
         <ConfigChip label="Fail thresh" value={String(check.failure_threshold)} />
-        <ConfigChip
-          label="Lighthouse"
-          value={check.lighthouse_enabled ? check.lighthouse_form_factor ?? "on" : "off"}
-        />
+        <ConfigChip label="Severity" value={check.severity} />
+        {check.kind === "http" ? (
+          <ConfigChip label="Assertion" value={`${check.method} ${check.expected_status}`} />
+        ) : (
+          <ConfigChip
+            label="Lighthouse"
+            value={check.lighthouse_enabled ? check.lighthouse_form_factor : "off"}
+          />
+        )}
         <ConfigChip
           label="Perf budget"
           value={check.perf_budget_lcp_ms ? `LCP ${check.perf_budget_lcp_ms}ms` : "—"}
         />
+        {check.kind === "http" && (
+          <ConfigChip
+            label="Lighthouse"
+            value={check.lighthouse_enabled ? check.lighthouse_form_factor : "off"}
+          />
+        )}
+        {check.body_must_contain && (
+          <ConfigChip label="Body has" value={check.body_must_contain} />
+        )}
       </div>
 
       <LatencyChart runs={recent_runs} />

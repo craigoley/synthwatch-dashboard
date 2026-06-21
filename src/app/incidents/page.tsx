@@ -28,6 +28,9 @@ function IncidentRow({ incident }: { incident: IncidentWithCheck }) {
           <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
             {incident.check_kind}
           </span>
+          <span className="sw-mono rounded-full border border-[var(--color-border-strong)] px-1.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-dim)]">
+            {incident.status}
+          </span>
         </div>
         {incident.summary && (
           <p className="mt-0.5 truncate text-sm text-[var(--color-ink-dim)]">{incident.summary}</p>
@@ -38,6 +41,7 @@ function IncidentRow({ incident }: { incident: IncidentWithCheck }) {
           {formatSpan(incident.opened_at, incident.resolved_at)}
         </div>
         <div className="sw-mono text-[11px] text-[var(--color-ink-faint)]">
+          {incident.consecutive_failures} consecutive ·{" "}
           {open
             ? `opened ${formatRelative(incident.opened_at)}`
             : `resolved ${formatLocalDateTime(incident.resolved_at)}`}

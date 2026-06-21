@@ -170,9 +170,9 @@ export default function MonitorsPage() {
                     >
                       {c.name}
                     </Link>
-                    {(c.flow || c.target_url) && (
+                    {(c.flow_name || c.target_url) && (
                       <span className="sw-mono block truncate text-[11px] text-[var(--color-ink-faint)]">
-                        {c.flow ?? c.target_url}
+                        {c.flow_name ?? c.target_url}
                       </span>
                     )}
                   </div>

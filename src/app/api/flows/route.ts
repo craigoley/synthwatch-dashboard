@@ -5,8 +5,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/flows — distinct non-null `checks.flow` values, for the browser-check
- * flow dropdown.
+ * GET /api/flows — distinct non-null `checks.flow_name` values, for the
+ * browser-check flow dropdown.
  *
  * TODO: source flows from a runner-emitted manifest rather than from the checks
  * table itself. Reading them back from `checks` only surfaces flows that already
@@ -17,13 +17,13 @@ export async function GET(): Promise<Response> {
   return handleRoute(async () => {
     const result = await query(
       `
-      SELECT DISTINCT flow
+      SELECT DISTINCT flow_name
       FROM checks
-      WHERE flow IS NOT NULL AND flow <> ''
-      ORDER BY flow ASC
+      WHERE flow_name IS NOT NULL AND flow_name <> ''
+      ORDER BY flow_name ASC
       `,
     );
 
-    return json(result.rows.map((r) => r.flow as string));
+    return json(result.rows.map((r) => r.flow_name as string));
   });
 }

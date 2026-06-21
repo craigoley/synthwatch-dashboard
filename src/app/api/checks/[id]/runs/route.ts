@@ -23,8 +23,8 @@ export async function GET(req: NextRequest, ctx: Ctx): Promise<Response> {
     const [rows, count] = await Promise.all([
       query(
         `
-        SELECT id, check_id, started_at, finished_at, status, duration_ms,
-               runner_id, error_message, artifact_url
+        SELECT id, check_id, status, started_at, finished_at, duration_ms,
+               http_status, error_message, failed_step, screenshot_url
         FROM runs
         WHERE check_id = $1
         ORDER BY started_at DESC

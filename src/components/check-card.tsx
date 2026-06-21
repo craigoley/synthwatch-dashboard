@@ -27,8 +27,8 @@ export function CheckCard({ check }: { check: CheckWithStatus }) {
             <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
               {check.kind}
             </span>
-            {check.kind === "browser" && check.flow && (
-              <span className="sw-mono truncate text-[10px] text-[var(--color-ink-dim)]">· {check.flow}</span>
+            {check.kind === "browser" && check.flow_name && (
+              <span className="sw-mono truncate text-[10px] text-[var(--color-ink-dim)]">· {check.flow_name}</span>
             )}
             {!check.enabled && (
               <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">

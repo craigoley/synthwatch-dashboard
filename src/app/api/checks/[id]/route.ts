@@ -14,12 +14,15 @@ const UPDATABLE = [
   "name",
   "kind",
   "target_url",
-  "flow",
+  "flow_name",
+  "method",
+  "expected_status",
+  "body_must_contain",
   "interval_seconds",
   "timeout_ms",
-  "latency_warn_ms",
-  "enabled",
   "failure_threshold",
+  "severity",
+  "enabled",
   "lighthouse_enabled",
   "lighthouse_interval_seconds",
   "lighthouse_form_factor",
@@ -38,8 +41,8 @@ export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
 
     const runsRes = await query(
       `
-      SELECT id, check_id, started_at, finished_at, status, duration_ms,
-             runner_id, error_message, artifact_url
+      SELECT id, check_id, status, started_at, finished_at, duration_ms,
+             http_status, error_message, failed_step, screenshot_url
       FROM runs
       WHERE check_id = $1
       ORDER BY started_at DESC
