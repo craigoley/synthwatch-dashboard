@@ -1,0 +1,346 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SynthWatch — "control room" design language.
+   Deep instrument-panel dark, phosphor-teal brand accent, a faint technical
+   grid for atmosphere, IBM Plex Sans/Mono for an engineering-console feel.
+   Status color law is absolute: pass=green, warn=amber, fail/error=red.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  /* surfaces */
+  --color-bg: #090c0f;
+  --color-bg-elev: #0e1318;
+  --color-panel: #121922;
+  --color-panel-2: #18212c;
+  --color-border: #212c37;
+  --color-border-strong: #30404e;
+
+  /* ink */
+  --color-ink: #e9eff4;
+  --color-ink-dim: #94a3b0;
+  --color-ink-faint: #5d6b77;
+
+  /* brand — phosphor teal */
+  --color-brand: #45e3c2;
+  --color-brand-dim: #176b5e;
+
+  /* status law */
+  --color-pass: #38d29a;
+  --color-warn: #f3b13c;
+  --color-fail: #f15b50;
+  --color-running: #5aa6f2;
+  --color-idle: #5d6b77;
+
+  /* type */
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", monospace;
+
+  --radius-panel: 10px;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv05", "ss01";
+    /* atmosphere: a faint engineering grid + a single brand glow up top */
+    background-image:
+      radial-gradient(110% 70% at 50% -10%, rgba(69, 227, 194, 0.07), transparent 60%),
+      linear-gradient(to right, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+    background-size: 100% 100%, 44px 44px, 44px 44px;
+    background-attachment: fixed;
+    min-height: 100dvh;
+  }
+
+  ::selection {
+    background: rgba(69, 227, 194, 0.28);
+    color: #fff;
+  }
+
+  /* slim instrument scrollbars */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border-strong);
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #41525f;
+    background-clip: padding-box;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer components {
+  /* panels & cards */
+  .sw-panel {
+    background: linear-gradient(180deg, var(--color-panel) 0%, var(--color-bg-elev) 100%);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+  }
+
+  .sw-card {
+    background: linear-gradient(180deg, var(--color-panel) 0%, var(--color-bg-elev) 100%);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    transition:
+      border-color 0.16s ease,
+      transform 0.16s ease,
+      box-shadow 0.16s ease;
+  }
+  .sw-card:hover {
+    border-color: var(--color-border-strong);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 30px -16px rgba(0, 0, 0, 0.8);
+  }
+
+  /* the colored left rail that encodes status on a card */
+  .sw-rail {
+    position: relative;
+    overflow: hidden;
+  }
+  .sw-rail::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--rail, var(--color-idle));
+    box-shadow: 0 0 14px -2px var(--rail, transparent);
+  }
+
+  /* status dots with a soft glow */
+  .sw-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    flex: none;
+  }
+  .sw-dot-pass {
+    background: var(--color-pass);
+    box-shadow: 0 0 9px -1px var(--color-pass);
+  }
+  .sw-dot-warn {
+    background: var(--color-warn);
+    box-shadow: 0 0 9px -1px var(--color-warn);
+  }
+  .sw-dot-fail {
+    background: var(--color-fail);
+    box-shadow: 0 0 9px -1px var(--color-fail);
+  }
+  .sw-dot-running {
+    background: var(--color-running);
+    box-shadow: 0 0 9px -1px var(--color-running);
+    animation: sw-pulse 1.3s ease-in-out infinite;
+  }
+  .sw-dot-idle {
+    background: var(--color-idle);
+  }
+
+  /* status badge (token color set via inline --tone) */
+  .sw-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--tone, var(--color-ink-dim));
+    background: color-mix(in srgb, var(--tone, var(--color-idle)) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tone, var(--color-idle)) 34%, transparent);
+    white-space: nowrap;
+  }
+
+  /* buttons */
+  .sw-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-panel-2);
+    color: var(--color-ink);
+    cursor: pointer;
+    transition:
+      background 0.14s ease,
+      border-color 0.14s ease,
+      color 0.14s ease,
+      opacity 0.14s ease;
+    white-space: nowrap;
+  }
+  .sw-btn:hover {
+    background: #1f2a36;
+    border-color: #3a4a58;
+  }
+  .sw-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .sw-btn-primary {
+    background: var(--color-brand);
+    border-color: var(--color-brand);
+    color: #04201b;
+    font-weight: 600;
+  }
+  .sw-btn-primary:hover {
+    background: #5cf0d2;
+    border-color: #5cf0d2;
+  }
+  .sw-btn-danger {
+    border-color: color-mix(in srgb, var(--color-fail) 50%, transparent);
+    color: var(--color-fail);
+    background: color-mix(in srgb, var(--color-fail) 10%, transparent);
+  }
+  .sw-btn-danger:hover {
+    background: color-mix(in srgb, var(--color-fail) 18%, transparent);
+    border-color: var(--color-fail);
+  }
+  .sw-btn-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--color-ink-dim);
+    padding: 6px 10px;
+  }
+  .sw-btn-ghost:hover {
+    background: var(--color-panel-2);
+    color: var(--color-ink);
+  }
+  .sw-btn-sm {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  /* form controls */
+  .sw-input,
+  .sw-select,
+  .sw-textarea {
+    width: 100%;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 8px;
+    padding: 9px 11px;
+    font-size: 13px;
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    transition:
+      border-color 0.14s ease,
+      box-shadow 0.14s ease;
+  }
+  .sw-input:focus,
+  .sw-select:focus,
+  .sw-textarea:focus {
+    outline: none;
+    border-color: var(--color-brand);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 18%, transparent);
+  }
+  .sw-input::placeholder,
+  .sw-textarea::placeholder {
+    color: var(--color-ink-faint);
+  }
+  .sw-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-ink-dim);
+    margin-bottom: 6px;
+  }
+
+  .sw-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* the "watch" eyebrow label used in section headers */
+  .sw-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--color-brand);
+  }
+
+  /* nav item */
+  .sw-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    color: var(--color-ink-dim);
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.14s ease, color 0.14s ease;
+  }
+  .sw-nav:hover {
+    background: var(--color-panel-2);
+    color: var(--color-ink);
+  }
+  .sw-nav-active {
+    background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+    color: var(--color-brand);
+  }
+}
+
+@keyframes sw-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes sw-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sw-rise {
+  animation: sw-rise 0.4s ease both;
+}

@@ -1,0 +1,37 @@
+{
+  "name": "synthwatch-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.34.4",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "gen:types": "pg-to-ts generate -c \"$DATABASE_URL\" -t checks runs run_steps run_metrics incidents -o src/db-types.ts"
+  },
+  "dependencies": {
+    "@vercel/functions": "^2.0.0",
+    "next": "15.5.4",
+    "pg": "^8.13.1",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "recharts": "^2.15.0",
+    "swr": "^2.3.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "pg-to-ts": "^4.1.1",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,110 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+import { useChecks } from "@/lib/client";
+import { statusRank } from "@/lib/status";
+
+const NAV = [
+  { href: "/", label: "Status", match: (p: string) => p === "/" || p.startsWith("/checks") },
+  { href: "/incidents", label: "Incidents", match: (p: string) => p.startsWith("/incidents") },
+  { href: "/monitors", label: "Monitors", match: (p: string) => p.startsWith("/monitors") },
+];
+
+function Logo() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9.5" stroke="var(--color-brand)" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="2.4" fill="var(--color-brand)" />
+      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" stroke="var(--color-brand)" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M12 12l4.7-2.7" stroke="var(--color-brand)" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Live fleet summary shown in the header. */
+function FleetPulse() {
+  const { data, isLoading } = useChecks();
+
+  if (isLoading || !data) {
+    return <span className="sw-mono text-xs text-[var(--color-ink-faint)]">syncing…</span>;
+  }
+
+  const enabled = data.filter((c) => c.enabled);
+  const failing = enabled.filter(
+    (c) => c.current_status === "fail" || c.current_status === "error",
+  ).length;
+  const warning = enabled.filter((c) => c.current_status === "warn").length;
+  const passing = enabled.filter((c) => c.current_status === "pass").length;
+
+  const items = [
+    { n: failing, cls: "sw-dot-fail", color: "var(--color-fail)" },
+    { n: warning, cls: "sw-dot-warn", color: "var(--color-warn)" },
+    { n: passing, cls: "sw-dot-pass", color: "var(--color-pass)" },
+  ];
+
+  return (
+    <div className="flex items-center gap-3" aria-label="fleet status summary">
+      {items.map((it, i) => (
+        <span key={i} className="flex items-center gap-1.5">
+          <span className={`sw-dot ${it.cls}`} />
+          <span className="sw-mono text-xs" style={{ color: it.color }}>
+            {it.n}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname() ?? "/";
+
+  return (
+    <div className="min-h-dvh">
+      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_82%,transparent)] backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-4 px-4 sm:px-6">
+          <Link href="/" className="flex items-center gap-2.5 shrink-0">
+            <Logo />
+            <span className="flex flex-col leading-none">
+              <span className="text-[15px] font-semibold tracking-tight">
+                Synth<span className="text-[var(--color-brand)]">Watch</span>
+              </span>
+              <span className="sw-mono text-[9px] tracking-[0.2em] text-[var(--color-ink-faint)]">
+                SYNTHETIC MONITOR
+              </span>
+            </span>
+          </Link>
+
+          <nav className="ml-2 flex items-center gap-1 overflow-x-auto">
+            {NAV.map((item) => {
+              const active = item.match(pathname);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`sw-nav ${active ? "sw-nav-active" : ""}`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="ml-auto flex items-center gap-4">
+            <FleetPulse />
+            <span className="hidden items-center gap-1.5 sm:flex">
+              <span className="sw-dot sw-dot-running" />
+              <span className="sw-mono text-[10px] tracking-wider text-[var(--color-ink-faint)]">
+                LIVE
+              </span>
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+    </div>
+  );
+}
