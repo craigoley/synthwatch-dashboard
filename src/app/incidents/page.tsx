@@ -33,7 +33,16 @@ function IncidentRow({ incident }: { incident: IncidentWithCheck }) {
           </span>
         </div>
         {incident.summary && (
-          <p className="mt-0.5 truncate text-sm text-[var(--color-ink-dim)]">{incident.summary}</p>
+          // Historical snapshot captured at incident-open time — it may reference
+          // the check's name/flow AS IT WAS THEN (which can differ from the
+          // current name above). Framed as a quoted "at open" snapshot so the
+          // difference reads as intentional history, not a mismatch. Not rewritten.
+          <p className="mt-0.5 text-sm text-[var(--color-ink-dim)]">
+            <span className="sw-mono mr-1.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+              at open
+            </span>
+            <span className="italic">“{incident.summary}”</span>
+          </p>
         )}
       </div>
       <div className="text-left sm:text-right">

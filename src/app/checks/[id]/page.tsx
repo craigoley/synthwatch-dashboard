@@ -147,7 +147,10 @@ export default function CheckDetailPage() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">{check.name}</h1>
-            <StatusBadge status={recent_runs[0]?.status ?? null} />
+            <span className="flex items-center gap-1.5">
+              <span className="text-[9px] uppercase tracking-wider text-[var(--color-ink-faint)]">latest run</span>
+              <StatusBadge status={recent_runs[0]?.status ?? null} />
+            </span>
             {!check.enabled && (
               <span className="sw-mono text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">
                 paused
