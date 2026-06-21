@@ -67,6 +67,12 @@ export function formatBytes(bytes: number | null | undefined): string {
   return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[i]}`;
 }
 
+/** Availability/percentage, e.g. "99.95%". Dash when unknown. */
+export function formatPct(pct: number | null | undefined, digits = 2): string {
+  if (pct === null || pct === undefined || Number.isNaN(pct)) return "—";
+  return `${pct.toFixed(digits)}%`;
+}
+
 /** Compact integer with thousands separators. */
 export function formatCount(n: number | null | undefined): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "—";

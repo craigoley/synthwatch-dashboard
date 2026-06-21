@@ -148,6 +148,27 @@ export interface IncidentsResponse {
   resolved: IncidentWithCheck[];
 }
 
+/** Rolling SLA window backed by the sla_availability_<window> views. */
+export type SlaWindow = "24h" | "7d" | "30d";
+
+/**
+ * One row from `sla_availability_<window>` (and the `sla_availability()`
+ * function) — per-check availability over a rolling window. Columns mirror the
+ * live DB exactly. `availability_pct` is `numeric` in PG (cast to float in the
+ * route); it is null when there are no completed runs in the window.
+ */
+export interface SlaRow {
+  check_id: number;
+  check_name: string;
+  kind: CheckKind;
+  window_from: string;
+  window_to: string;
+  completed_runs: number;
+  up_runs: number;
+  down_runs: number;
+  availability_pct: number | null;
+}
+
 export interface ApiError {
   error: string;
   details?: unknown;

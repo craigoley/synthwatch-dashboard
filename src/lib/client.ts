@@ -21,11 +21,13 @@ import {
   getMetrics,
   listIncidents,
   listFlows,
+  getSla,
   createCheck as apiCreateCheck,
   updateCheck as apiUpdateCheck,
   deleteCheck as apiDeleteCheck,
 } from "@/lib/api-client";
 import type { CreateCheckInput, UpdateCheckInput } from "@/lib/schemas";
+import type { SlaWindow } from "@/lib/types";
 
 // Logical SWR cache keys (NOT URLs). Centralized so reads and revalidation agree.
 const keys = {
@@ -36,6 +38,7 @@ const keys = {
   metrics: (id: number) => ["metrics", id] as const,
   incidents: ["incidents"] as const,
   flows: ["flows"] as const,
+  sla: (window: SlaWindow) => ["sla", window] as const,
 };
 
 // Live dashboards: refresh on an interval, revalidate when the tab refocuses.
@@ -77,6 +80,10 @@ export function useIncidents() {
 
 export function useFlows() {
   return useSWR(keys.flows, () => listFlows(), { revalidateOnFocus: false });
+}
+
+export function useSla(window: SlaWindow = "24h") {
+  return useSWR(keys.sla(window), () => getSla(window), live);
 }
 
 // ─── mutations (transport via api-client, then refresh affected caches) ─────────
