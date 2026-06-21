@@ -136,6 +136,7 @@ interface RawCheck {
   lighthouseFormFactor?: string | null;
   perfBudgetLcpMs?: number | null;
   perfBudgetTransferBytes?: number | null;
+  certExpiryWarnDays?: number | null;
   lastRunAt: string | null;
   createdAt: string;
 }
@@ -272,6 +273,7 @@ function mapCheck(raw: RawCheck): Check {
     lighthouse_form_factor: raw.lighthouseFormFactor ?? "desktop",
     perf_budget_lcp_ms: raw.perfBudgetLcpMs ?? null,
     perf_budget_transfer_bytes: raw.perfBudgetTransferBytes ?? null,
+    cert_expiry_warn_days: raw.certExpiryWarnDays ?? null,
   };
 }
 

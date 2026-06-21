@@ -32,6 +32,7 @@ interface FormState {
   lighthouse_form_factor: LighthouseFormFactor;
   perf_budget_lcp_ms: string;
   perf_budget_transfer_bytes: string;
+  cert_expiry_warn_days: string;
 }
 
 function numOrNull(s: string): number | null {
@@ -75,6 +76,7 @@ function fromCheck(c: Check | null | undefined): FormState {
     perf_budget_lcp_ms: c?.perf_budget_lcp_ms != null ? String(c.perf_budget_lcp_ms) : "",
     perf_budget_transfer_bytes:
       c?.perf_budget_transfer_bytes != null ? String(c.perf_budget_transfer_bytes) : "",
+    cert_expiry_warn_days: c?.cert_expiry_warn_days != null ? String(c.cert_expiry_warn_days) : "30",
   };
 }
 
@@ -191,13 +193,18 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
       failure_threshold: numOrNull(form.failure_threshold) ?? 3,
       severity: form.severity,
       enabled: form.enabled,
-      lighthouse_enabled: form.lighthouse_enabled,
-      lighthouse_interval_seconds: form.lighthouse_enabled
-        ? numOrNull(form.lighthouse_interval_seconds)
-        : null,
+      // Lighthouse + perf budgets are browser-only; force off for http/ssl.
+      lighthouse_enabled: form.kind === "browser" ? form.lighthouse_enabled : false,
+      lighthouse_interval_seconds:
+        form.kind === "browser" && form.lighthouse_enabled
+          ? numOrNull(form.lighthouse_interval_seconds)
+          : null,
       lighthouse_form_factor: form.lighthouse_form_factor,
-      perf_budget_lcp_ms: numOrNull(form.perf_budget_lcp_ms),
-      perf_budget_transfer_bytes: numOrNull(form.perf_budget_transfer_bytes),
+      perf_budget_lcp_ms: form.kind === "browser" ? numOrNull(form.perf_budget_lcp_ms) : null,
+      perf_budget_transfer_bytes:
+        form.kind === "browser" ? numOrNull(form.perf_budget_transfer_bytes) : null,
+      // SSL-only: warn window in days.
+      cert_expiry_warn_days: form.kind === "ssl" ? numOrNull(form.cert_expiry_warn_days) ?? 30 : null,
     };
 
     setSubmitting(true);
@@ -251,6 +258,7 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
             options={[
               { value: "http", label: "HTTP" },
               { value: "browser", label: "Browser" },
+              { value: "ssl", label: "SSL" },
             ]}
           />
         </div>
@@ -276,7 +284,13 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
 
       <Field
         label="Target URL"
-        hint={form.kind === "browser" ? "Entry URL for the browser flow." : "Endpoint to probe."}
+        hint={
+          form.kind === "browser"
+            ? "Entry URL for the browser flow."
+            : form.kind === "ssl"
+              ? "Host or https:// URL whose TLS certificate to check (port 443 default)."
+              : "Endpoint to probe."
+        }
       >
         <input
           className="sw-input"
@@ -344,6 +358,24 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
         </div>
       )}
 
+      {form.kind === "ssl" && (
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+          <div className="mb-3 sw-eyebrow">TLS certificate</div>
+          <Field
+            label="Cert expiry warn (days)"
+            hint="Warn (not fail) once the certificate has this many days or fewer remaining."
+          >
+            <input
+              className="sw-input sw-mono"
+              value={form.cert_expiry_warn_days}
+              onChange={(e) => set("cert_expiry_warn_days", e.target.value)}
+              inputMode="numeric"
+              placeholder="30"
+            />
+          </Field>
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-4">
         <Field label="Interval (s)">
           <input
@@ -371,6 +403,7 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
         </Field>
       </div>
 
+      {form.kind === "browser" && (
       <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
         <div className="mb-3 flex items-center justify-between">
           <span className="sw-eyebrow">Lighthouse</span>
@@ -405,7 +438,9 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
           </div>
         )}
       </div>
+      )}
 
+      {form.kind === "browser" && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Perf budget — LCP (ms)" hint="Optional regression budget.">
           <input
@@ -426,6 +461,7 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
           />
         </Field>
       </div>
+      )}
 
       <div className="flex items-center justify-end gap-2 border-t border-[var(--color-border)] pt-4">
         <button type="button" onClick={onCancel} className="sw-btn">

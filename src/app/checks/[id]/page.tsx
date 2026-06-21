@@ -8,18 +8,47 @@ import { useCheck, useMetrics, updateCheck, revalidateChecks } from "@/lib/clien
 import { LatencyChart, MetricsCharts } from "@/components/charts";
 import { CheckSlaPanel } from "@/components/sla";
 import { FunnelBar } from "@/components/funnel-bar";
-import { StatusBadge, StatusDot } from "@/components/status-badge";
+import { StatusBadge, StatusDot, TONE_VAR } from "@/components/status-badge";
 import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
-import { formatDuration, formatLocalDateTime, formatRelative } from "@/lib/format";
-import type { Run } from "@/lib/types";
+import { runStatusMeta } from "@/lib/status";
+import { formatCertExpiry, formatDuration, formatLocalDateTime, formatRelative } from "@/lib/format";
+import type { Check, Run } from "@/lib/types";
 
 function ConfigChip({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
       <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">{label}</div>
       <div className="sw-mono mt-0.5 text-sm text-[var(--color-ink)]">{value}</div>
+    </div>
+  );
+}
+
+/** SSL-only: the cert's days-remaining, parsed from the latest run's message. */
+function CertPanel({ check, latest }: { check: Check; latest: Run | null }) {
+  const expiry = formatCertExpiry(latest?.error_message);
+  const tone = TONE_VAR[runStatusMeta(latest?.status ?? null).token];
+  return (
+    <div className="sw-panel p-4">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-[var(--color-ink)]">TLS certificate</h3>
+        <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+          warn ≤ {check.cert_expiry_warn_days != null ? `${check.cert_expiry_warn_days}d` : "—"}
+        </span>
+      </div>
+      {expiry ? (
+        <div className="sw-mono text-2xl font-medium" style={{ color: tone }}>
+          {expiry}
+        </div>
+      ) : (
+        <div className="text-sm text-[var(--color-ink-dim)]">
+          {latest ? "No certificate reading on the latest run." : "No runs yet."}
+        </div>
+      )}
+      {latest?.error_message && (
+        <p className="mt-2 text-xs text-[var(--color-ink-faint)]">{latest.error_message}</p>
+      )}
     </div>
   );
 }
@@ -67,12 +96,14 @@ function RunRow({
           <div className="mb-3 sw-eyebrow">Funnel · run #{run.id}</div>
           <FunnelBar runId={run.id} />
           {run.error_message && (
+            // Toned by run status: ssl records its cert message on PASS runs too
+            // ("cert valid, expires … (Nd)"), so a green run must not look red.
             <p
               className="sw-mono mt-3 rounded border-l-2 px-3 py-2 text-[12px]"
               style={{
-                borderColor: "var(--color-fail)",
-                background: "color-mix(in srgb, var(--color-fail) 8%, transparent)",
-                color: "var(--color-fail)",
+                borderColor: TONE_VAR[runStatusMeta(run.status).token],
+                background: `color-mix(in srgb, ${TONE_VAR[runStatusMeta(run.status).token]} 8%, transparent)`,
+                color: TONE_VAR[runStatusMeta(run.status).token],
               }}
             >
               {run.error_message}
@@ -191,28 +222,33 @@ export default function CheckDetailPage() {
         <ConfigChip label="Timeout" value={`${check.timeout_ms}ms`} />
         <ConfigChip label="Fail thresh" value={String(check.failure_threshold)} />
         <ConfigChip label="Severity" value={check.severity} />
-        {check.kind === "http" ? (
-          <ConfigChip label="Assertion" value={`${check.method} ${check.expected_status}`} />
-        ) : (
-          <ConfigChip
-            label="Lighthouse"
-            value={check.lighthouse_enabled ? check.lighthouse_form_factor : "off"}
-          />
-        )}
-        <ConfigChip
-          label="Perf budget"
-          value={check.perf_budget_lcp_ms ? `LCP ${check.perf_budget_lcp_ms}ms` : "—"}
-        />
         {check.kind === "http" && (
-          <ConfigChip
-            label="Lighthouse"
-            value={check.lighthouse_enabled ? check.lighthouse_form_factor : "off"}
-          />
+          <ConfigChip label="Assertion" value={`${check.method} ${check.expected_status}`} />
         )}
-        {check.body_must_contain && (
+        {check.kind === "http" && check.body_must_contain && (
           <ConfigChip label="Body has" value={check.body_must_contain} />
         )}
+        {check.kind === "browser" && (
+          <ConfigChip
+            label="Lighthouse"
+            value={check.lighthouse_enabled ? check.lighthouse_form_factor : "off"}
+          />
+        )}
+        {check.kind === "browser" && (
+          <ConfigChip
+            label="Perf budget"
+            value={check.perf_budget_lcp_ms ? `LCP ${check.perf_budget_lcp_ms}ms` : "—"}
+          />
+        )}
+        {check.kind === "ssl" && (
+          <ConfigChip
+            label="Cert warn"
+            value={check.cert_expiry_warn_days != null ? `${check.cert_expiry_warn_days}d` : "—"}
+          />
+        )}
       </div>
+
+      {check.kind === "ssl" && <CertPanel check={check} latest={recent_runs[0] ?? null} />}
 
       <CheckSlaPanel checkId={check.id} />
 
