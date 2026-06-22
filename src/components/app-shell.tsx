@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useChecks } from "@/lib/client";
-import { statusRank } from "@/lib/status";
 
 const NAV = [
   { href: "/", label: "Status", match: (p: string) => p === "/" || p.startsWith("/checks") },
