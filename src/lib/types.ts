@@ -11,7 +11,22 @@
 
 // ─── UI enums (runner-constrained; generated db-types calls these `string`) ────
 
-export type CheckKind = "http" | "browser" | "ssl";
+export type CheckKind = "http" | "browser" | "ssl" | "dns" | "tcp" | "ping";
+
+export type DnsRecordType = "A" | "AAAA" | "CNAME" | "MX" | "TXT" | "NS";
+
+/**
+ * Per-kind network config (the host comes from target_url). The API returns a
+ * normalized camelCase object with all keys (nulls for the irrelevant ones):
+ *   dns  → { recordType, expectedValue }   (port null)
+ *   tcp  → { port }                         (port required)
+ *   ping → { port }                         (defaults to 443 when null)
+ */
+export interface NetConfig {
+  recordType: DnsRecordType | null;
+  expectedValue: string | null;
+  port: number | null;
+}
 
 // ── HTTP assertion model (no-code) ───────────────────────────────────────────
 export type AssertionSource = "status" | "response_time" | "header" | "body" | "json_path" | "size";
@@ -82,6 +97,8 @@ export interface Check {
   perf_budget_transfer_bytes: number | null;
   /** SSL checks only: warn when the cert has <= this many days remaining. */
   cert_expiry_warn_days: number | null;
+  /** Network checks (dns/tcp/ping): per-kind config; null otherwise. */
+  net_config: NetConfig | null;
   /** HTTP checks: rich assertions (empty = legacy expected_status/body_must_contain). */
   assertions: Assertion[];
   request_headers: Record<string, string> | null;

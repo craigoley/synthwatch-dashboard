@@ -6,7 +6,14 @@ import { z } from "zod";
  * Everything else is read-only. Column names mirror the generated db-types.ts.
  */
 
-const kind = z.enum(["http", "browser", "ssl"]);
+const kind = z.enum(["http", "browser", "ssl", "dns", "tcp", "ping"]);
+
+// Network-check config (camelCase nested, mirroring the API's normalized shape).
+const netConfigSchema = z.object({
+  recordType: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS"]).nullable().optional(),
+  expectedValue: z.string().trim().nullable().optional(),
+  port: z.coerce.number().int().positive().nullable().optional(),
+});
 const formFactor = z.enum(["mobile", "desktop"]);
 const method = z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]);
 const severity = z.enum(["warning", "critical"]);
@@ -78,6 +85,8 @@ export const createCheckSchema = z.object({
   perf_budget_transfer_bytes: nonNegativeInt.nullable().optional().default(null),
   // SSL checks: warn when the cert has <= this many days remaining.
   cert_expiry_warn_days: positiveInt.nullable().optional().default(null),
+  // Network checks (dns/tcp/ping): per-kind config (sent as-is; API validates).
+  net_config: netConfigSchema.nullable().optional().default(null),
   // HTTP no-code assertions + request config (sent as-is; API validates).
   assertions: z.array(assertionSchema).optional().default([]),
   request_headers: z.record(z.string(), z.string()).nullable().optional().default(null),
@@ -108,6 +117,7 @@ export const updateCheckSchema = z
     perf_budget_lcp_ms: positiveInt.nullable(),
     perf_budget_transfer_bytes: nonNegativeInt.nullable(),
     cert_expiry_warn_days: positiveInt.nullable(),
+    net_config: netConfigSchema.nullable(),
     assertions: z.array(assertionSchema),
     request_headers: z.record(z.string(), z.string()).nullable(),
     request_body: z.string().nullable(),

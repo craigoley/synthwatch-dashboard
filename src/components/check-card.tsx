@@ -9,6 +9,15 @@ import { formatCertExpiry, formatDuration, formatRelative } from "@/lib/format";
 
 const RAIL: Record<string, string> = TONE_VAR;
 
+/** Compact target label for network checks (dns: "A host"; tcp/ping: "host:port"). */
+function netLabel(check: CheckWithStatus): string {
+  const host = check.target_url;
+  if (check.kind === "dns") return `${check.net_config?.recordType ?? "A"} ${host}`;
+  if (host.includes(":")) return host; // already host:port
+  const port = check.net_config?.port ?? (check.kind === "ping" ? 443 : null);
+  return port != null ? `${host}:${port}` : host;
+}
+
 export function CheckCard({
   check,
   availability = null,
@@ -38,6 +47,9 @@ export function CheckCard({
             </span>
             {check.kind === "browser" && check.flow_name && (
               <span className="sw-mono truncate text-[10px] text-[var(--color-ink-dim)]">· {check.flow_name}</span>
+            )}
+            {(check.kind === "dns" || check.kind === "tcp" || check.kind === "ping") && (
+              <span className="sw-mono truncate text-[10px] text-[var(--color-ink-dim)]">· {netLabel(check)}</span>
             )}
             {!check.enabled && (
               <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
