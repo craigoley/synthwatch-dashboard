@@ -61,6 +61,12 @@ function FleetPulse() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "/";
 
+  // The public status page is stakeholder-facing — it brings its own clean chrome
+  // and must not show the operator nav / fleet pulse.
+  if (pathname.startsWith("/status")) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_82%,transparent)] backdrop-blur-md">
