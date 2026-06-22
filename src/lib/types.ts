@@ -130,6 +130,12 @@ export interface Check {
   steps: ChainStep[] | null;
 }
 
+/** Latest status for one runner location (the check-list per-location rollup). */
+export interface LocationStatus {
+  location: string;
+  status: RunStatus;
+}
+
 /** One point in a card sparkline: recent run duration + outcome. */
 export interface SparkPoint {
   t: string; // started_at ISO
@@ -154,6 +160,8 @@ export interface CheckWithStatus extends Check {
   spark: SparkPoint[];
   /** SSL checks: days until cert expiry from the latest run (null otherwise). */
   last_cert_days_remaining: number | null;
+  /** Per-location latest status rollup (single `default` entry for single-location). */
+  locations: LocationStatus[];
 }
 
 export interface Run {
@@ -217,6 +225,27 @@ export interface MetricPoint {
   recalc_style_count: number | null;
 }
 
+/**
+ * Root-cause analysis the runner attaches to an incident (incidents.rca JSONB).
+ * The honesty structure is intentional: `observed` are facts the evidence shows,
+ * `inferred` are the model's hypotheses — the UI must keep them visually distinct.
+ */
+export type RcaClassification =
+  | "real-outage"
+  | "flaky-transient"
+  | "selector-drift"
+  | "environment-regional"
+  | "perf-regression";
+export type RcaConfidence = "high" | "medium" | "low";
+export interface IncidentRca {
+  classification: RcaClassification;
+  confidence: RcaConfidence;
+  observed: string[];
+  inferred: string[];
+  summary: string;
+  signature?: string;
+}
+
 export interface IncidentWithCheck {
   id: number;
   check_id: number;
@@ -230,6 +259,8 @@ export interface IncidentWithCheck {
   summary: string | null;
   check_name: string;
   check_kind: CheckKind;
+  /** Runner root-cause analysis; null when not computed. */
+  rca: IncidentRca | null;
 }
 
 /** Paginated run history. */

@@ -28,7 +28,12 @@ export function CheckCard({
   availabilityInsufficient?: boolean;
 }) {
   const meta = runStatusMeta(check.current_status);
-  const rail = check.open_incident_count > 0 ? TONE_VAR.fail : RAIL[meta.token];
+  // ★ Regional = some-but-not-all locations failing — a partial blip, visually
+  // distinct (amber) from a full outage (red) or healthy (token color).
+  const locs = check.locations ?? [];
+  const locDown = locs.filter((l) => l.status === "fail" || l.status === "error").length;
+  const regional = locs.length > 1 && locDown > 0 && locDown < locs.length;
+  const rail = check.open_incident_count > 0 ? TONE_VAR.fail : regional ? TONE_VAR.warn : RAIL[meta.token];
 
   return (
     <Link
@@ -54,6 +59,14 @@ export function CheckCard({
             {check.kind === "multistep" && (
               <span className="sw-mono truncate text-[10px] text-[var(--color-ink-dim)]">
                 · {check.steps?.length ?? 0} {(check.steps?.length ?? 0) === 1 ? "step" : "steps"}
+              </span>
+            )}
+            {regional && (
+              <span
+                className="sw-mono text-[10px] uppercase tracking-wider"
+                style={{ color: TONE_VAR.warn }}
+              >
+                · regional {locDown}/{locs.length}
               </span>
             )}
             {!check.enabled && (

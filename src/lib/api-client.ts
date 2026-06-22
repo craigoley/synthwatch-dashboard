@@ -28,9 +28,11 @@ import type {
   Flow,
   NetConfig,
   CheckWithStatus,
+  IncidentRca,
   IncidentSeverity,
   IncidentsResponse,
   IncidentWithCheck,
+  LocationStatus,
   MetricPoint,
   Run,
   RunStatus,
@@ -179,6 +181,7 @@ interface RawCheckListItem extends RawCheck {
   openIncidentCount: number;
   maxOpenSeverity: IncidentSeverity | null;
   lastCertDaysRemaining: number | null;
+  locations: LocationStatus[] | null;
 }
 
 interface RawRun {
@@ -255,6 +258,7 @@ interface RawIncident {
   summary: string | null;
   checkName: string;
   checkKind: CheckKind;
+  rca: IncidentRca | null;
 }
 
 interface RawSlaItem {
@@ -335,6 +339,7 @@ function mapCheckWithStatus(raw: RawCheckListItem): CheckWithStatus {
     max_open_severity: raw.maxOpenSeverity,
     spark: raw.spark ?? [],
     last_cert_days_remaining: raw.lastCertDaysRemaining ?? null,
+    locations: raw.locations ?? [],
   };
 }
 
@@ -406,6 +411,7 @@ function mapIncident(raw: RawIncident): IncidentWithCheck {
     summary: raw.summary,
     check_name: raw.checkName,
     check_kind: raw.checkKind,
+    rca: raw.rca ?? null,
   };
 }
 
