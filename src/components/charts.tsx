@@ -200,11 +200,6 @@ function MultiLineChart({
   );
 }
 
-/**
- * Tier-1 telemetry from run_metrics. Renders only the series that actually have
- * data; HTTP checks have none, in which case `hasAny` is false and the parent
- * shows the "browser checks only" message instead.
- */
 /** A single Core Web Vital, colored by its standard threshold. */
 function Vital({
   label,
@@ -255,6 +250,12 @@ function CoreWebVitals({ latest }: { latest: MetricPoint }) {
   );
 }
 
+/**
+ * Tier-1 telemetry from run_metrics: a Core Web Vitals summary (fed by the
+ * latest row) plus the time-series that actually have data. `hasAny` is driven
+ * by whether any metric row exists; HTTP checks have no run_metrics rows, so the
+ * parent shows the "browser checks only" message instead.
+ */
 export function MetricsCharts({ data }: { data: MetricPoint[] }) {
   const vitals: LineSeries[] = (
     [
