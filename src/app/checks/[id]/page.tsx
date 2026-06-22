@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { useCheck, useMetrics, updateCheck, revalidateChecks } from "@/lib/client";
+import { apiUrl } from "@/lib/api-client";
 import { LatencyChart, MetricsCharts } from "@/components/charts";
 import { CheckSlaPanel } from "@/components/sla";
 import { FunnelBar } from "@/components/funnel-bar";
@@ -81,6 +82,54 @@ function NetPanel({ check, latest }: { check: Check; latest: Run | null }) {
   );
 }
 
+/**
+ * Failure artifacts for a failed browser run: inline screenshot + trace download.
+ * screenshot_url / trace_url are proxy PATHS, resolved against the API base via
+ * apiUrl(). Both may be null (passing/non-browser runs → section hidden) or 404
+ * (blob deleted after 90d retention while the DB url persists) — the <img>
+ * onError shows a neutral "unavailable" instead of a broken-image icon.
+ */
+function RunArtifacts({ run }: { run: Run }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const screenshot = run.screenshot_url ? apiUrl(run.screenshot_url) : null;
+  const trace = run.trace_url ? apiUrl(run.trace_url) : null;
+  if (!screenshot && !trace) return null;
+  return (
+    <div className="mt-3 space-y-3">
+      {screenshot && (
+        <div>
+          <div className="mb-2 sw-eyebrow">Failure screenshot</div>
+          {imgFailed ? (
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-4 text-xs text-[var(--color-ink-faint)]">
+              Screenshot unavailable — the artifact has expired or was removed.
+            </div>
+          ) : (
+            <a href={screenshot} target="_blank" rel="noreferrer">
+              <img
+                src={screenshot}
+                alt={`Failure screenshot for run ${run.id}`}
+                onError={() => setImgFailed(true)}
+                className="max-h-80 rounded-lg border border-[var(--color-border)]"
+              />
+            </a>
+          )}
+        </div>
+      )}
+      {trace && (
+        <div>
+          <div className="mb-1 sw-eyebrow">Playwright trace</div>
+          <a href={trace} download className="sw-btn sw-btn-sm">
+            ↓ Download trace (.zip)
+          </a>
+          <p className="mt-1.5 text-[11px] text-[var(--color-ink-faint)]">
+            Open with: <span className="sw-mono">npx playwright show-trace &lt;file&gt;</span>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RunRow({
   run,
   expanded,
@@ -137,20 +186,7 @@ function RunRow({
               {run.error_message}
             </p>
           )}
-          {failed && run.screenshot_url && (
-            <div className="mt-3">
-              <div className="mb-2 sw-eyebrow">Screenshot</div>
-              {/* Runner-written screenshot. Plain <img> so any blob host works. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <a href={run.screenshot_url} target="_blank" rel="noreferrer">
-                <img
-                  src={run.screenshot_url}
-                  alt={`Failure screenshot for run ${run.id}`}
-                  className="max-h-80 rounded-lg border border-[var(--color-border)]"
-                />
-              </a>
-            </div>
-          )}
+          {failed && <RunArtifacts run={run} />}
           {!run.error_message && !failed && (
             <p className="mt-3 text-xs text-[var(--color-ink-faint)]">Run completed without errors.</p>
           )}

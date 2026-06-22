@@ -65,6 +65,24 @@ export class ApiRequestError extends Error {
 
 type QueryValue = string | number | boolean | null | undefined;
 
+/**
+ * Resolve an origin-relative proxy path (e.g. "/api/runs/1/screenshot") to an
+ * absolute URL — for direct browser loads like <img src> and download links that
+ * bypass the typed request() helper. These paths already include the "/api"
+ * segment, so they resolve against the API ORIGIN (not API_BASE, which itself
+ * ends in "/api" — concatenating would double it). Already-absolute URLs pass
+ * through; empty base = same-origin.
+ */
+export function apiUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
+  if (!API_BASE) return path;
+  try {
+    return `${new URL(API_BASE).origin}${path}`;
+  } catch {
+    return path;
+  }
+}
+
 function buildUrl(path: string, params?: Record<string, QueryValue>): string {
   let url = `${API_BASE}${path}`;
   if (params) {
@@ -172,6 +190,7 @@ interface RawRun {
   errorMessage: string | null;
   failedStep: string | null;
   screenshotUrl: string | null;
+  traceUrl: string | null;
   certDaysRemaining: number | null;
 }
 
@@ -327,6 +346,7 @@ function mapRun(raw: RawRun): Run {
     error_message: raw.errorMessage,
     failed_step: raw.failedStep,
     screenshot_url: raw.screenshotUrl,
+    trace_url: raw.traceUrl ?? null,
     cert_days_remaining: raw.certDaysRemaining ?? null,
   };
 }
