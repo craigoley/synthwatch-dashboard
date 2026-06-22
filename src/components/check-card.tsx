@@ -51,6 +51,11 @@ export function CheckCard({
             {(check.kind === "dns" || check.kind === "tcp" || check.kind === "ping") && (
               <span className="sw-mono truncate text-[10px] text-[var(--color-ink-dim)]">· {netLabel(check)}</span>
             )}
+            {check.kind === "multistep" && (
+              <span className="sw-mono truncate text-[10px] text-[var(--color-ink-dim)]">
+                · {check.steps?.length ?? 0} {(check.steps?.length ?? 0) === 1 ? "step" : "steps"}
+              </span>
+            )}
             {!check.enabled && (
               <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
                 · paused

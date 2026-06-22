@@ -15,7 +15,7 @@ import { MonitorForm } from "@/components/monitor-form";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { runStatusMeta } from "@/lib/status";
 import { formatCertExpiry, formatDuration, formatLocalDateTime, formatRelative } from "@/lib/format";
-import type { Check, Run } from "@/lib/types";
+import type { ChainStep, Check, Run } from "@/lib/types";
 
 function ConfigChip({ label, value }: { label: string; value: string }) {
   return (
@@ -125,6 +125,69 @@ function RunArtifacts({ run }: { run: Run }) {
             Open with: <span className="sw-mono">npx playwright show-trace &lt;file&gt;</span>
           </p>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Multistep checks: the configured step chain (the static "what the workflow
+ * does" view — request line + auth/assertion/extract summary per step). Runtime
+ * per-step results live in each run's funnel (run_steps) below; here we also flag
+ * the step the latest run failed at, so the chain shows where it broke.
+ */
+function StepChainPanel({ steps, latest }: { steps: ChainStep[]; latest: Run | null }) {
+  const failedAt =
+    latest && (latest.status === "fail" || latest.status === "error") ? latest.failed_step : null;
+  return (
+    <div className="sw-panel p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-[var(--color-ink)]">Step chain</h3>
+        <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+          {steps.length} {steps.length === 1 ? "step" : "steps"} · runs in order
+        </span>
+      </div>
+      {steps.length === 0 ? (
+        <p className="text-sm text-[var(--color-ink-dim)]">No steps configured.</p>
+      ) : (
+        <ol className="space-y-2">
+          {steps.map((s, i) => {
+            const name = s.name?.trim() || `step ${i + 1}`;
+            const failed = failedAt != null && name === failedAt;
+            const facets: string[] = [];
+            if (s.auth && s.auth.type !== "none") facets.push(`auth: ${s.auth.type}`);
+            if (s.assertions?.length) facets.push(`${s.assertions.length} assertion${s.assertions.length === 1 ? "" : "s"}`);
+            if (s.extract?.length) facets.push(`→ ${s.extract.map((e) => `{{${e.var}}}`).join(", ")}`);
+            return (
+              <li
+                key={i}
+                className="rounded-lg border bg-[var(--color-bg)] px-3 py-2"
+                style={{ borderColor: failed ? "var(--color-fail)" : "var(--color-border)" }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="sw-mono text-[11px] text-[var(--color-ink-faint)]">{i + 1}</span>
+                  <span className="sw-mono text-[11px] text-[var(--color-ink-dim)]">{s.method ?? "GET"}</span>
+                  <span className="truncate text-sm text-[var(--color-ink)]">{name}</span>
+                  {failed && (
+                    <span className="sw-mono text-[10px]" style={{ color: "var(--color-fail)" }}>
+                      ✕ failed here
+                    </span>
+                  )}
+                </div>
+                <div className="mt-0.5 sw-mono truncate text-[11px] text-[var(--color-ink-dim)]">{s.url}</div>
+                {facets.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--color-ink-faint)]">
+                    {facets.map((f, k) => (
+                      <span key={k} className="sw-mono">
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
       )}
     </div>
   );
@@ -334,11 +397,17 @@ export default function CheckDetailPage() {
             }
           />
         )}
+        {check.kind === "multistep" && (
+          <ConfigChip label="Steps" value={String(check.steps?.length ?? 0)} />
+        )}
       </div>
 
       {check.kind === "ssl" && <CertPanel check={check} latest={recent_runs[0] ?? null} />}
       {(check.kind === "dns" || check.kind === "tcp" || check.kind === "ping") && (
         <NetPanel check={check} latest={recent_runs[0] ?? null} />
+      )}
+      {check.kind === "multistep" && (
+        <StepChainPanel steps={check.steps ?? []} latest={recent_runs[0] ?? null} />
       )}
 
       <CheckSlaPanel checkId={check.id} />
