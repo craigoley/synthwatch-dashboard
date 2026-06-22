@@ -19,7 +19,9 @@
  */
 
 import type {
+  Assertion,
   Check,
+  CheckAuth,
   CheckDetail,
   CheckKind,
   CheckWithStatus,
@@ -137,6 +139,10 @@ interface RawCheck {
   perfBudgetLcpMs?: number | null;
   perfBudgetTransferBytes?: number | null;
   certExpiryWarnDays?: number | null;
+  assertions?: Assertion[] | null;
+  requestHeaders?: Record<string, string> | null;
+  requestBody?: string | null;
+  auth?: CheckAuth | null;
   lastRunAt: string | null;
   createdAt: string;
 }
@@ -276,6 +282,13 @@ function mapCheck(raw: RawCheck): Check {
     perf_budget_lcp_ms: raw.perfBudgetLcpMs ?? null,
     perf_budget_transfer_bytes: raw.perfBudgetTransferBytes ?? null,
     cert_expiry_warn_days: raw.certExpiryWarnDays ?? null,
+    // JSONB columns: the API returns these verbatim (nested keys already in the
+    // UI's shape — assertion {source,comparison,target,expected}, auth.token_env,
+    // header dict), so pass them through unchanged.
+    assertions: raw.assertions ?? [],
+    request_headers: raw.requestHeaders ?? null,
+    request_body: raw.requestBody ?? null,
+    auth: raw.auth ?? null,
   };
 }
 
