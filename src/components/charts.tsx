@@ -14,6 +14,8 @@ import {
 
 import type { MetricPoint, Run } from "@/lib/types";
 import { formatBytes, formatCount, formatDuration } from "@/lib/format";
+import { TONE_VAR } from "@/components/status-badge";
+import { cwvTone } from "@/lib/status";
 
 const AXIS = "#5d6b77";
 const GRID = "rgba(255,255,255,0.05)";
@@ -203,21 +205,78 @@ function MultiLineChart({
  * data; HTTP checks have none, in which case `hasAny` is false and the parent
  * shows the "browser checks only" message instead.
  */
+/** A single Core Web Vital, colored by its standard threshold. */
+function Vital({
+  label,
+  value,
+  tone,
+  hint,
+}: {
+  label: string;
+  value: string;
+  tone: ReturnType<typeof cwvTone>;
+  hint: string;
+}) {
+  const color =
+    value === "—" ? "var(--color-ink-faint)" : tone === "idle" ? "var(--color-ink)" : TONE_VAR[tone];
+  return (
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2.5">
+      <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">{label}</div>
+      <div className="sw-mono mt-0.5 text-lg font-medium" style={{ color }}>
+        {value}
+      </div>
+      <div className="text-[10px] text-[var(--color-ink-faint)]">{hint}</div>
+    </div>
+  );
+}
+
+/** Latest Core Web Vitals with standard threshold coloring (LCP/CLS/INP). */
+function CoreWebVitals({ latest }: { latest: MetricPoint }) {
+  const cls = latest.cls != null ? latest.cls.toFixed(3) : "—";
+  const inp = latest.inp_ms != null ? formatDuration(latest.inp_ms) : "—";
+  return (
+    <div className="sw-panel p-4">
+      <div className="mb-3 flex items-baseline justify-between">
+        <h3 className="text-sm font-semibold text-[var(--color-ink)]">Core Web Vitals</h3>
+        <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">latest</span>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Vital label="LCP" value={formatDuration(latest.lcp_ms)} tone={cwvTone("lcp", latest.lcp_ms)} hint="good ≤ 2.5s" />
+        <Vital label="CLS" value={cls} tone={cwvTone("cls", latest.cls)} hint="good ≤ 0.1" />
+        <Vital
+          label="INP"
+          value={inp}
+          tone={latest.inp_ms != null ? cwvTone("inp", latest.inp_ms) : "idle"}
+          hint={latest.inp_ms != null ? "good ≤ 200ms" : "no interaction"}
+        />
+        <Vital label="FCP" value={formatDuration(latest.fcp_ms)} tone="idle" hint="for context" />
+      </div>
+    </div>
+  );
+}
+
 export function MetricsCharts({ data }: { data: MetricPoint[] }) {
   const vitals: LineSeries[] = (
     [
       { key: "lcp_ms", label: "LCP", color: "#45e3c2" },
+      { key: "inp_ms", label: "INP", color: "#e07bb8" },
       { key: "fcp_ms", label: "FCP", color: "#5aa6f2" },
       { key: "ttfb_ms", label: "TTFB", color: "#c08cf0" },
     ] satisfies LineSeries[]
   ).filter((s) => hasData(data, s.key));
 
+  const showCls = hasData(data, "cls");
   const showTransfer = hasData(data, "transfer_bytes");
   const showRequests = hasData(data, "resource_count");
   const showHeap = hasData(data, "js_heap_bytes");
   const showCpu = hasData(data, "cpu_time_ms");
 
-  const hasAny = vitals.length > 0 || showTransfer || showRequests || showHeap || showCpu;
+  // Latest reading (by capture time) drives the CWV summary tiles.
+  const latest = data.length
+    ? data.reduce((a, b) => (new Date(b.captured_at) > new Date(a.captured_at) ? b : a))
+    : null;
+
+  const hasAny = latest !== null;
 
   if (!hasAny) {
     return (
@@ -229,10 +288,21 @@ export function MetricsCharts({ data }: { data: MetricPoint[] }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      {vitals.length > 0 && (
-        <MultiLineChart title="Web vitals" unit="ms" data={data} series={vitals} fmt={formatDuration} />
-      )}
+    <div className="space-y-4">
+      {latest && <CoreWebVitals latest={latest} />}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {vitals.length > 0 && (
+          <MultiLineChart title="Web vitals" unit="ms" data={data} series={vitals} fmt={formatDuration} />
+        )}
+        {showCls && (
+          <MultiLineChart
+            title="Layout shift (CLS)"
+            unit="score"
+            data={data}
+            series={[{ key: "cls", label: "CLS", color: "#f3b13c" }]}
+            fmt={(v) => (v == null ? "—" : v.toFixed(2))}
+          />
+        )}
       {showCpu && (
         <MultiLineChart
           title="CPU time"
@@ -269,6 +339,7 @@ export function MetricsCharts({ data }: { data: MetricPoint[] }) {
           fmt={formatCount}
         />
       )}
+      </div>
     </div>
   );
 }

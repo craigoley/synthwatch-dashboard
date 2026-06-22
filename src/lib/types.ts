@@ -158,6 +158,10 @@ export interface MetricPoint {
   load_event_ms: number | null;
   fcp_ms: number | null;
   lcp_ms: number | null;
+  /** Cumulative Layout Shift (unitless). */
+  cls: number | null;
+  /** Interaction to Next Paint (ms); null when the load had no interaction. */
+  inp_ms: number | null;
   transfer_bytes: number | null;
   resource_count: number | null;
   dom_node_count: number | null;

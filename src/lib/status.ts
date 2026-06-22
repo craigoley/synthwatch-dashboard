@@ -57,6 +57,20 @@ export function availabilityTone(pct: number | null | undefined): StatusMeta["to
   return "fail";
 }
 
+/**
+ * Standard Core Web Vitals thresholds → status token. null = no reading (idle).
+ *   LCP (ms): ≤2500 good · ≤4000 needs-improvement · >4000 poor
+ *   CLS:      ≤0.1  good · ≤0.25 needs-improvement · >0.25 poor
+ *   INP (ms): ≤200  good · ≤500  needs-improvement · >500  poor
+ */
+export function cwvTone(metric: "lcp" | "cls" | "inp", value: number | null | undefined): StatusMeta["token"] {
+  if (value === null || value === undefined || Number.isNaN(value)) return "idle";
+  const [good, ni] = metric === "lcp" ? [2500, 4000] : metric === "cls" ? [0.1, 0.25] : [200, 500];
+  if (value <= good) return "pass";
+  if (value <= ni) return "warn";
+  return "fail";
+}
+
 // ── Status-page (stakeholder) derivations ────────────────────────────────────
 
 export type SystemStatus = "operational" | "partial" | "major";
