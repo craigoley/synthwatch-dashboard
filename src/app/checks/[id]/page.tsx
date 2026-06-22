@@ -193,6 +193,56 @@ function StepChainPanel({ steps, latest }: { steps: ChainStep[]; latest: Run | n
   );
 }
 
+/**
+ * Multi-location checks: the latest status per location, so a partial/regional
+ * failure (e.g. eastus2 ✓, westus2 ✗) is visible at a glance next to the
+ * aggregated verdict. Single-location checks (only "default") render nothing —
+ * no clutter, no regression for the common case.
+ */
+function PerLocationPanel({ runs }: { runs: Run[] }) {
+  // Latest run per location.
+  const byLoc = new Map<string, Run>();
+  for (const r of runs) {
+    const loc = r.location ?? "default";
+    const cur = byLoc.get(loc);
+    if (!cur || new Date(r.started_at) > new Date(cur.started_at)) byLoc.set(loc, r);
+  }
+  if (byLoc.size <= 1) return null; // single-location → no panel
+
+  const entries = [...byLoc.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  const isDown = (r: Run) => r.status === "fail" || r.status === "error";
+  const down = entries.filter(([, r]) => isDown(r)).length;
+  // ★ Regional (some locations down) is visually distinct from a global outage.
+  const verdict =
+    down === 0
+      ? { label: "Healthy in all locations", token: "pass" as const }
+      : down === entries.length
+        ? { label: "Global outage — all locations failing", token: "fail" as const }
+        : { label: `Regional — ${down}/${entries.length} locations failing`, token: "warn" as const };
+
+  return (
+    <div className="sw-panel p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-[var(--color-ink)]">By location</h3>
+        <span className="sw-mono text-[11px] font-medium" style={{ color: TONE_VAR[verdict.token] }}>
+          {verdict.label}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {entries.map(([loc, r]) => (
+          <div
+            key={loc}
+            className="flex items-center justify-between gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2"
+          >
+            <span className="sw-mono truncate text-[12px] text-[var(--color-ink-dim)]">{loc}</span>
+            <StatusBadge status={r.status} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RunRow({
   run,
   expanded,
@@ -409,6 +459,8 @@ export default function CheckDetailPage() {
       {check.kind === "multistep" && (
         <StepChainPanel steps={check.steps ?? []} latest={recent_runs[0] ?? null} />
       )}
+
+      <PerLocationPanel runs={recent_runs} />
 
       <CheckSlaPanel checkId={check.id} />
 

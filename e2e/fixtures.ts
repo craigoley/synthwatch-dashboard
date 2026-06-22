@@ -64,6 +64,7 @@ export function run(over: RawObj = {}): RawObj {
     httpStatus: 200,
     errorMessage: null,
     failedStep: null,
+    location: "default",
     screenshotUrl: null,
     traceUrl: null,
     certDaysRemaining: null,
@@ -221,6 +222,11 @@ export function defaultDetails(): Record<number, RawObj> {
     8: detail({ id: 8, name: "Paused check", kind: "http", enabled: false, currentStatus: "paused" }, []),
     // a check with NO runs yet (graceful-degradation case)
     9: detail({ id: 9, name: "Brand new", kind: "http", currentStatus: null, lastRunId: null }, []),
+    // MULTI-LOCATION: eastus2 healthy, westus2 failing → "regional" (partial) state.
+    10: detail({ id: 10, name: "Global API", kind: "http", currentStatus: "fail" }, [
+      run({ id: 1001, checkId: 10, status: "pass", location: "eastus2" }),
+      run({ id: 1002, checkId: 10, status: "fail", location: "westus2", errorMessage: "503 from westus2" }),
+    ]),
   };
 }
 

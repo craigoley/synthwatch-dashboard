@@ -191,6 +191,7 @@ interface RawRun {
   httpStatus: number | null;
   errorMessage: string | null;
   failedStep: string | null;
+  location: string | null;
   screenshotUrl: string | null;
   traceUrl: string | null;
   certDaysRemaining: number | null;
@@ -348,6 +349,7 @@ function mapRun(raw: RawRun): Run {
     http_status: raw.httpStatus,
     error_message: raw.errorMessage,
     failed_step: raw.failedStep,
+    location: raw.location ?? null,
     screenshot_url: raw.screenshotUrl,
     trace_url: raw.traceUrl ?? null,
     cert_days_remaining: raw.certDaysRemaining ?? null,

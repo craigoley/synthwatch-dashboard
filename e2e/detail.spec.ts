@@ -41,6 +41,23 @@ test.describe("check detail", () => {
     await expect(page.getByText("A example.com: 93.184.216.34").first()).toBeVisible();
   });
 
+  test("multi-location: shows the per-location panel with a regional verdict", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/checks/10");
+
+    await expect(page.getByRole("heading", { name: "By location" })).toBeVisible();
+    await expect(page.getByText("eastus2")).toBeVisible();
+    await expect(page.getByText("westus2")).toBeVisible();
+    // partial failure → "regional", visually distinct from a global outage
+    await expect(page.getByText(/Regional — 1\/2 locations failing/)).toBeVisible();
+  });
+
+  test("single-location: NO per-location panel (no regression)", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/checks/1"); // only "default"
+    await expect(page.getByRole("heading", { name: "By location" })).toHaveCount(0);
+  });
+
   test("no runs yet: degrades gracefully (no crash)", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
