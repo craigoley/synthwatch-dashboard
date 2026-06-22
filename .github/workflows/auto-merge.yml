@@ -1,0 +1,43 @@
+name: Auto-merge
+
+# Hands-free merge for TRUSTED authors. This workflow only ENABLES GitHub's
+# native auto-merge (allow_auto_merge=true on the repo); GitHub then holds the PR
+# and squash-merges it the moment every REQUIRED status check is green
+# (currently "E2E / Playwright (hermetic)"). It never bypasses a check.
+#
+# ★ SECURITY (public repo): auto-merge fires ONLY for the explicit trusted-author
+# allowlist below — the operator, the agent, and dependabot. ANY other author's
+# PR is skipped here, so it can NEVER auto-merge even with all checks green.
+# "Checks passing" is NOT authorization to merge; the allowlist is. The trust gate
+# is a job-level `if:` evaluated by GitHub BEFORE the job runs, so an untrusted
+# author's job is skipped entirely — there is no merge step to reach.
+#
+# The merge is intentionally NOT performed by the Claude review action (which acts
+# on PR-supplied content); a prompt-injected untrusted diff therefore has no path
+# to a merge. Review (claude-review.yml) is advisory only.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write # merge the PR
+  pull-requests: write # enable auto-merge
+
+jobs:
+  auto-merge:
+    name: Enable auto-merge (trusted authors only)
+    runs-on: ubuntu-latest
+    # ★ TRUST GATE — the single security boundary. Webhook user.login values:
+    # operator craigoley / cao825, agent craigoleyagent, and dependabot[bot]
+    # (the [bot] form is what pull_request webhooks send). Anyone else → skipped.
+    if: >-
+      contains(fromJSON('["craigoley", "cao825", "craigoleyagent", "dependabot[bot]"]'),
+      github.event.pull_request.user.login)
+    steps:
+      - name: Enable native auto-merge (waits for required checks, incl. E2E)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: gh pr merge "$PR" --auto --squash --delete-branch --repo "$REPO"
