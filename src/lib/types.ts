@@ -11,7 +11,7 @@
 
 // ─── UI enums (runner-constrained; generated db-types calls these `string`) ────
 
-export type CheckKind = "http" | "browser" | "ssl" | "dns" | "tcp" | "ping";
+export type CheckKind = "http" | "browser" | "ssl" | "dns" | "tcp" | "ping" | "multistep";
 
 export type DnsRecordType = "A" | "AAAA" | "CNAME" | "MX" | "TXT" | "NS";
 
@@ -50,6 +50,28 @@ export interface Assertion {
   target?: string | null;
   /** Expected value; array for one_of; ignored for exists. */
   expected?: unknown;
+}
+
+/** Pull a value from a step's JSON response into a named var, referenced later as {{var}}. */
+export interface ExtractRule {
+  var: string;
+  jsonPath: string;
+}
+
+/**
+ * One step of a multistep (kind="multistep") API chain. The request shape mirrors
+ * a single http check; url/headers/body may contain {{var}} templates resolved
+ * from earlier steps' extracts. auth is a secret-ref ([[CheckAuth]], *_env only).
+ */
+export interface ChainStep {
+  name: string;
+  method?: HttpMethod | null;
+  url: string;
+  headers?: Record<string, string> | null;
+  body?: string | null;
+  auth?: CheckAuth | null;
+  assertions?: Assertion[] | null;
+  extract?: ExtractRule[] | null;
 }
 
 export type AuthType = "none" | "basic" | "bearer" | "api_key";
@@ -104,6 +126,8 @@ export interface Check {
   request_headers: Record<string, string> | null;
   request_body: string | null;
   auth: CheckAuth | null;
+  /** Multistep checks: ordered API-chain steps (null/empty otherwise). */
+  steps: ChainStep[] | null;
 }
 
 /** One point in a card sparkline: recent run duration + outcome. */

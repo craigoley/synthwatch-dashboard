@@ -6,7 +6,7 @@ import { z } from "zod";
  * Everything else is read-only. Column names mirror the generated db-types.ts.
  */
 
-const kind = z.enum(["http", "browser", "ssl", "dns", "tcp", "ping"]);
+const kind = z.enum(["http", "browser", "ssl", "dns", "tcp", "ping", "multistep"]);
 
 // Network-check config (camelCase nested, mirroring the API's normalized shape).
 const netConfigSchema = z.object({
@@ -63,6 +63,24 @@ const authSchema = z.object({
   value_env: z.string().trim().nullable().optional(),
 });
 
+// Multistep (kind="multistep") API-chain step. Same request/assertion/auth model
+// as a single check + extract rules ([{var, jsonPath}]); url/headers/body may hold
+// {{var}} templates. The API validates {{var}} reference integrity (dangling → 400).
+const extractRuleSchema = z.object({
+  var: z.string().trim(),
+  jsonPath: z.string().trim(),
+});
+const stepSchema = z.object({
+  name: z.string().trim(),
+  method: method.nullable().optional(),
+  url: z.string().trim(),
+  headers: z.record(z.string(), z.string()).nullable().optional(),
+  body: z.string().nullable().optional(),
+  auth: authSchema.nullable().optional(),
+  assertions: z.array(assertionSchema).nullable().optional(),
+  extract: z.array(extractRuleSchema).nullable().optional(),
+});
+
 export const createCheckSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200),
   kind,
@@ -87,6 +105,8 @@ export const createCheckSchema = z.object({
   cert_expiry_warn_days: positiveInt.nullable().optional().default(null),
   // Network checks (dns/tcp/ping): per-kind config (sent as-is; API validates).
   net_config: netConfigSchema.nullable().optional().default(null),
+  // Multistep chains: ordered steps (sent as-is; API validates {{var}} integrity).
+  steps: z.array(stepSchema).nullable().optional().default(null),
   // HTTP no-code assertions + request config (sent as-is; API validates).
   assertions: z.array(assertionSchema).optional().default([]),
   request_headers: z.record(z.string(), z.string()).nullable().optional().default(null),
@@ -118,6 +138,7 @@ export const updateCheckSchema = z
     perf_budget_transfer_bytes: nonNegativeInt.nullable(),
     cert_expiry_warn_days: positiveInt.nullable(),
     net_config: netConfigSchema.nullable(),
+    steps: z.array(stepSchema).nullable(),
     assertions: z.array(assertionSchema),
     request_headers: z.record(z.string(), z.string()).nullable(),
     request_body: z.string().nullable(),
