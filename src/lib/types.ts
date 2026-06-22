@@ -241,3 +241,14 @@ export interface ApiError {
   error: string;
   details?: unknown;
 }
+
+/**
+ * A flow from the runner-emitted manifest (the single source of truth for
+ * browser flows, replacing distinct `checks.flow_name`). `/api/flows`.
+ */
+export interface Flow {
+  name: string;
+  description: string | null;
+  entry_url_hint: string | null;
+  updated_at: string;
+}

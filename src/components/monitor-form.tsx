@@ -169,10 +169,22 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { data: flows } = useFlows();
+  const selectedFlow = (flows ?? []).find((f) => f.name === form.flow_name);
 
   const isEdit = Boolean(initial);
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  // Picking a flow suggests the manifest's entry URL — without overwriting a
+  // target URL the author already typed.
+  const onFlowChange = (name: string) => {
+    const match = (flows ?? []).find((f) => f.name === name);
+    setForm((f) => ({
+      ...f,
+      flow_name: name,
+      target_url: match?.entry_url_hint && f.target_url.trim() === "" ? match.entry_url_hint : f.target_url,
+    }));
+  };
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -324,20 +336,30 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
       {form.kind === "browser" && (
         <Field
           label="Flow"
-          hint="Pick a known flow or type a new one. TODO: source flows from the runner-emitted manifest, not the checks table."
+          hint={
+            selectedFlow?.description ??
+            "Pick a flow from the runner's manifest, or type a new one (it appears here after its first run syncs)."
+          }
         >
           <input
             className="sw-input"
             list="sw-flows"
             value={form.flow_name}
-            onChange={(e) => set("flow_name", e.target.value)}
+            onChange={(e) => onFlowChange(e.target.value)}
             placeholder="signup_to_paid"
           />
           <datalist id="sw-flows">
             {(flows ?? []).map((f) => (
-              <option key={f} value={f} />
+              <option key={f.name} value={f.name}>
+                {f.description ?? ""}
+              </option>
             ))}
           </datalist>
+          {selectedFlow?.entry_url_hint && (
+            <span className="mt-1 block text-[11px] text-[var(--color-ink-faint)]">
+              Manifest entry URL: <span className="sw-mono">{selectedFlow.entry_url_hint}</span>
+            </span>
+          )}
         </Field>
       )}
 
