@@ -24,6 +24,38 @@ const requiredUrl = z.string().trim().url("Must be a valid URL");
 const positiveInt = z.coerce.number().int().positive();
 const nonNegativeInt = z.coerce.number().int().nonnegative();
 
+// HTTP assertion model. Kept permissive client-side — the API is the source of
+// truth for cross-field rules (target required for header/json_path, expected
+// required except `exists`, …) and returns field-keyed 400s the UI surfaces.
+const assertionSchema = z.object({
+  source: z.enum(["status", "response_time", "header", "body", "json_path", "size"]),
+  comparison: z.enum([
+    "eq",
+    "ne",
+    "lt",
+    "gt",
+    "gte",
+    "lte",
+    "contains",
+    "not_contains",
+    "matches",
+    "exists",
+    "one_of",
+  ]),
+  target: z.string().trim().nullable().optional(),
+  expected: z.unknown().optional(),
+});
+
+// Auth is a secret REFERENCE: *_env fields hold env-var NAMES, never raw secrets.
+const authSchema = z.object({
+  type: z.enum(["none", "basic", "bearer", "api_key"]),
+  token_env: z.string().trim().nullable().optional(),
+  username: z.string().trim().nullable().optional(),
+  password_env: z.string().trim().nullable().optional(),
+  header: z.string().trim().nullable().optional(),
+  value_env: z.string().trim().nullable().optional(),
+});
+
 export const createCheckSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200),
   kind,
@@ -46,6 +78,11 @@ export const createCheckSchema = z.object({
   perf_budget_transfer_bytes: nonNegativeInt.nullable().optional().default(null),
   // SSL checks: warn when the cert has <= this many days remaining.
   cert_expiry_warn_days: positiveInt.nullable().optional().default(null),
+  // HTTP no-code assertions + request config (sent as-is; API validates).
+  assertions: z.array(assertionSchema).optional().default([]),
+  request_headers: z.record(z.string(), z.string()).nullable().optional().default(null),
+  request_body: z.string().nullable().optional().default(null),
+  auth: authSchema.nullable().optional().default(null),
 });
 
 export type CreateCheckInput = z.infer<typeof createCheckSchema>;
@@ -71,6 +108,10 @@ export const updateCheckSchema = z
     perf_budget_lcp_ms: positiveInt.nullable(),
     perf_budget_transfer_bytes: nonNegativeInt.nullable(),
     cert_expiry_warn_days: positiveInt.nullable(),
+    assertions: z.array(assertionSchema),
+    request_headers: z.record(z.string(), z.string()).nullable(),
+    request_body: z.string().nullable(),
+    auth: authSchema.nullable(),
   })
   .partial()
   .refine((data) => Object.keys(data).length > 0, {

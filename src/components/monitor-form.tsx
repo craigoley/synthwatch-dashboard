@@ -4,6 +4,12 @@ import { useState } from "react";
 
 import { createCheck, updateCheck, useFlows } from "@/lib/client";
 import { ApiRequestError } from "@/lib/api-client";
+import {
+  AssertionBuilder,
+  buildHttpConfigPayload,
+  httpConfigFromCheck,
+  type HttpConfigState,
+} from "@/components/assertion-builder";
 import type { Check, CheckKind, HttpMethod, LighthouseFormFactor } from "@/lib/types";
 
 interface Props {
@@ -158,6 +164,8 @@ function Field({
 
 export function MonitorForm({ initial, onDone, onCancel }: Props) {
   const [form, setForm] = useState<FormState>(() => fromCheck(initial));
+  const [http, setHttp] = useState<HttpConfigState>(() => httpConfigFromCheck(initial));
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { data: flows } = useFlows();
@@ -169,6 +177,7 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setFieldErrors({});
 
     if (form.name.trim() === "") {
       setError("Name is required.");
@@ -205,6 +214,10 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
         form.kind === "browser" ? numOrNull(form.perf_budget_transfer_bytes) : null,
       // SSL-only: warn window in days.
       cert_expiry_warn_days: form.kind === "ssl" ? numOrNull(form.cert_expiry_warn_days) ?? 30 : null,
+      // HTTP-only: no-code assertions + request config. Cleared for other kinds.
+      ...(form.kind === "http"
+        ? buildHttpConfigPayload(http)
+        : { assertions: [], request_headers: null, request_body: null, auth: null }),
     };
 
     setSubmitting(true);
@@ -216,9 +229,16 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
       }
       onDone();
     } catch (err) {
-      const msg =
-        err instanceof ApiRequestError ? err.message : "Failed to save monitor. Please try again.";
-      setError(msg);
+      if (err instanceof ApiRequestError) {
+        // The API returns field-keyed validation messages (e.g.
+        // "assertions[0].comparison"); surface them inline on the right row.
+        if (err.details && typeof err.details === "object" && !Array.isArray(err.details)) {
+          setFieldErrors(err.details as Record<string, string>);
+        }
+        setError(err.message);
+      } else {
+        setError("Failed to save monitor. Please try again.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -356,6 +376,10 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
             </Field>
           </div>
         </div>
+      )}
+
+      {form.kind === "http" && (
+        <AssertionBuilder value={http} onChange={setHttp} errors={fieldErrors} />
       )}
 
       {form.kind === "ssl" && (

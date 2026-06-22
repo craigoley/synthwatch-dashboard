@@ -12,6 +12,45 @@
 // ─── UI enums (runner-constrained; generated db-types calls these `string`) ────
 
 export type CheckKind = "http" | "browser" | "ssl";
+
+// ── HTTP assertion model (no-code) ───────────────────────────────────────────
+export type AssertionSource = "status" | "response_time" | "header" | "body" | "json_path" | "size";
+export type AssertionComparison =
+  | "eq"
+  | "ne"
+  | "lt"
+  | "gt"
+  | "gte"
+  | "lte"
+  | "contains"
+  | "not_contains"
+  | "matches"
+  | "exists"
+  | "one_of";
+
+export interface Assertion {
+  source: AssertionSource;
+  comparison: AssertionComparison;
+  /** Header name (source=header) or JSONPath expr (source=json_path). */
+  target?: string | null;
+  /** Expected value; array for one_of; ignored for exists. */
+  expected?: unknown;
+}
+
+export type AuthType = "none" | "basic" | "bearer" | "api_key";
+
+/**
+ * Auth is a SECRET REFERENCE — the *_env fields hold the NAME of a runner env
+ * var, never a raw credential. The runner resolves the value at request time.
+ */
+export interface CheckAuth {
+  type: AuthType;
+  token_env?: string | null; // bearer
+  username?: string | null; // basic (not secret)
+  password_env?: string | null; // basic
+  header?: string | null; // api_key header name
+  value_env?: string | null; // api_key
+}
 export type RunStatus = "running" | "pass" | "warn" | "fail" | "error";
 export type RunStepStatus = "pass" | "fail" | "skip";
 export type IncidentSeverity = "warning" | "critical";
@@ -43,6 +82,11 @@ export interface Check {
   perf_budget_transfer_bytes: number | null;
   /** SSL checks only: warn when the cert has <= this many days remaining. */
   cert_expiry_warn_days: number | null;
+  /** HTTP checks: rich assertions (empty = legacy expected_status/body_must_contain). */
+  assertions: Assertion[];
+  request_headers: Record<string, string> | null;
+  request_body: string | null;
+  auth: CheckAuth | null;
 }
 
 /** One point in a card sparkline: recent run duration + outcome. */
