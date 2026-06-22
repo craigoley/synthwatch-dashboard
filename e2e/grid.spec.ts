@@ -48,6 +48,15 @@ test.describe("status grid", () => {
     expect(errors).toEqual([]);
   });
 
+  // ★ Regional: some-but-not-all locations failing reads distinctly from a full
+  // outage; a single-location check shows no regional indicator (no regression).
+  test("a multi-location check shows the 'regional' indicator; single-location does not", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/");
+    await expect(page.locator('a[href="/checks/11"]')).toContainText(/regional 1\/2/i);
+    await expect(page.locator('a[href="/checks/1"]')).not.toContainText(/regional/i);
+  });
+
   test("kind-specific card labels (multistep step count, ssl cert, dns record)", async ({ page }) => {
     await mockApi(page);
     await page.goto("/");

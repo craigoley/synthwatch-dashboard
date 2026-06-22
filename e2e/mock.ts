@@ -9,8 +9,8 @@ import type { Page, Route } from "@playwright/test";
 import {
   defaultChecks,
   defaultDetails,
+  defaultIncidents,
   defaultSteps,
-  emptyIncidents,
   emptySla,
   type RawObj,
 } from "./fixtures";
@@ -30,7 +30,7 @@ export interface World {
   details: Record<number, RawObj>;
   steps: Record<number, RawObj[]>;
   sla: RawObj;
-  incidents: RawObj;
+  incidents: RawObj[];
   flows: RawObj[];
   /** Make the screenshot proxy return 404 (blob expired/retention). */
   screenshot404?: boolean;
@@ -46,7 +46,7 @@ export function defaultWorld(): World {
     details: defaultDetails(),
     steps: defaultSteps(),
     sla: emptySla(),
-    incidents: emptyIncidents(),
+    incidents: defaultIncidents(),
     flows: [],
   };
 }

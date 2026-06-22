@@ -48,6 +48,7 @@ export function listItem(over: RawObj = {}): RawObj {
     auth: null,
     netConfig: null,
     steps: null,
+    locations: [{ location: "default", status: "pass" }],
     ...over,
   };
 }
@@ -129,8 +130,51 @@ export function emptySla(window = "24h"): RawObj {
   return { window, items: [], fleet: null };
 }
 
-export function emptyIncidents(): RawObj {
-  return { open: [], resolved: [] };
+/** /incidents is a RAW ARRAY (api-client splits it into open/resolved). */
+export function emptyIncidents(): RawObj[] {
+  return [];
+}
+
+export function incident(over: RawObj = {}): RawObj {
+  return {
+    id: 1,
+    checkId: 1,
+    status: "open",
+    severity: "critical",
+    openedAt: NOW,
+    resolvedAt: null,
+    openedRunId: 100,
+    resolvedRunId: null,
+    consecutiveFailures: 3,
+    summary: "Check failing",
+    checkName: "Check",
+    checkKind: "http",
+    rca: null,
+    ...over,
+  };
+}
+
+/** One incident WITH a populated rca + one with rca null (graceful-empty case). */
+export function defaultIncidents(): RawObj[] {
+  return [
+    incident({
+      id: 1,
+      checkName: "Global API",
+      summary: "503s from westus2",
+      rca: {
+        classification: "environment-regional",
+        confidence: "high",
+        observed: ["westus2 returned 503 on 3/3 attempts", "eastus2 returned 200 throughout"],
+        inferred: [
+          "likely a regional provider outage in westus2",
+          "not a code regression — other regions stayed healthy",
+        ],
+        summary: "Failures isolated to westus2; eastus2 healthy — regional, not global.",
+        signature: "10|503|",
+      },
+    }),
+    incident({ id: 2, checkName: "Legacy check", summary: "timeout", rca: null }),
+  ];
 }
 
 // ── the default world: one check of every kind + a DISABLED (paused) one ─────
@@ -174,6 +218,17 @@ export function defaultChecks(): RawObj[] {
       currentStatus: "pass",
     }),
     listItem({ id: 7, name: "Login chain", kind: "multistep", steps: twoStepChain(), currentStatus: "fail" }),
+    // ★ regional — some-but-not-all locations failing (amber "regional" indicator).
+    listItem({
+      id: 11,
+      name: "Regional API",
+      kind: "http",
+      currentStatus: "pass",
+      locations: [
+        { location: "eastus2", status: "pass" },
+        { location: "westus2", status: "fail" },
+      ],
+    }),
     // ★ disabled check — the API reports currentStatus "paused" (outside the run
     // taxonomy); this once crashed the grid via runStatusMeta. Lock it down.
     listItem({ id: 8, name: "Paused check", kind: "http", enabled: false, currentStatus: "paused" }),
