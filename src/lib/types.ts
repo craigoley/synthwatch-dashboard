@@ -166,6 +166,8 @@ export interface Run {
   http_status: number | null;
   error_message: string | null;
   failed_step: string | null;
+  /** Runner location that produced this run ("default" for single-location checks). */
+  location: string | null;
   /** Proxy path to the failure screenshot (image/png), or null. */
   screenshot_url: string | null;
   /** Proxy path to the Playwright trace (.zip download), or null. */
