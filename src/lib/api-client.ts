@@ -24,6 +24,7 @@ import type {
   CheckAuth,
   CheckDetail,
   CheckKind,
+  Flow,
   CheckWithStatus,
   IncidentSeverity,
   IncidentsResponse,
@@ -463,9 +464,26 @@ export async function listIncidents(): Promise<IncidentsResponse> {
   };
 }
 
-/** GET /api/flows — distinct non-null flow_name values. */
-export async function listFlows(): Promise<string[]> {
-  return request<string[]>("/flows");
+interface RawFlow {
+  name: string;
+  description: string | null;
+  entryUrlHint: string | null;
+  updatedAt: string;
+}
+
+function mapFlow(raw: RawFlow): Flow {
+  return {
+    name: raw.name,
+    description: raw.description ?? null,
+    entry_url_hint: raw.entryUrlHint ?? null,
+    updated_at: raw.updatedAt,
+  };
+}
+
+/** GET /api/flows — runner-emitted flow manifest (name + metadata). */
+export async function listFlows(): Promise<Flow[]> {
+  const raw = await request<RawFlow[]>("/flows");
+  return (raw ?? []).map(mapFlow);
 }
 
 /** GET /api/sla?window= — per-check availability + server fleet rollup. */
