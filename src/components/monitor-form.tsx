@@ -10,6 +10,12 @@ import {
   httpConfigFromCheck,
   type HttpConfigState,
 } from "@/components/assertion-builder";
+import {
+  MultistepBuilder,
+  buildStepsPayload,
+  stepsFromCheck,
+  type StepState,
+} from "@/components/multistep-builder";
 import type { Check, CheckKind, DnsRecordType, HttpMethod, LighthouseFormFactor } from "@/lib/types";
 
 interface Props {
@@ -178,6 +184,7 @@ function Field({
 export function MonitorForm({ initial, onDone, onCancel }: Props) {
   const [form, setForm] = useState<FormState>(() => fromCheck(initial));
   const [http, setHttp] = useState<HttpConfigState>(() => httpConfigFromCheck(initial));
+  const [steps, setSteps] = useState<StepState[]>(() => stepsFromCheck(initial));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -208,16 +215,33 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
       setError("Name is required.");
       return;
     }
-    // target_url is NOT NULL in the schema — required for every check.
-    if (form.target_url.trim() === "") {
+    // Multistep has no single target (derived from step 1's URL); guard the chain
+    // is non-empty instead. Every other kind requires target_url (NOT NULL column).
+    if (form.kind === "multistep") {
+      if (steps.length === 0) {
+        setError("Add at least one step to the chain.");
+        return;
+      }
+      if (steps[0]!.url.trim() === "") {
+        setError("The first step needs a URL.");
+        return;
+      }
+    } else if (form.target_url.trim() === "") {
       setError("A target URL is required.");
       return;
     }
 
+    const stepsPayload = form.kind === "multistep" ? buildStepsPayload(steps) : null;
+
     const payload = {
       name: form.name.trim(),
       kind: form.kind,
-      target_url: form.target_url.trim(),
+      // Multistep has no single target — the chain's entry is step 1's URL. The
+      // column is NOT NULL, so derive it (the field is hidden for this kind).
+      target_url:
+        form.kind === "multistep"
+          ? stepsPayload?.[0]?.url || "https://multistep.local"
+          : form.target_url.trim(),
       flow_name: form.kind === "browser" ? form.flow_name.trim() || null : null,
       method: form.method,
       expected_status: numOrNull(form.expected_status) ?? 200,
@@ -248,6 +272,8 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
             : form.kind === "ping"
               ? { recordType: null, expectedValue: null, port: numOrNull(form.ping_port) }
               : null,
+      // Multistep-only: the ordered step chain. Cleared for other kinds.
+      steps: stepsPayload,
       // HTTP-only: no-code assertions + request config. Cleared for other kinds.
       ...(form.kind === "http"
         ? buildHttpConfigPayload(http)
@@ -316,6 +342,7 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
               { value: "dns", label: "DNS" },
               { value: "tcp", label: "TCP" },
               { value: "ping", label: "Ping" },
+              { value: "multistep", label: "Multistep" },
             ]}
           />
         </div>
@@ -339,32 +366,39 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
         </div>
       </div>
 
-      <Field
-        label={form.kind === "dns" || form.kind === "tcp" || form.kind === "ping" ? "Target host" : "Target URL"}
-        hint={
-          form.kind === "browser"
-            ? "Entry URL for the browser flow."
-            : form.kind === "ssl"
-              ? "Host or https:// URL whose TLS certificate to check (port 443 default)."
-              : form.kind === "dns"
-                ? "Hostname to resolve (e.g. example.com)."
-                : form.kind === "tcp" || form.kind === "ping"
-                  ? "Host, or host:port (e.g. example.com or example.com:5432)."
-                  : "Endpoint to probe."
-        }
-      >
-        <input
-          className="sw-input"
-          value={form.target_url}
-          onChange={(e) => set("target_url", e.target.value)}
-          placeholder={
-            form.kind === "dns" || form.kind === "tcp" || form.kind === "ping"
-              ? "example.com"
-              : "https://example.com/health"
+      {/* Multistep has no single target — the chain defines its own per-step URLs. */}
+      {form.kind !== "multistep" && (
+        <Field
+          label={form.kind === "dns" || form.kind === "tcp" || form.kind === "ping" ? "Target host" : "Target URL"}
+          hint={
+            form.kind === "browser"
+              ? "Entry URL for the browser flow."
+              : form.kind === "ssl"
+                ? "Host or https:// URL whose TLS certificate to check (port 443 default)."
+                : form.kind === "dns"
+                  ? "Hostname to resolve (e.g. example.com)."
+                  : form.kind === "tcp" || form.kind === "ping"
+                    ? "Host, or host:port (e.g. example.com or example.com:5432)."
+                    : "Endpoint to probe."
           }
-          inputMode="url"
-        />
-      </Field>
+        >
+          <input
+            className="sw-input"
+            value={form.target_url}
+            onChange={(e) => set("target_url", e.target.value)}
+            placeholder={
+              form.kind === "dns" || form.kind === "tcp" || form.kind === "ping"
+                ? "example.com"
+                : "https://example.com/health"
+            }
+            inputMode="url"
+          />
+        </Field>
+      )}
+
+      {form.kind === "multistep" && (
+        <MultistepBuilder steps={steps} onChange={setSteps} errors={fieldErrors} />
+      )}
 
       {form.kind === "browser" && (
         <Field

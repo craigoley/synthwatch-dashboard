@@ -99,27 +99,36 @@ export function emptyHttpConfig(): HttpConfigState {
   };
 }
 
-export function httpConfigFromCheck(check: Check | null | undefined): HttpConfigState {
-  if (!check) return emptyHttpConfig();
-  const a = check.auth;
+/** Build editor state from raw request parts — shared by single checks and chain steps. */
+export function httpConfigFromParts(
+  assertions: Assertion[] | null | undefined,
+  headers: Record<string, string> | null | undefined,
+  body: string | null | undefined,
+  auth: CheckAuth | null | undefined,
+): HttpConfigState {
   return {
-    assertions: (check.assertions ?? []).map((x) => ({
+    assertions: (assertions ?? []).map((x) => ({
       source: x.source,
       comparison: x.comparison,
       target: x.target ?? "",
       expected: expectedToString(x.expected, x.comparison),
     })),
-    headers: Object.entries(check.request_headers ?? {}).map(([key, value]) => ({ key, value })),
-    request_body: check.request_body ?? "",
+    headers: Object.entries(headers ?? {}).map(([key, value]) => ({ key, value })),
+    request_body: body ?? "",
     auth: {
-      type: a?.type ?? "none",
-      token_env: a?.token_env ?? "",
-      username: a?.username ?? "",
-      password_env: a?.password_env ?? "",
-      header: a?.header ?? "",
-      value_env: a?.value_env ?? "",
+      type: auth?.type ?? "none",
+      token_env: auth?.token_env ?? "",
+      username: auth?.username ?? "",
+      password_env: auth?.password_env ?? "",
+      header: auth?.header ?? "",
+      value_env: auth?.value_env ?? "",
     },
   };
+}
+
+export function httpConfigFromCheck(check: Check | null | undefined): HttpConfigState {
+  if (!check) return emptyHttpConfig();
+  return httpConfigFromParts(check.assertions, check.request_headers, check.request_body, check.auth);
 }
 
 const looksNumeric = (s: string) => s !== "" && !Number.isNaN(Number(s));

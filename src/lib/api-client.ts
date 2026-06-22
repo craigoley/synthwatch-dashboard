@@ -20,6 +20,7 @@
 
 import type {
   Assertion,
+  ChainStep,
   Check,
   CheckAuth,
   CheckDetail,
@@ -160,6 +161,7 @@ interface RawCheck {
   perfBudgetTransferBytes?: number | null;
   certExpiryWarnDays?: number | null;
   netConfig?: NetConfig | null;
+  steps?: ChainStep[] | null;
   assertions?: Assertion[] | null;
   requestHeaders?: Record<string, string> | null;
   requestBody?: string | null;
@@ -307,6 +309,7 @@ function mapCheck(raw: RawCheck): Check {
     perf_budget_transfer_bytes: raw.perfBudgetTransferBytes ?? null,
     cert_expiry_warn_days: raw.certExpiryWarnDays ?? null,
     net_config: raw.netConfig ?? null,
+    steps: raw.steps ?? null,
     // JSONB columns: the API returns these verbatim (nested keys already in the
     // UI's shape — assertion {source,comparison,target,expected}, auth.token_env,
     // header dict), so pass them through unchanged.
