@@ -4,7 +4,7 @@
  * Returns CSS-variable-backed token names defined in globals.css.
  */
 
-import type { IncidentSeverity, RunStatus, RunStepStatus } from "@/lib/types";
+import type { CheckWithStatus, IncidentSeverity, RunStatus, RunStepStatus } from "@/lib/types";
 
 export interface StatusMeta {
   label: string;
@@ -55,6 +55,60 @@ export function availabilityTone(pct: number | null | undefined): StatusMeta["to
   if (pct >= 99.9) return "pass";
   if (pct >= 99) return "warn";
   return "fail";
+}
+
+// ── Status-page (stakeholder) derivations ────────────────────────────────────
+
+export type SystemStatus = "operational" | "partial" | "major";
+
+export interface SystemStatusMeta {
+  status: SystemStatus;
+  label: string;
+  token: "pass" | "warn" | "fail";
+}
+
+const SYSTEM_META: Record<SystemStatus, SystemStatusMeta> = {
+  operational: { status: "operational", label: "All Systems Operational", token: "pass" },
+  partial: { status: "partial", label: "Partial Outage", token: "warn" },
+  major: { status: "major", label: "Major Outage", token: "fail" },
+};
+
+/**
+ * Roll enabled checks into an overall system status for the public status page:
+ *   major   — an open critical incident, or a critical service currently down
+ *   partial — an open warning incident, a non-critical service down, or degraded
+ *   operational — otherwise
+ */
+export function deriveSystemStatus(checks: CheckWithStatus[]): SystemStatusMeta {
+  let partial = false;
+  for (const c of checks) {
+    if (!c.enabled) continue;
+    const down = c.current_status === "fail" || c.current_status === "error";
+    const degraded = c.current_status === "warn";
+    const openCritical = c.open_incident_count > 0 && c.max_open_severity === "critical";
+    const openWarning = c.open_incident_count > 0 && c.max_open_severity === "warning";
+
+    if (openCritical || (down && c.severity === "critical")) return SYSTEM_META.major;
+    if (openWarning || down || degraded) partial = true;
+  }
+  return partial ? SYSTEM_META.partial : SYSTEM_META.operational;
+}
+
+/** Friendly per-component (per-check) status for stakeholders. */
+export function componentStatus(c: CheckWithStatus): { label: string; token: StatusMeta["token"] } {
+  if (!c.enabled) return { label: "Paused", token: "idle" };
+  switch (c.current_status) {
+    case "fail":
+    case "error":
+      return { label: "Down", token: "fail" };
+    case "warn":
+      return { label: "Degraded", token: "warn" };
+    case "pass":
+    case "running":
+      return { label: "Operational", token: "pass" };
+    default:
+      return { label: "No data", token: "idle" };
+  }
 }
 
 /** Order used when sorting/grouping by run status severity (worst first). */
