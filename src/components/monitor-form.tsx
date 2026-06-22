@@ -10,7 +10,7 @@ import {
   httpConfigFromCheck,
   type HttpConfigState,
 } from "@/components/assertion-builder";
-import type { Check, CheckKind, HttpMethod, LighthouseFormFactor } from "@/lib/types";
+import type { Check, CheckKind, DnsRecordType, HttpMethod, LighthouseFormFactor } from "@/lib/types";
 
 interface Props {
   initial?: Check | null;
@@ -39,6 +39,15 @@ interface FormState {
   perf_budget_lcp_ms: string;
   perf_budget_transfer_bytes: string;
   cert_expiry_warn_days: string;
+  dns_record_type: DnsRecordType;
+  dns_expected_value: string;
+  tcp_port: string;
+  ping_port: string;
+}
+
+function asRecordType(r: string | null | undefined): DnsRecordType {
+  const allowed: DnsRecordType[] = ["A", "AAAA", "CNAME", "MX", "TXT", "NS"];
+  return allowed.includes(r as DnsRecordType) ? (r as DnsRecordType) : "A";
 }
 
 function numOrNull(s: string): number | null {
@@ -83,6 +92,10 @@ function fromCheck(c: Check | null | undefined): FormState {
     perf_budget_transfer_bytes:
       c?.perf_budget_transfer_bytes != null ? String(c.perf_budget_transfer_bytes) : "",
     cert_expiry_warn_days: c?.cert_expiry_warn_days != null ? String(c.cert_expiry_warn_days) : "30",
+    dns_record_type: asRecordType(c?.net_config?.recordType),
+    dns_expected_value: c?.net_config?.expectedValue ?? "",
+    tcp_port: c?.kind === "tcp" && c.net_config?.port != null ? String(c.net_config.port) : "",
+    ping_port: c?.kind === "ping" && c.net_config?.port != null ? String(c.net_config.port) : "",
   };
 }
 
@@ -226,6 +239,15 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
         form.kind === "browser" ? numOrNull(form.perf_budget_transfer_bytes) : null,
       // SSL-only: warn window in days.
       cert_expiry_warn_days: form.kind === "ssl" ? numOrNull(form.cert_expiry_warn_days) ?? 30 : null,
+      // Network-only (dns/tcp/ping): per-kind config (camelCase nested, as the API expects).
+      net_config:
+        form.kind === "dns"
+          ? { recordType: form.dns_record_type, expectedValue: form.dns_expected_value.trim() || null, port: null }
+          : form.kind === "tcp"
+            ? { recordType: null, expectedValue: null, port: numOrNull(form.tcp_port) }
+            : form.kind === "ping"
+              ? { recordType: null, expectedValue: null, port: numOrNull(form.ping_port) }
+              : null,
       // HTTP-only: no-code assertions + request config. Cleared for other kinds.
       ...(form.kind === "http"
         ? buildHttpConfigPayload(http)
@@ -291,6 +313,9 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
               { value: "http", label: "HTTP" },
               { value: "browser", label: "Browser" },
               { value: "ssl", label: "SSL" },
+              { value: "dns", label: "DNS" },
+              { value: "tcp", label: "TCP" },
+              { value: "ping", label: "Ping" },
             ]}
           />
         </div>
@@ -315,20 +340,28 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
       </div>
 
       <Field
-        label="Target URL"
+        label={form.kind === "dns" || form.kind === "tcp" || form.kind === "ping" ? "Target host" : "Target URL"}
         hint={
           form.kind === "browser"
             ? "Entry URL for the browser flow."
             : form.kind === "ssl"
               ? "Host or https:// URL whose TLS certificate to check (port 443 default)."
-              : "Endpoint to probe."
+              : form.kind === "dns"
+                ? "Hostname to resolve (e.g. example.com)."
+                : form.kind === "tcp" || form.kind === "ping"
+                  ? "Host, or host:port (e.g. example.com or example.com:5432)."
+                  : "Endpoint to probe."
         }
       >
         <input
           className="sw-input"
           value={form.target_url}
           onChange={(e) => set("target_url", e.target.value)}
-          placeholder="https://example.com/health"
+          placeholder={
+            form.kind === "dns" || form.kind === "tcp" || form.kind === "ping"
+              ? "example.com"
+              : "https://example.com/health"
+          }
           inputMode="url"
         />
       </Field>
@@ -419,6 +452,77 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
               placeholder="30"
             />
           </Field>
+        </div>
+      )}
+
+      {form.kind === "dns" && (
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+          <div className="mb-3 sw-eyebrow">DNS</div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <span className="sw-label">Record type</span>
+              <Segmented
+                value={form.dns_record_type}
+                onChange={(v) => set("dns_record_type", v)}
+                options={[
+                  { value: "A", label: "A" },
+                  { value: "AAAA", label: "AAAA" },
+                  { value: "CNAME", label: "CNAME" },
+                  { value: "MX", label: "MX" },
+                  { value: "TXT", label: "TXT" },
+                  { value: "NS", label: "NS" },
+                ]}
+              />
+            </div>
+            <Field label="Expected value" hint="Optional — fail unless a record contains this substring.">
+              <input
+                className="sw-input sw-mono"
+                value={form.dns_expected_value}
+                onChange={(e) => set("dns_expected_value", e.target.value)}
+                placeholder="93.184 (optional)"
+              />
+            </Field>
+          </div>
+        </div>
+      )}
+
+      {form.kind === "tcp" && (
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+          <div className="mb-3 sw-eyebrow">TCP</div>
+          <Field label="Port" hint="Required — the TCP port to connect to (or include host:port above).">
+            <input
+              className="sw-input sw-mono"
+              value={form.tcp_port}
+              onChange={(e) => set("tcp_port", e.target.value)}
+              inputMode="numeric"
+              placeholder="443"
+            />
+          </Field>
+          {(fieldErrors["netConfig.port"] || fieldErrors["netConfig"]) && (
+            <p className="mt-1 text-[11px]" style={{ color: "var(--color-fail)" }}>
+              {fieldErrors["netConfig.port"] ?? fieldErrors["netConfig"]}
+            </p>
+          )}
+        </div>
+      )}
+
+      {form.kind === "ping" && (
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+          <div className="mb-3 sw-eyebrow">Ping</div>
+          <Field label="Port" hint="Optional — TCP-reachability probe; defaults to 443.">
+            <input
+              className="sw-input sw-mono"
+              value={form.ping_port}
+              onChange={(e) => set("ping_port", e.target.value)}
+              inputMode="numeric"
+              placeholder="443"
+            />
+          </Field>
+          {(fieldErrors["netConfig.port"] || fieldErrors["netConfig"]) && (
+            <p className="mt-1 text-[11px]" style={{ color: "var(--color-fail)" }}>
+              {fieldErrors["netConfig.port"] ?? fieldErrors["netConfig"]}
+            </p>
+          )}
         </div>
       )}
 

@@ -53,6 +53,34 @@ function CertPanel({ check, latest }: { check: Check; latest: Run | null }) {
   );
 }
 
+/** Network checks (dns/tcp/ping): the latest run's result, colored by status. */
+function NetPanel({ check, latest }: { check: Check; latest: Run | null }) {
+  const tone = TONE_VAR[runStatusMeta(latest?.status ?? null).token];
+  const title = check.kind === "dns" ? "DNS resolution" : check.kind === "tcp" ? "TCP connection" : "Reachability";
+  return (
+    <div className="sw-panel p-4">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-[var(--color-ink)]">{title}</h3>
+        <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+          latest result
+        </span>
+      </div>
+      {latest?.error_message ? (
+        <p className="sw-mono text-sm" style={{ color: tone }}>
+          {latest.error_message}
+        </p>
+      ) : (
+        <p className="text-sm text-[var(--color-ink-dim)]">
+          {latest ? "Run completed (no detail recorded)." : "No runs yet."}
+        </p>
+      )}
+      {latest?.duration_ms != null && (
+        <p className="mt-2 text-xs text-[var(--color-ink-faint)]">latency {formatDuration(latest.duration_ms)}</p>
+      )}
+    </div>
+  );
+}
+
 function RunRow({
   run,
   expanded,
@@ -193,6 +221,12 @@ export default function CheckDetailPage() {
             {check.kind === "http" && (
               <span className="sw-mono">· {check.method} → {check.expected_status}</span>
             )}
+            {check.kind === "dns" && (
+              <span className="sw-mono">· {check.net_config?.recordType ?? "A"}</span>
+            )}
+            {(check.kind === "tcp" || check.kind === "ping") && check.net_config?.port != null && (
+              <span className="sw-mono">· :{check.net_config.port}</span>
+            )}
             {check.flow_name && <span className="sw-mono">· {check.flow_name}</span>}
             {check.target_url && (
               <a
@@ -246,9 +280,30 @@ export default function CheckDetailPage() {
             value={check.cert_expiry_warn_days != null ? `${check.cert_expiry_warn_days}d` : "—"}
           />
         )}
+        {check.kind === "dns" && (
+          <ConfigChip label="Record" value={check.net_config?.recordType ?? "A"} />
+        )}
+        {check.kind === "dns" && check.net_config?.expectedValue && (
+          <ConfigChip label="Expect" value={check.net_config.expectedValue} />
+        )}
+        {(check.kind === "tcp" || check.kind === "ping") && (
+          <ConfigChip
+            label="Port"
+            value={
+              check.net_config?.port != null
+                ? String(check.net_config.port)
+                : check.kind === "ping"
+                  ? "443"
+                  : "—"
+            }
+          />
+        )}
       </div>
 
       {check.kind === "ssl" && <CertPanel check={check} latest={recent_runs[0] ?? null} />}
+      {(check.kind === "dns" || check.kind === "tcp" || check.kind === "ping") && (
+        <NetPanel check={check} latest={recent_runs[0] ?? null} />
+      )}
 
       <CheckSlaPanel checkId={check.id} />
 
