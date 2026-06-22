@@ -192,6 +192,8 @@ interface RawMetric {
   loadEventMs: number | null;
   fcpMs: number | null;
   lcpMs: number | null;
+  cls: number | null;
+  inpMs: number | null;
   transferBytes: number | null;
   resourceCount: number | null;
   domNodeCount: number | null;
@@ -337,6 +339,8 @@ function mapMetric(raw: RawMetric): MetricPoint {
     load_event_ms: raw.loadEventMs,
     fcp_ms: raw.fcpMs,
     lcp_ms: raw.lcpMs,
+    cls: raw.cls,
+    inp_ms: raw.inpMs,
     transfer_bytes: raw.transferBytes,
     resource_count: raw.resourceCount,
     dom_node_count: raw.domNodeCount,
