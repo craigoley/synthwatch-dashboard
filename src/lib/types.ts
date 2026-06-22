@@ -142,7 +142,10 @@ export interface Run {
   http_status: number | null;
   error_message: string | null;
   failed_step: string | null;
+  /** Proxy path to the failure screenshot (image/png), or null. */
   screenshot_url: string | null;
+  /** Proxy path to the Playwright trace (.zip download), or null. */
+  trace_url: string | null;
   /** SSL runs: structured days-until-expiry (negative if expired; null otherwise). */
   cert_days_remaining: number | null;
 }
