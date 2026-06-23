@@ -10,8 +10,13 @@ import { componentStatus, deriveSystemStatus } from "@/lib/status";
 import { formatLocalDateTime, formatRelative, formatSpan } from "@/lib/format";
 import type { CheckWithStatus, IncidentWithCheck, SlaWindow } from "@/lib/types";
 
-const WINDOWS: SlaWindow[] = ["24h", "7d", "30d"];
-const WINDOW_LABEL: Record<SlaWindow, string> = { "24h": "24 hours", "7d": "7 days", "30d": "30 days" };
+const WINDOWS: SlaWindow[] = ["24h", "7d", "30d", "90d"];
+const WINDOW_LABEL: Record<SlaWindow, string> = {
+  "24h": "24 hours",
+  "7d": "7 days",
+  "30d": "30 days",
+  "90d": "90 days",
+};
 
 // Worst-first so any problem components surface at the top.
 const RANK: Record<string, number> = { fail: 0, warn: 1, pass: 2, running: 2, idle: 3 };
@@ -49,7 +54,13 @@ export default function StatusPage() {
   const w24 = useSla("24h");
   const w7 = useSla("7d");
   const w30 = useSla("30d");
-  const slaByWindow = { "24h": w24.data, "7d": w7.data, "30d": w30.data } as const;
+  const w90 = useSla("90d");
+  const slaByWindow: Record<SlaWindow, (typeof w24)["data"]> = {
+    "24h": w24.data,
+    "7d": w7.data,
+    "30d": w30.data,
+    "90d": w90.data,
+  };
 
   const enabled = useMemo(() => (checks ?? []).filter((c) => c.enabled), [checks]);
   const system = deriveSystemStatus(checks ?? []);

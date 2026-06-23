@@ -31,6 +31,8 @@ export interface World {
   details: Record<number, RawObj>;
   steps: Record<number, RawObj[]>;
   sla: RawObj;
+  /** Per-window SLA responses (window → response); falls back to `sla` when absent. */
+  slaByWindow?: Record<string, RawObj>;
   incidents: RawObj[];
   incidentDetails: Record<number, RawObj>;
   flows: RawObj[];
@@ -107,7 +109,11 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
         body: Buffer.from("PK\x05\x06" + "\x00".repeat(18)),
       });
     }
-    if (path === "/api/sla") return json(route, { ...world.sla, window: url.searchParams.get("window") ?? "24h" });
+    if (path === "/api/sla") {
+      const win = url.searchParams.get("window") ?? "24h";
+      const resp = world.slaByWindow?.[win] ?? world.sla;
+      return json(route, { ...resp, window: win });
+    }
     if ((m = path.match(/^\/api\/incidents\/(\d+)$/))) {
       const d = world.incidentDetails[Number(m[1])];
       return d ? json(route, d) : json(route, { error: "not_found" }, 404);

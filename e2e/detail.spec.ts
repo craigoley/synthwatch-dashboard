@@ -1,8 +1,35 @@
 import { test, expect } from "@playwright/test";
 
-import { mockApi } from "./mock";
+import { mockApi, defaultWorld } from "./mock";
+import { slaResponse, slaRow } from "./fixtures";
 
 test.describe("check detail", () => {
+  test("SLA: the 90d window toggle is present and renders its value", async ({ page }) => {
+    const world = defaultWorld();
+    world.slaByWindow = {
+      "90d": slaResponse("90d", [slaRow({ checkId: 1, availabilityPct: 99.9, insufficientData: false })]),
+    };
+    await mockApi(page, world);
+    await page.goto("/checks/1");
+
+    // the 90d toggle button exists alongside the existing windows
+    await expect(page.getByRole("button", { name: "90d", exact: true })).toBeVisible();
+    // its value renders (the other windows are empty → this 99.90% is the 90d card)
+    await expect(page.getByText("99.90%")).toBeVisible();
+  });
+
+  test("SLA: a thin 90d window reads 'building baseline'", async ({ page }) => {
+    const world = defaultWorld();
+    world.slaByWindow = {
+      "90d": slaResponse("90d", [slaRow({ checkId: 1, availabilityPct: null, insufficientData: true })]),
+    };
+    await mockApi(page, world);
+    await page.goto("/checks/1");
+
+    await expect(page.getByRole("button", { name: "90d", exact: true })).toBeVisible();
+    await expect(page.getByText(/building baseline/i).first()).toBeVisible();
+  });
+
   test("multistep: shows the step chain + flags the failed step", async ({ page }) => {
     await mockApi(page);
     await page.goto("/checks/7");

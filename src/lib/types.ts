@@ -339,7 +339,7 @@ export interface IncidentsResponse {
 }
 
 /** Rolling SLA window backed by the sla_availability_<window> views. */
-export type SlaWindow = "24h" | "7d" | "30d";
+export type SlaWindow = "24h" | "7d" | "30d" | "90d";
 
 /**
  * One row from the SLA endpoint — per-check availability over a rolling window.

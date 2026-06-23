@@ -8,7 +8,7 @@ import { availabilityTone } from "@/lib/status";
 import { formatCount, formatPct } from "@/lib/format";
 import type { SlaFleet, SlaWindow, Slo } from "@/lib/types";
 
-const WINDOWS: SlaWindow[] = ["24h", "7d", "30d"];
+const WINDOWS: SlaWindow[] = ["24h", "7d", "30d", "90d"];
 
 /** Calm, color-coded availability percentage. */
 export function SlaPercent({
@@ -65,25 +65,28 @@ export function FleetSlaSummary() {
   const w24 = useSla("24h");
   const w7 = useSla("7d");
   const w30 = useSla("30d");
+  const w90 = useSla("90d");
   const fleetByWindow: Record<SlaWindow, SlaFleet | null | undefined> = {
     "24h": w24.data?.fleet,
     "7d": w7.data?.fleet,
     "30d": w30.data?.fleet,
+    "90d": w90.data?.fleet,
   };
 
   return (
-    <div className="sw-panel grid grid-cols-3 divide-x divide-[var(--color-border)] overflow-hidden">
+    <div className="sw-panel grid grid-cols-4 divide-x divide-[var(--color-border)] overflow-hidden">
       {WINDOWS.map((win) => {
         const fleet = fleetByWindow[win];
         return (
-          <div key={win} className="px-4 py-3">
+          <div key={win} className="px-3 py-3 sm:px-4">
             <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
               Availability · {win}
             </div>
             <AvailabilityValue
               pct={fleet?.availability_pct ?? null}
               insufficient={fleet?.insufficient_data ?? false}
-              className="mt-1 text-2xl font-medium"
+              compact
+              className="mt-1 text-xl font-medium sm:text-2xl"
             />
           </div>
         );
@@ -98,14 +101,16 @@ export function CheckSlaPanel({ checkId }: { checkId: number }) {
   const w24 = useSla("24h");
   const w7 = useSla("7d");
   const w30 = useSla("30d");
+  const w90 = useSla("90d");
 
   const find = (resp: typeof w24.data) => resp?.items.find((r) => r.check_id === checkId);
-  const byWindow = {
+  const byWindow: Record<SlaWindow, ReturnType<typeof find>> = {
     "24h": find(w24.data),
     "7d": find(w7.data),
     "30d": find(w30.data),
-  } as const;
-  const loading = w24.isLoading && w7.isLoading && w30.isLoading;
+    "90d": find(w90.data),
+  };
+  const loading = w24.isLoading && w7.isLoading && w30.isLoading && w90.isLoading;
   const selected = byWindow[active];
 
   return (
@@ -130,8 +135,8 @@ export function CheckSlaPanel({ checkId }: { checkId: number }) {
         </div>
       </div>
 
-      {/* the three windows side by side; the active one is highlighted */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* the windows side by side; the active one is highlighted */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {WINDOWS.map((win) => {
           const row = byWindow[win];
           const isActive = win === active;
