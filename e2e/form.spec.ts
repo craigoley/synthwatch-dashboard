@@ -9,6 +9,27 @@ async function openNewMonitor(page: import("@playwright/test").Page) {
 }
 
 test.describe("monitor form", () => {
+  // ★ The field is labelled "Type" to the user but still binds to `kind` underneath.
+  // At phone width the 7 type options must stay within the modal (wrap, not clip).
+  test("modal: 'Type' label + type options stay within bounds at 390px", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockApi(page);
+    await openNewMonitor(page);
+
+    // scope to the modal: the monitors table behind it has its own (unrelated) "Kind" column
+    const modal = page.getByRole("dialog");
+    await expect(modal.getByText("Type", { exact: true })).toBeVisible();
+    await expect(modal.getByText("Kind", { exact: true })).toHaveCount(0);
+
+    const within = await page.evaluate(() => {
+      const panel = document.querySelector(".sw-panel.sw-rise");
+      const seg = document.querySelector(".inline-flex.flex-wrap"); // the Type segmented
+      if (!panel || !seg) return null;
+      return seg.getBoundingClientRect().right <= panel.getBoundingClientRect().right + 1;
+    });
+    expect(within).toBe(true);
+  });
+
   test("each kind shows its own fields and hides the others", async ({ page }) => {
     await mockApi(page);
     await openNewMonitor(page);
