@@ -27,12 +27,19 @@ import {
   getLocations,
   getCheckLocations,
   setCheckLocations as apiSetCheckLocations,
+  listChannels,
+  createChannel as apiCreateChannel,
+  updateChannel as apiUpdateChannel,
+  deleteChannel as apiDeleteChannel,
+  getRouting,
+  setRouting as apiSetRouting,
+  type ChannelInput,
   createCheck as apiCreateCheck,
   updateCheck as apiUpdateCheck,
   deleteCheck as apiDeleteCheck,
 } from "@/lib/api-client";
 import type { CreateCheckInput, UpdateCheckInput } from "@/lib/schemas";
-import type { SlaWindow } from "@/lib/types";
+import type { Routing, SlaWindow } from "@/lib/types";
 
 // Logical SWR cache keys (NOT URLs). Centralized so reads and revalidation agree.
 const keys = {
@@ -48,6 +55,8 @@ const keys = {
   availability: (id: number, window: SlaWindow) => ["availability", id, window] as const,
   locations: ["locations"] as const,
   checkLocations: (id: number) => ["check-locations", id] as const,
+  channels: ["channels"] as const,
+  routing: ["routing"] as const,
 };
 
 // Live dashboards: refresh on an interval, revalidate when the tab refocuses.
@@ -114,6 +123,22 @@ export function useCheckLocations(id: number | null) {
   );
 }
 
+// Alerting. shouldRetryOnError:false so a pre-API 404 leaves data undefined (the
+// settings page shows "setup pending") rather than retry-looping.
+export function useChannels() {
+  return useSWR(keys.channels, () => listChannels(), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+}
+
+export function useRouting() {
+  return useSWR(keys.routing, () => getRouting(), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+}
+
 export function useSla(window: SlaWindow = "24h") {
   return useSWR(keys.sla(window), () => getSla(window), live);
 }
@@ -157,6 +182,31 @@ export async function setCheckLocations(id: number, locations: string[]) {
     globalMutate(keys.check(id)),
     globalMutate(keys.checks),
   ]);
+  return result;
+}
+
+// ─── alerting mutations ──────────────────────────────────────────────────────
+export async function createChannel(input: ChannelInput) {
+  const result = await apiCreateChannel(input);
+  await globalMutate(keys.channels);
+  return result;
+}
+
+export async function updateChannel(id: number, input: ChannelInput) {
+  const result = await apiUpdateChannel(id, input);
+  await globalMutate(keys.channels);
+  return result;
+}
+
+export async function deleteChannel(id: number) {
+  await apiDeleteChannel(id);
+  // A deleted channel may also be referenced by routing — refresh both.
+  await Promise.all([globalMutate(keys.channels), globalMutate(keys.routing)]);
+}
+
+export async function setRouting(routing: Routing) {
+  const result = await apiSetRouting(routing);
+  await globalMutate(keys.routing);
   return result;
 }
 

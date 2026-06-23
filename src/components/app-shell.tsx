@@ -9,6 +9,7 @@ const NAV = [
   { href: "/", label: "Status", match: (p: string) => p === "/" || p.startsWith("/checks") },
   { href: "/incidents", label: "Incidents", match: (p: string) => p.startsWith("/incidents") },
   { href: "/monitors", label: "Monitors", match: (p: string) => p.startsWith("/monitors") },
+  { href: "/notifications", label: "Notifications", match: (p: string) => p.startsWith("/notifications") },
 ];
 
 function Logo() {
