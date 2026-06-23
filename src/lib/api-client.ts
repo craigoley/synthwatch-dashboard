@@ -472,10 +472,13 @@ export async function getCheck(id: number): Promise<CheckDetail> {
 
 /** GET /api/checks/:id/runs — paginated run history. */
 export async function getRuns(id: number, query: RunsQuery = {}): Promise<RunsPage> {
-  const raw = await request<RawRunsPage>(`/checks/${id}/runs`, {
-    limit: query.limit,
-    offset: query.offset,
-  });
+  // The endpoint is PAGE-based (page/pageSize); it ignores limit/offset entirely.
+  // Translate the caller's offset/limit into the page/pageSize it actually honors
+  // so paging works (the dashboard-facing RunsQuery/RunsPage stay offset/limit).
+  const reqPageSize = query.limit ?? 50;
+  const reqOffset = query.offset ?? 0;
+  const page = Math.floor(reqOffset / reqPageSize) + 1;
+  const raw = await request<RawRunsPage>(`/checks/${id}/runs`, { page, pageSize: reqPageSize });
   const pageSize = raw.pageSize || raw.items.length;
   return {
     runs: raw.items.map(mapRun),
@@ -556,7 +559,6 @@ export async function getIncident(id: number): Promise<IncidentDetail> {
     severity: raw.severity,
     opened_at: raw.openedAt,
     resolved_at: raw.resolvedAt,
-    duration_seconds: raw.durationSeconds ?? null,
     consecutive_failures: raw.consecutiveFailures,
     summary: raw.summary,
     rca: raw.rca ?? null,

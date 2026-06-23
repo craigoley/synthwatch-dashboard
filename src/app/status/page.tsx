@@ -48,7 +48,8 @@ function StatusGlyph({ token }: { token: "pass" | "warn" | "fail" }) {
 }
 
 export default function StatusPage() {
-  const [window, setWindow] = useState<SlaWindow>("24h");
+  // Named slaWindow (NOT `window`) so it doesn't shadow the global `window` object.
+  const [slaWindow, setSlaWindow] = useState<SlaWindow>("24h");
   const { data: checks, isLoading } = useChecks();
   const { data: incidents } = useIncidents();
   const w24 = useSla("24h");
@@ -64,7 +65,7 @@ export default function StatusPage() {
 
   const enabled = useMemo(() => (checks ?? []).filter((c) => c.enabled), [checks]);
   const system = deriveSystemStatus(checks ?? []);
-  const sla = slaByWindow[window];
+  const sla = slaByWindow[slaWindow];
   const uptimeByCheck = useMemo(() => {
     const m = new Map<number, { pct: number | null; insufficient: boolean }>();
     for (const row of sla?.items ?? []) m.set(row.check_id, { pct: row.availability_pct, insufficient: row.insufficient_data });
@@ -139,9 +140,9 @@ export default function StatusPage() {
                     <button
                       key={win}
                       type="button"
-                      onClick={() => setWindow(win)}
+                      onClick={() => setSlaWindow(win)}
                       className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                        window === win
+                        slaWindow === win
                           ? "bg-[var(--color-panel-2)] text-[var(--color-ink)]"
                           : "text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]"
                       }`}
@@ -157,12 +158,12 @@ export default function StatusPage() {
                   <div className="px-4 py-6 text-sm text-[var(--color-ink-dim)]">No components are being monitored yet.</div>
                 ) : (
                   sortedComponents.map((c) => (
-                    <ComponentRow key={c.id} check={c} uptime={uptimeByCheck.get(c.id)} window={window} />
+                    <ComponentRow key={c.id} check={c} uptime={uptimeByCheck.get(c.id)} win={slaWindow} />
                   ))
                 )}
               </div>
               <p className="px-1 text-[11px] text-[var(--color-ink-faint)]">
-                Uptime shown over the last {WINDOW_LABEL[window]}. &quot;Building baseline&quot; means not enough history yet.
+                Uptime shown over the last {WINDOW_LABEL[slaWindow]}. &quot;Building baseline&quot; means not enough history yet.
               </p>
             </section>
 
@@ -199,11 +200,11 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function ComponentRow({
   check,
   uptime,
-  window,
+  win,
 }: {
   check: CheckWithStatus;
   uptime: { pct: number | null; insufficient: boolean } | undefined;
-  window: SlaWindow;
+  win: SlaWindow;
 }) {
   const cs = componentStatus(check);
   return (
@@ -213,7 +214,7 @@ function ComponentRow({
         <span className="truncate text-sm font-medium text-[var(--color-ink)]">{check.name}</span>
       </div>
       <div className="flex shrink-0 items-center gap-5">
-        <span className="hidden items-center gap-1.5 sm:flex" title={`Uptime over ${WINDOW_LABEL[window]}`}>
+        <span className="hidden items-center gap-1.5 sm:flex" title={`Uptime over ${WINDOW_LABEL[win]}`}>
           <AvailabilityValue
             pct={uptime?.pct ?? null}
             insufficient={uptime?.insufficient ?? false}

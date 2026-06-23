@@ -151,4 +151,63 @@ test.describe("monitor form", () => {
     // step 2 is the open/referencing step; the routed error renders in its body
     await expect(page.getByText(/References .*nope.* no earlier step extracts/)).toBeVisible();
   });
+
+  // ★ #40a — an extract row with a var but EMPTY jsonPath must NOT be sent
+  // (it would go as {var, jsonPath:""} and the API 400s on it). buildStepsPayload
+  // filters on BOTH fields, so only the complete row survives in the payload.
+  test("an extract row with a var but no jsonPath is dropped from the payload", async ({ page }) => {
+    await mockApi(page);
+    await openNewMonitor(page);
+    await page.locator("input").first().fill("Extract filter");
+    await page.getByRole("button", { name: "Multistep", exact: true }).click();
+
+    await page.getByRole("button", { name: "+ Add step" }).click();
+    await page.locator('input[aria-label="step name"]').fill("login");
+    await page.locator('input[aria-label="step url"]').fill("https://api.example.com/login");
+
+    // row 1 — complete (var + jsonPath)
+    await page.getByRole("button", { name: "+ Add extract rule" }).click();
+    await page.locator('input[aria-label="extract variable name"]').first().fill("token");
+    await page.locator('input[aria-label="extract json path"]').first().fill("$.access_token");
+    // row 2 — var set but jsonPath left BLANK → must be filtered out
+    await page.getByRole("button", { name: "+ Add extract rule" }).click();
+    await page.locator('input[aria-label="extract variable name"]').nth(1).fill("orphan");
+
+    const reqPromise = page.waitForRequest((r) => r.url().endsWith("/api/checks") && r.method() === "POST");
+    await page.getByRole("button", { name: /Create monitor/ }).click();
+    const body = (await reqPromise).postDataJSON();
+
+    // only the complete row survives — no {var:"orphan", jsonPath:""}
+    expect(body.steps[0].extract).toEqual([{ var: "token", jsonPath: "$.access_token" }]);
+  });
+
+  // ★ #40b — a step-level error (e.g. the dangling-{{var}} template error) must stay
+  // visible when the step card is COLLAPSED; the red border alone doesn't say what's wrong.
+  test("a step-level error stays visible when the step card is collapsed", async ({ page }) => {
+    const world = defaultWorld();
+    world.createResponse = {
+      status: 400,
+      body: {
+        error: "validation_error",
+        details: { "steps[0].template": "References {{nope}} which no earlier step extracts." },
+      },
+    };
+    await mockApi(page, world);
+    await openNewMonitor(page);
+    await page.locator("input").first().fill("Collapsed error");
+    await page.getByRole("button", { name: "Multistep", exact: true }).click();
+
+    await page.getByRole("button", { name: "+ Add step" }).click();
+    await page.locator('input[aria-label="step name"]').fill("login");
+    await page.locator('input[aria-label="step url"]').fill("https://api.example.com/x?t={{nope}}");
+    await page.getByRole("button", { name: /Create monitor/ }).click();
+
+    const err = page.getByText(/References .*nope.* no earlier step extracts/);
+    await expect(err).toBeVisible(); // visible while the step is expanded
+
+    // collapse the step card via its header toggle
+    await page.getByRole("button", { name: /login/ }).click();
+    await expect(page.locator('input[aria-label="step url"]')).toHaveCount(0); // confirm collapsed
+    await expect(err).toBeVisible(); // ★ error still visible when collapsed
+  });
 });
