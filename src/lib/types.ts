@@ -316,7 +316,6 @@ export interface IncidentDetail {
   severity: IncidentSeverity;
   opened_at: string;
   resolved_at: string | null;
-  duration_seconds: number | null;
   consecutive_failures: number;
   summary: string | null;
   rca: IncidentRca | null;

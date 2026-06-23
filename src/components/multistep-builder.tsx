@@ -17,6 +17,8 @@ export interface ExtractRow {
   jsonPath: string;
 }
 export interface StepState {
+  /** Stable client-only id for React keys — survives reorder (NOT sent to the API). */
+  id: string;
   name: string;
   method: HttpMethod;
   url: string;
@@ -27,18 +29,24 @@ export interface StepState {
 
 const METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"];
 
+// Monotonic per-session step id — stable across reorders so the keyed
+// AssertionBuilder's internal state follows the step, not the slot.
+let stepIdSeq = 0;
+const nextStepId = () => `step-${(stepIdSeq += 1)}`;
+
 function asMethod(m: string | null | undefined): HttpMethod {
   return METHODS.includes(m as HttpMethod) ? (m as HttpMethod) : "GET";
 }
 
 export function emptyStep(): StepState {
-  return { name: "", method: "GET", url: "", http: emptyHttpConfig(), extract: [] };
+  return { id: nextStepId(), name: "", method: "GET", url: "", http: emptyHttpConfig(), extract: [] };
 }
 
 // ── (de)serialization between the API steps array and editor state ───────────
 
 function stepFromApi(s: ChainStep): StepState {
   return {
+    id: nextStepId(),
     name: s.name ?? "",
     method: asMethod(s.method),
     url: s.url ?? "",
@@ -55,8 +63,10 @@ export function stepsFromCheck(check: Check | null | undefined): StepState[] {
 export function buildStepsPayload(steps: StepState[]): ChainStep[] {
   return steps.map((s) => {
     const { assertions, request_headers, request_body, auth } = buildHttpConfigPayload(s.http);
+    // Require BOTH var and jsonPath — a row with a var but empty jsonPath would be
+    // sent as { var, jsonPath: "" }, which the API 400s on.
     const extract = s.extract
-      .filter((e) => e.var.trim() !== "")
+      .filter((e) => e.var.trim() !== "" && e.jsonPath.trim() !== "")
       .map((e) => ({ var: e.var.trim(), jsonPath: e.jsonPath.trim() }));
     return {
       name: s.name.trim(),
@@ -153,7 +163,7 @@ export function MultistepBuilder({
         const isOpen = open === i;
         return (
           <div
-            key={i}
+            key={step.id}
             className="rounded-lg border bg-[var(--color-bg)]"
             style={{ borderColor: hasErr ? "var(--color-fail)" : "var(--color-border)" }}
           >
@@ -196,6 +206,14 @@ export function MultistepBuilder({
                 ✕
               </button>
             </div>
+
+            {/* Step error (incl. the dangling-{{var}} template error) shows even when
+                the card is COLLAPSED — the red border alone doesn't say what's wrong. */}
+            {stepLevelErr && (
+              <p className="px-3 pb-2 text-[11px]" style={{ color: "var(--color-fail)" }}>
+                {stepLevelErr}
+              </p>
+            )}
 
             {isOpen && (
               <div className="space-y-3 border-t border-[var(--color-border)] p-3">
@@ -254,12 +272,6 @@ export function MultistepBuilder({
                     <>No variables available yet — extract one below to reference it in later steps.</>
                   )}
                 </p>
-
-                {stepLevelErr && (
-                  <p className="text-[11px]" style={{ color: "var(--color-fail)" }}>
-                    {stepLevelErr}
-                  </p>
-                )}
 
                 {/* per-step assertions + headers/body/auth (reused) */}
                 <AssertionBuilder
