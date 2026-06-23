@@ -410,3 +410,42 @@ export interface Flow {
   entry_url_hint: string | null;
   updated_at: string;
 }
+
+// ─── alerting (dashboard-managed): channels + routing ────────────────────────
+// Delivery TARGETS only — no transport credentials live here (email uses the ACS
+// transport configured in infrastructure). `config` is JSONB-ish and passes
+// through verbatim (nested camelCase), like check assertions/auth.
+export type ChannelType = "email" | "webhook";
+
+export interface ChannelConfig {
+  /** email: recipients */
+  to?: string[];
+  /** email: from address (display/sender) */
+  from?: string | null;
+  /** webhook: target URL */
+  url?: string | null;
+  /** webhook: optional header sent to the target (e.g. "Authorization: Bearer …") */
+  authHeader?: string | null;
+}
+
+export interface Channel {
+  id: number;
+  name: string;
+  type: ChannelType;
+  config: ChannelConfig;
+  enabled: boolean;
+}
+
+/** Routing severities for v1 (alert trigger categories). Tag-based routing is Phase 9. */
+export type RoutingSeverity = "fail" | "error" | "warn" | "resolved";
+
+export interface RoutingRule {
+  channelIds: number[];
+}
+
+export interface Routing {
+  /** severity → channels (defaults applied to every check). */
+  defaults: Record<string, RoutingRule>;
+  /** checkId → channels (per-check override of the severity defaults). */
+  overrides: Record<string, RoutingRule>;
+}

@@ -22,6 +22,8 @@ import type {
   Assertion,
   AvailabilitySeries,
   ChainStep,
+  Channel,
+  Routing,
   Check,
   CheckAuth,
   CheckDetail,
@@ -648,6 +650,55 @@ export async function setCheckLocations(id: number, locations: string[]): Promis
     body: JSON.stringify({ locations }),
   });
   return raw?.locations ?? [];
+}
+
+// ─── alerting: channels + routing (dashboard-managed) ────────────────────────
+// Channels are delivery TARGETS — no transport credentials. `config` is JSONB-ish
+// (nested camelCase) and passes through verbatim, like check assertions/auth.
+// Contract (parallel API PR):
+//   GET/POST /api/channels, PUT/DELETE /api/channels/{id}
+//   GET/PUT  /api/routing  -> { defaults:{[sev]:{channelIds}}, overrides:{[checkId]:{channelIds}} }
+
+/** Fields a channel create/update accepts (everything but the server-assigned id). */
+export type ChannelInput = Omit<Channel, "id">;
+
+export async function listChannels(): Promise<Channel[]> {
+  const raw = await request<Channel[]>("/channels");
+  return raw ?? [];
+}
+
+export async function createChannel(input: ChannelInput): Promise<Channel> {
+  return request<Channel>("/channels", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateChannel(id: number, input: ChannelInput): Promise<Channel> {
+  return request<Channel>(`/channels/${id}`, undefined, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteChannel(id: number): Promise<void> {
+  await request<unknown>(`/channels/${id}`, undefined, { method: "DELETE" });
+}
+
+export async function getRouting(): Promise<Routing> {
+  const raw = await request<Partial<Routing>>("/routing");
+  return { defaults: raw?.defaults ?? {}, overrides: raw?.overrides ?? {} };
+}
+
+export async function setRouting(routing: Routing): Promise<Routing> {
+  const raw = await request<Partial<Routing>>("/routing", undefined, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(routing),
+  });
+  return { defaults: raw?.defaults ?? routing.defaults, overrides: raw?.overrides ?? routing.overrides };
 }
 
 /** GET /api/sla?window= — per-check availability + server fleet rollup. */

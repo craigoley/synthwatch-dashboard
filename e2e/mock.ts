@@ -49,6 +49,10 @@ export interface World {
   locations?: { name: string; enabled: boolean }[];
   /** Per-check location assignment (GET /checks/{id}/locations). */
   checkLocations?: Record<number, string[]>;
+  /** Alerting channels (stateful across CRUD); undefined → endpoint 404s. */
+  channels?: RawObj[];
+  /** Alerting routing ({ defaults, overrides }); undefined → endpoint 404s. */
+  routing?: RawObj;
 }
 
 export function defaultWorld(): World {
@@ -68,6 +72,8 @@ export function defaultWorld(): World {
       { name: "decommissioned", enabled: false }, // disabled → must NOT appear in the selector
     ],
     checkLocations: {},
+    channels: [],
+    routing: { defaults: {}, overrides: {} },
   };
 }
 
@@ -106,6 +112,29 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
       }
       return json(route, { locations: locs });
     }
+    // Channels CRUD — stateful so create/delete reflect on the next GET.
+    if (path === "/api/channels" && method === "POST") {
+      const body = JSON.parse(req.postData() || "{}") as RawObj;
+      const id = (world.channels ?? []).reduce((mx, c) => Math.max(mx, Number(c.id) || 0), 0) + 1;
+      const created = { ...body, id };
+      world.channels = [...(world.channels ?? []), created];
+      return json(route, created);
+    }
+    if ((m = path.match(/^\/api\/channels\/(\d+)$/)) && method === "PUT") {
+      const id = Number(m[1]);
+      const body = JSON.parse(req.postData() || "{}") as RawObj;
+      world.channels = (world.channels ?? []).map((c) => (Number(c.id) === id ? { ...body, id } : c));
+      return json(route, { ...body, id });
+    }
+    if ((m = path.match(/^\/api\/channels\/(\d+)$/)) && method === "DELETE") {
+      const id = Number(m[1]);
+      world.channels = (world.channels ?? []).filter((c) => Number(c.id) !== id);
+      return route.fulfill({ status: 204 });
+    }
+    if (path === "/api/routing" && method === "PUT") {
+      world.routing = JSON.parse(req.postData() || "{}") as RawObj;
+      return json(route, world.routing);
+    }
 
     if (world.failAllReads) return route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"down"}' });
 
@@ -116,6 +145,13 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
     }
     if ((m = path.match(/^\/api\/checks\/(\d+)\/locations$/)) && method === "GET") {
       return json(route, { locations: world.checkLocations?.[Number(m[1])] ?? [] });
+    }
+    // Alerting reads (undefined → 404, exercising the "setup pending" path).
+    if (path === "/api/channels" && method === "GET") {
+      return world.channels ? json(route, world.channels) : json(route, { error: "not_found" }, 404);
+    }
+    if (path === "/api/routing" && method === "GET") {
+      return world.routing ? json(route, world.routing) : json(route, { error: "not_found" }, 404);
     }
     if ((m = path.match(/^\/api\/checks\/(\d+)$/))) {
       const d = world.details[Number(m[1])];
