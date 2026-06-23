@@ -131,6 +131,27 @@ export function emptySla(window = "24h"): RawObj {
   return { window, items: [], fleet: null };
 }
 
+/** One per-check SLA row (raw camelCase). */
+export function slaRow(over: RawObj = {}): RawObj {
+  return {
+    checkId: 1,
+    checkName: "Check",
+    kind: "http",
+    windowFrom: NOW,
+    windowTo: NOW,
+    completedRuns: 100,
+    upRuns: 100,
+    downRuns: 0,
+    availabilityPct: 100,
+    insufficientData: false,
+    ...over,
+  };
+}
+
+export function slaResponse(window: string, items: RawObj[] = [], fleet: RawObj | null = null): RawObj {
+  return { window, items, fleet };
+}
+
 /** /incidents is a RAW ARRAY (api-client splits it into open/resolved). */
 export function emptyIncidents(): RawObj[] {
   return [];
