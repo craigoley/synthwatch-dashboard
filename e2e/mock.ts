@@ -45,6 +45,10 @@ export interface World {
   createResponse?: { status: number; body: unknown };
   /** Make every GET fail (API-down → error-state test). */
   failAllReads?: boolean;
+  /** Available run locations (selector options); undefined → endpoint 404s. */
+  locations?: { name: string; enabled: boolean }[];
+  /** Per-check location assignment (GET /checks/{id}/locations). */
+  checkLocations?: Record<number, string[]>;
 }
 
 export function defaultWorld(): World {
@@ -57,6 +61,13 @@ export function defaultWorld(): World {
     incidentDetails: defaultIncidentDetails(),
     availability: availabilitySeries(),
     flows: [],
+    locations: [
+      { name: "eastus2", enabled: true },
+      { name: "centralus", enabled: true },
+      { name: "westeurope", enabled: true },
+      { name: "decommissioned", enabled: false }, // disabled → must NOT appear in the selector
+    ],
+    checkLocations: {},
   };
 }
 
@@ -86,10 +97,26 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
     if (/^\/api\/checks\/\d+$/.test(path) && method === "DELETE") {
       return route.fulfill({ status: 204 });
     }
+    // PUT location assignment — mirrors the API's ≥1-location rule (empty → 400).
+    if ((m = path.match(/^\/api\/checks\/(\d+)\/locations$/)) && method === "PUT") {
+      const body = JSON.parse(req.postData() || "{}");
+      const locs = Array.isArray(body.locations) ? (body.locations as string[]) : [];
+      if (locs.length === 0) {
+        return json(route, { error: "validation_error", message: "At least one location is required." }, 400);
+      }
+      return json(route, { locations: locs });
+    }
 
     if (world.failAllReads) return route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"down"}' });
 
     if (path === "/api/checks" && method === "GET") return json(route, world.checks);
+    // Locations: available options + a check's current assignment (undefined → 404).
+    if (path === "/api/locations" && method === "GET") {
+      return world.locations ? json(route, { locations: world.locations }) : json(route, { error: "not_found" }, 404);
+    }
+    if ((m = path.match(/^\/api\/checks\/(\d+)\/locations$/)) && method === "GET") {
+      return json(route, { locations: world.checkLocations?.[Number(m[1])] ?? [] });
+    }
     if ((m = path.match(/^\/api\/checks\/(\d+)$/))) {
       const d = world.details[Number(m[1])];
       return d ? json(route, d) : json(route, { error: "not_found" }, 404);
