@@ -69,8 +69,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_82%,transparent)] backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-4 px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2.5 shrink-0">
+        {/* Mobile: wraps to two rows — logo + fleet pulse on row 1, the full nav on
+            row 2 (so every tab stays tappable at ~390px). Desktop: a single h-14 row. */}
+        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:h-14 sm:flex-nowrap sm:py-0 sm:px-6">
+          <Link href="/" className="flex shrink-0 items-center gap-2.5">
             <Logo />
             <span className="flex flex-col leading-none">
               <span className="text-[15px] font-semibold tracking-tight">
@@ -82,14 +84,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
 
-          <nav className="ml-2 flex items-center gap-1 overflow-x-auto">
+          <nav className="order-last w-full flex items-center gap-1 overflow-x-auto sm:order-none sm:ml-2 sm:w-auto">
             {NAV.map((item) => {
               const active = item.match(pathname);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`sw-nav ${active ? "sw-nav-active" : ""}`}
+                  className={`sw-nav shrink-0 whitespace-nowrap ${active ? "sw-nav-active" : ""}`}
                 >
                   {item.label}
                 </Link>
@@ -97,7 +99,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div className="ml-auto flex items-center gap-4">
+          <div className="ml-auto flex shrink-0 items-center gap-4">
             <FleetPulse />
             <span className="hidden items-center gap-1.5 sm:flex">
               <span className="sw-dot sw-dot-running" />
