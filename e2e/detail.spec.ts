@@ -58,6 +58,32 @@ test.describe("check detail", () => {
     await expect(page.getByRole("heading", { name: "By location" })).toHaveCount(0);
   });
 
+  test("SLO: shows the error-budget + burn state when an SLO is set", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/checks/12");
+
+    await expect(page.getByRole("heading", { name: "Error budget (SLO)" })).toBeVisible();
+    await expect(page.getByText(/99\.90% target/)).toBeVisible();
+    await expect(page.getByText(/budget remaining/i)).toBeVisible();
+    await expect(page.getByText(/15\.0× burn rate/)).toBeVisible();
+    await expect(page.getByText(/Fast burn \(1h\): firing/i)).toBeVisible();
+    await expect(page.getByText(/Slow burn \(6h\): ok/i)).toBeVisible();
+  });
+
+  test("SLO: an exhausted budget reads as blown", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/checks/13");
+
+    await expect(page.getByText("Budget blown")).toBeVisible();
+    await expect(page.getByText(/over budget/i)).toBeVisible();
+  });
+
+  test("SLO: no panel when the check has no SLO (opt-in)", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/checks/1"); // slo null
+    await expect(page.getByRole("heading", { name: "Error budget (SLO)" })).toHaveCount(0);
+  });
+
   test("no runs yet: degrades gracefully (no crash)", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
