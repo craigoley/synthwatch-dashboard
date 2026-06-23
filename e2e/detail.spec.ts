@@ -121,6 +121,17 @@ test.describe("check detail", () => {
     await expect(page.getByText(/Regional — 1\/2 locations failing/)).toBeVisible();
   });
 
+  // ★ #47 — a pass+warn mix (no fail/error) must read as DEGRADED, not the green
+  // "Healthy in all locations" that contradicted the amber per-location badge.
+  test("multi-location: a warn location reads as 'degraded', not healthy", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/checks/14");
+
+    await expect(page.getByRole("heading", { name: "By location" })).toBeVisible();
+    await expect(page.getByText(/Degraded — 1\/2 location degraded/)).toBeVisible();
+    await expect(page.getByText(/Healthy in all locations/)).toHaveCount(0);
+  });
+
   test("single-location: NO per-location panel (no regression)", async ({ page }) => {
     await mockApi(page);
     await page.goto("/checks/1"); // only "default"

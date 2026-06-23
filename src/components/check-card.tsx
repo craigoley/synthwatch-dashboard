@@ -32,8 +32,16 @@ export function CheckCard({
   // distinct (amber) from a full outage (red) or healthy (token color).
   const locs = check.locations ?? [];
   const locDown = locs.filter((l) => l.status === "fail" || l.status === "error").length;
+  // warn = up-but-degraded; surfaced only when nothing is hard-down (failures win).
+  const locDegraded = locs.filter((l) => l.status === "warn").length;
   const regional = locs.length > 1 && locDown > 0 && locDown < locs.length;
-  const rail = check.open_incident_count > 0 ? TONE_VAR.fail : regional ? TONE_VAR.warn : RAIL[meta.token];
+  const degraded = locs.length > 1 && locDown === 0 && locDegraded > 0;
+  const rail =
+    check.open_incident_count > 0
+      ? TONE_VAR.fail
+      : regional || degraded
+        ? TONE_VAR.warn
+        : RAIL[meta.token];
 
   return (
     <Link
@@ -67,6 +75,14 @@ export function CheckCard({
                 style={{ color: TONE_VAR.warn }}
               >
                 · regional {locDown}/{locs.length}
+              </span>
+            )}
+            {degraded && (
+              <span
+                className="sw-mono text-[10px] uppercase tracking-wider"
+                style={{ color: TONE_VAR.warn }}
+              >
+                · degraded {locDegraded}/{locs.length}
               </span>
             )}
             {!check.enabled && (

@@ -359,6 +359,19 @@ export function defaultChecks(): RawObj[] {
         { location: "westus2", status: "fail" },
       ],
     }),
+    // ★ degraded — a warn location (no fail/error) must read as "degraded", NOT
+    // healthy. currentStatus is "pass" so the indicator can ONLY come from the
+    // per-location warn (the #47 bug: warn was dropped from the aggregate).
+    listItem({
+      id: 14,
+      name: "Degraded API",
+      kind: "http",
+      currentStatus: "pass",
+      locations: [
+        { location: "eastus2", status: "pass" },
+        { location: "westus2", status: "warn" },
+      ],
+    }),
     // ★ disabled check — the API reports currentStatus "paused" (outside the run
     // taxonomy); this once crashed the grid via runStatusMeta. Lock it down.
     listItem({ id: 8, name: "Paused check", kind: "http", enabled: false, currentStatus: "paused" }),
@@ -432,6 +445,12 @@ export function defaultDetails(): Record<number, RawObj> {
     10: detail({ id: 10, name: "Global API", kind: "http", currentStatus: "fail" }, [
       run({ id: 1001, checkId: 10, status: "pass", location: "eastus2" }),
       run({ id: 1002, checkId: 10, status: "fail", location: "westus2", errorMessage: "503 from westus2" }),
+    ]),
+    // MULTI-LOCATION DEGRADED: eastus2 healthy, westus2 warn (no fail) → "degraded",
+    // NOT "Healthy in all locations" (the #47 bug).
+    14: detail({ id: 14, name: "Degraded API", kind: "http", currentStatus: "pass" }, [
+      run({ id: 1401, checkId: 14, status: "pass", location: "eastus2" }),
+      run({ id: 1402, checkId: 14, status: "warn", location: "westus2", errorMessage: "elevated latency in westus2" }),
     ]),
   };
 }

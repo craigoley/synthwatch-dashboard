@@ -212,13 +212,22 @@ function PerLocationPanel({ runs }: { runs: Run[] }) {
   const entries = [...byLoc.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   const isDown = (r: Run) => r.status === "fail" || r.status === "error";
   const down = entries.filter(([, r]) => isDown(r)).length;
-  // ★ Regional (some locations down) is visually distinct from a global outage.
+  // warn = up-but-degraded; counted only when nothing is hard-down (failures take
+  // precedence in the headline).
+  const degraded = entries.filter(([, r]) => r.status === "warn").length;
+  // ★ 3-state summary, consistent with the per-location badges: down (regional vs
+  // global outage) → degraded (warn, NOT "healthy") → healthy.
   const verdict =
-    down === 0
-      ? { label: "Healthy in all locations", token: "pass" as const }
-      : down === entries.length
+    down > 0
+      ? down === entries.length
         ? { label: "Global outage — all locations failing", token: "fail" as const }
-        : { label: `Regional — ${down}/${entries.length} locations failing`, token: "warn" as const };
+        : { label: `Regional — ${down}/${entries.length} locations failing`, token: "warn" as const }
+      : degraded > 0
+        ? {
+            label: `Degraded — ${degraded}/${entries.length} location${degraded === 1 ? "" : "s"} degraded`,
+            token: "warn" as const,
+          }
+        : { label: "Healthy in all locations", token: "pass" as const };
 
   return (
     <div className="sw-panel p-4">

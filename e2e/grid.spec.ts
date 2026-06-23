@@ -57,6 +57,15 @@ test.describe("status grid", () => {
     await expect(page.locator('a[href="/checks/1"]')).not.toContainText(/regional/i);
   });
 
+  // ★ #47 — a warn location (no fail/error) surfaces as "degraded" on the card,
+  // distinct from "regional" and NOT silently green/healthy.
+  test("a warn location shows the 'degraded' indicator (not 'regional')", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/");
+    await expect(page.locator('a[href="/checks/14"]')).toContainText(/degraded 1\/2/i);
+    await expect(page.locator('a[href="/checks/14"]')).not.toContainText(/regional/i);
+  });
+
   test("kind-specific card labels (multistep step count, ssl cert, dns record)", async ({ page }) => {
     await mockApi(page);
     await page.goto("/");
