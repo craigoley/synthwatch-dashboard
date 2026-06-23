@@ -1,27 +1,35 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   Area,
   AreaChart,
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 
-import type { MetricPoint, Run } from "@/lib/types";
+import type { MetricPoint, Run, SlaWindow } from "@/lib/types";
 import { formatBytes, formatCount, formatDuration } from "@/lib/format";
 import { TONE_VAR } from "@/components/status-badge";
 import { cwvTone } from "@/lib/status";
+import { useAvailabilitySeries, useIncidents } from "@/lib/client";
 
 const AXIS = "#5d6b77";
 const GRID = "rgba(255,255,255,0.05)";
 
 function timeTick(ts: number): string {
   return new Date(ts).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function dateTick(ts: number): string {
+  return new Date(ts).toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
 }
 
 function ChartTooltip({
@@ -61,17 +69,20 @@ function ChartCard({
   unit,
   children,
   legend,
+  action,
 }: {
   title: string;
   unit?: string;
   children: React.ReactNode;
   legend?: React.ReactNode;
+  /** A header control (e.g. a window toggle), shown on the right instead of `unit`. */
+  action?: React.ReactNode;
 }) {
   return (
     <div className="sw-panel p-4">
-      <div className="mb-3 flex items-baseline justify-between">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-[var(--color-ink)]">{title}</h3>
-        {unit && <span className="sw-mono text-[10px] text-[var(--color-ink-faint)]">{unit}</span>}
+        {action ?? (unit && <span className="sw-mono text-[10px] text-[var(--color-ink-faint)]">{unit}</span>)}
       </div>
       {/* The plot occupies a FIXED-height box; the legend sits BELOW it, inside the
           card padding (not inside the 180px box, where it used to overflow). */}
@@ -133,6 +144,107 @@ export function LatencyChart({ runs }: { runs: Run[] }) {
           />
         </AreaChart>
       </ResponsiveContainer>
+    </ChartCard>
+  );
+}
+
+const AVAIL_WINDOWS: SlaWindow[] = ["24h", "7d", "30d", "90d"];
+const pctAxis = (v: number) => `${v}%`;
+const pctTip = (v: number | null) => (v == null ? "no data" : `${v.toFixed(2)}%`);
+
+/**
+ * Availability (uptime) over time — complements the SLA panel (point-in-time % per
+ * window) with the SHAPE over a window. Self-contained: own window toggle + fetch.
+ *  • y-domain is zoomed (min−1 → 100) so small dips (99→100) are visible, with the
+ *    100% baseline always shown; a real 0% dip still spans the full range.
+ *  • null buckets are a GAP in the line (connectNulls=false), not a 0% drop.
+ *  • the check's incidents are overlaid as red markers at their open time.
+ */
+export function AvailabilityChart({ checkId }: { checkId: number }) {
+  const [win, setWin] = useState<SlaWindow>("24h");
+  const { data, isLoading } = useAvailabilitySeries(checkId, win);
+  const { data: incidents } = useIncidents();
+
+  const rows = (data?.points ?? []).map((p) => ({ ts: new Date(p.ts).getTime(), pct: p.availability_pct }));
+  const vals = rows.map((r) => r.pct).filter((v): v is number => v != null);
+  const lo = vals.length ? Math.min(...vals) : 100;
+  // Zoom so small dips are visible, but never hide the 100% baseline.
+  const domainMin = Math.max(0, Math.min(99, Math.floor(lo) - 1));
+  const tickFn = data?.bucket === "day" ? dateTick : timeTick;
+
+  const tsMin = rows[0]?.ts;
+  const tsMax = rows[rows.length - 1]?.ts;
+  const marks =
+    tsMin != null && tsMax != null
+      ? [...(incidents?.open ?? []), ...(incidents?.resolved ?? [])]
+          .filter((i) => i.check_id === checkId)
+          .map((i) => ({ id: i.id, ts: new Date(i.opened_at).getTime() }))
+          .filter((m) => m.ts >= tsMin && m.ts <= tsMax)
+      : [];
+
+  const toggle = (
+    <div className="inline-flex rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5">
+      {AVAIL_WINDOWS.map((w) => (
+        <button
+          key={w}
+          type="button"
+          onClick={() => setWin(w)}
+          className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition ${
+            w === win
+              ? "bg-[var(--color-panel-2)] text-[var(--color-ink)]"
+              : "text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]"
+          }`}
+        >
+          {w}
+        </button>
+      ))}
+    </div>
+  );
+
+  return (
+    <ChartCard title="Availability over time" action={toggle}>
+      {rows.length === 0 ? (
+        <div className="flex h-full items-center justify-center text-xs text-[var(--color-ink-faint)]">
+          {isLoading ? "loading…" : "no availability data in this window yet"}
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={rows} margin={{ top: 4, right: 8, bottom: 0, left: -4 }}>
+            <CartesianGrid stroke={GRID} vertical={false} />
+            <XAxis
+              dataKey="ts"
+              type="number"
+              domain={["dataMin", "dataMax"]}
+              scale="time"
+              tickFormatter={tickFn}
+              stroke={AXIS}
+              tick={{ fontSize: 10 }}
+              minTickGap={36}
+            />
+            <YAxis domain={[domainMin, 100]} stroke={AXIS} tick={{ fontSize: 10 }} tickFormatter={pctAxis} width={44} />
+            <Tooltip content={<ChartTooltip fmt={pctTip} />} />
+            {marks.map((m) => (
+              <ReferenceLine
+                key={m.id}
+                x={m.ts}
+                stroke="var(--color-fail)"
+                strokeDasharray="3 3"
+                label={{ value: `#${m.id}`, fontSize: 9, fill: "var(--color-fail)", position: "insideTopRight" }}
+              />
+            ))}
+            <Line
+              type="monotone"
+              dataKey="pct"
+              name="availability"
+              stroke="#45e3c2"
+              strokeWidth={1.6}
+              dot={false}
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
     </ChartCard>
   );
 }

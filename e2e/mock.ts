@@ -7,6 +7,7 @@
  */
 import type { Page, Route } from "@playwright/test";
 import {
+  availabilitySeries,
   defaultChecks,
   defaultDetails,
   defaultIncidents,
@@ -35,6 +36,8 @@ export interface World {
   slaByWindow?: Record<string, RawObj>;
   incidents: RawObj[];
   incidentDetails: Record<number, RawObj>;
+  /** Availability-over-time series (any window); null = chart shows empty state. */
+  availability: RawObj | null;
   flows: RawObj[];
   /** Make the screenshot proxy return 404 (blob expired/retention). */
   screenshot404?: boolean;
@@ -52,6 +55,7 @@ export function defaultWorld(): World {
     sla: emptySla(),
     incidents: defaultIncidents(),
     incidentDetails: defaultIncidentDetails(),
+    availability: availabilitySeries(),
     flows: [],
   };
 }
@@ -94,6 +98,10 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
       const d = world.details[Number(m[1])];
       const runs = (d?.recentRuns as RawObj[]) ?? [];
       return json(route, { items: runs, total: runs.length, page: 1, pageSize: 50 });
+    }
+    if (/^\/api\/checks\/\d+\/availability-series$/.test(path)) {
+      const win = url.searchParams.get("window") ?? "24h";
+      return json(route, world.availability ? { ...world.availability, window: win } : { window: win, bucket: "hour", points: [] });
     }
     if (/^\/api\/checks\/\d+\/metrics$/.test(path)) return json(route, { items: [] });
     if ((m = path.match(/^\/api\/runs\/(\d+)\/steps$/))) return json(route, world.steps[Number(m[1])] ?? []);

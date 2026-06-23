@@ -12,10 +12,11 @@ test.describe("check detail", () => {
     await mockApi(page, world);
     await page.goto("/checks/1");
 
-    // the 90d toggle button exists alongside the existing windows
-    await expect(page.getByRole("button", { name: "90d", exact: true })).toBeVisible();
+    // scope to the SLA panel (the availability chart also has a 90d toggle)
+    const sla = page.locator(".sw-panel", { hasText: "Availability (SLA)" });
+    await expect(sla.getByRole("button", { name: "90d", exact: true })).toBeVisible();
     // its value renders (the other windows are empty → this 99.90% is the 90d card)
-    await expect(page.getByText("99.90%")).toBeVisible();
+    await expect(sla.getByText("99.90%")).toBeVisible();
   });
 
   test("SLA: a thin 90d window reads 'building baseline'", async ({ page }) => {
@@ -26,8 +27,49 @@ test.describe("check detail", () => {
     await mockApi(page, world);
     await page.goto("/checks/1");
 
-    await expect(page.getByRole("button", { name: "90d", exact: true })).toBeVisible();
-    await expect(page.getByText(/building baseline/i).first()).toBeVisible();
+    const sla = page.locator(".sw-panel", { hasText: "Availability (SLA)" });
+    await expect(sla.getByRole("button", { name: "90d", exact: true })).toBeVisible();
+    await expect(sla.getByText(/building baseline/i).first()).toBeVisible();
+  });
+
+  test("availability: over-time chart renders with a null gap (not a 0 dip)", async ({ page }) => {
+    await mockApi(page); // default world serves a series with a dip + a null bucket
+    await page.goto("/checks/1");
+
+    const card = page.locator(".sw-panel", { hasText: "Availability over time" });
+    await expect(card.getByRole("heading", { name: "Availability over time" })).toBeVisible();
+    await page.waitForTimeout(500); // let recharts paint
+
+    // the line renders
+    const line = card.locator(".recharts-line-curve").first();
+    await expect(line).toBeVisible();
+
+    // ★ null bucket → a GAP: connectNulls=false breaks the path into >1 segment (M cmd).
+    // A 0% dip (or connectNulls) would be a single continuous path (one M).
+    const segments = await line.evaluate((el) => (el.getAttribute("d")?.match(/M/g) || []).length);
+    expect(segments).toBeGreaterThan(1);
+  });
+
+  test("availability: its own window toggle switches and re-renders", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/checks/1");
+    const card = page.locator(".sw-panel", { hasText: "Availability over time" });
+    await card.getByRole("button", { name: "90d", exact: true }).click();
+    await page.waitForTimeout(400);
+    await expect(card.locator(".recharts-line-curve").first()).toBeVisible();
+  });
+
+  test("availability: empty series shows a graceful empty state (no crash)", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    const world = defaultWorld();
+    world.availability = null; // no series
+    await mockApi(page, world);
+    await page.goto("/checks/1");
+
+    const card = page.locator(".sw-panel", { hasText: "Availability over time" });
+    await expect(card.getByText(/no availability data/i)).toBeVisible();
+    expect(errors).toEqual([]);
   });
 
   test("multistep: shows the step chain + flags the failed step", async ({ page }) => {
