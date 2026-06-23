@@ -154,11 +154,103 @@ export function incident(over: RawObj = {}): RawObj {
   };
 }
 
+/** GET /api/incidents/{id} — investigation detail (camelCase per the API contract). */
+export function incidentDetail(over: RawObj = {}): RawObj {
+  return {
+    id: 1,
+    checkId: 10,
+    checkName: "Global API",
+    checkKind: "http",
+    status: "resolved",
+    severity: "critical",
+    openedAt: NOW,
+    resolvedAt: NOW,
+    durationSeconds: 540,
+    consecutiveFailures: 3,
+    summary: "503s from westus2",
+    rca: null,
+    perLocation: [
+      { location: "eastus2", status: "pass" },
+      { location: "westus2", status: "fail" },
+    ],
+    timeline: [],
+    recurrence: [],
+    ...over,
+  };
+}
+
+export function defaultIncidentDetails(): Record<number, RawObj> {
+  return {
+    // id 1 — populated rca + a fail→recovery timeline (with screenshot/trace) + recurrence
+    1: incidentDetail({
+      id: 1,
+      rca: {
+        classification: "real-outage",
+        confidence: "medium",
+        observed: ["westus2 returned 503 on 3/3 attempts", "eastus2 returned 200 throughout"],
+        inferred: ["likely a regional provider outage in westus2", "not a code regression — other regions healthy"],
+        summary: "Failures isolated to westus2; eastus2 healthy.",
+      },
+      timeline: [
+        {
+          runId: 1001,
+          status: "fail",
+          startedAt: "2026-06-22T17:50:00Z",
+          durationMs: 45000,
+          httpStatus: 503,
+          errorMessage: "503 Service Unavailable from westus2",
+          failedStep: null,
+          screenshotUrl: "/api/runs/1001/screenshot",
+          traceUrl: "/api/runs/1001/trace",
+          location: "westus2",
+        },
+        {
+          runId: 1002,
+          status: "pass",
+          startedAt: "2026-06-22T18:00:00Z",
+          durationMs: 240,
+          httpStatus: 200,
+          errorMessage: null,
+          failedStep: null,
+          screenshotUrl: null,
+          traceUrl: null,
+          location: "westus2",
+        },
+      ],
+      recurrence: [
+        { id: 3, openedAt: "2026-06-20T10:00:00Z", resolvedAt: "2026-06-20T10:30:00Z", status: "resolved", summary: "earlier westus2 blip" },
+      ],
+    }),
+    // id 2 — rca null (graceful: no RCA panel), no recurrence
+    2: incidentDetail({
+      id: 2,
+      checkName: "Legacy check",
+      rca: null,
+      timeline: [
+        {
+          runId: 2001,
+          status: "fail",
+          startedAt: NOW,
+          durationMs: 30000,
+          httpStatus: null,
+          errorMessage: "timeout",
+          failedStep: null,
+          screenshotUrl: null,
+          traceUrl: null,
+          location: "default",
+        },
+      ],
+      recurrence: [],
+    }),
+  };
+}
+
 /** One incident WITH a populated rca + one with rca null (graceful-empty case). */
 export function defaultIncidents(): RawObj[] {
   return [
     incident({
       id: 1,
+      checkId: 10,
       checkName: "Global API",
       summary: "503s from westus2",
       rca: {

@@ -263,6 +263,48 @@ export interface IncidentWithCheck {
   rca: IncidentRca | null;
 }
 
+/** One run in an incident's evidence timeline (GET /api/incidents/{id}). */
+export interface IncidentTimelineRun {
+  run_id: number;
+  status: RunStatus;
+  started_at: string;
+  duration_ms: number | null;
+  http_status: number | null;
+  error_message: string | null;
+  failed_step: string | null;
+  screenshot_url: string | null;
+  trace_url: string | null;
+  location: string | null;
+}
+
+/** A prior/related incident on the same check (recurrence / flapping). */
+export interface IncidentRecurrence {
+  id: number;
+  opened_at: string;
+  resolved_at: string | null;
+  status: string;
+  summary: string | null;
+}
+
+/** Full incident investigation payload (GET /api/incidents/{id}). */
+export interface IncidentDetail {
+  id: number;
+  check_id: number;
+  check_name: string;
+  check_kind: CheckKind;
+  status: string;
+  severity: IncidentSeverity;
+  opened_at: string;
+  resolved_at: string | null;
+  duration_seconds: number | null;
+  consecutive_failures: number;
+  summary: string | null;
+  rca: IncidentRca | null;
+  per_location: LocationStatus[];
+  timeline: IncidentTimelineRun[];
+  recurrence: IncidentRecurrence[];
+}
+
 /** Paginated run history. */
 export interface RunsPage {
   runs: Run[];

@@ -28,6 +28,7 @@ import type {
   Flow,
   NetConfig,
   CheckWithStatus,
+  IncidentDetail,
   IncidentRca,
   IncidentSeverity,
   IncidentsResponse,
@@ -499,6 +500,82 @@ export async function listIncidents(): Promise<IncidentsResponse> {
   return {
     open: all.filter((i) => i.resolved_at === null),
     resolved: all.filter((i) => i.resolved_at !== null),
+  };
+}
+
+interface RawTimelineRun {
+  runId: number;
+  status: RunStatus;
+  startedAt: string;
+  durationMs: number | null;
+  httpStatus: number | null;
+  errorMessage: string | null;
+  failedStep: string | null;
+  screenshotUrl: string | null;
+  traceUrl: string | null;
+  location: string | null;
+}
+interface RawRecurrence {
+  id: number;
+  openedAt: string;
+  resolvedAt: string | null;
+  status: string;
+  summary: string | null;
+}
+interface RawIncidentDetail {
+  id: number;
+  checkId: number;
+  checkName: string;
+  checkKind: CheckKind;
+  status: string;
+  severity: IncidentSeverity;
+  openedAt: string;
+  resolvedAt: string | null;
+  durationSeconds: number | null;
+  consecutiveFailures: number;
+  summary: string | null;
+  rca: IncidentRca | null;
+  perLocation: LocationStatus[] | null;
+  timeline: RawTimelineRun[] | null;
+  recurrence: RawRecurrence[] | null;
+}
+
+/** GET /api/incidents/{id} — the incident investigation payload. */
+export async function getIncident(id: number): Promise<IncidentDetail> {
+  const raw = await request<RawIncidentDetail>(`/incidents/${id}`);
+  return {
+    id: raw.id,
+    check_id: raw.checkId,
+    check_name: raw.checkName,
+    check_kind: raw.checkKind,
+    status: raw.status,
+    severity: raw.severity,
+    opened_at: raw.openedAt,
+    resolved_at: raw.resolvedAt,
+    duration_seconds: raw.durationSeconds ?? null,
+    consecutive_failures: raw.consecutiveFailures,
+    summary: raw.summary,
+    rca: raw.rca ?? null,
+    per_location: raw.perLocation ?? [],
+    timeline: (raw.timeline ?? []).map((t) => ({
+      run_id: t.runId,
+      status: t.status,
+      started_at: t.startedAt,
+      duration_ms: t.durationMs,
+      http_status: t.httpStatus,
+      error_message: t.errorMessage,
+      failed_step: t.failedStep,
+      screenshot_url: t.screenshotUrl,
+      trace_url: t.traceUrl,
+      location: t.location ?? null,
+    })),
+    recurrence: (raw.recurrence ?? []).map((r) => ({
+      id: r.id,
+      opened_at: r.openedAt,
+      resolved_at: r.resolvedAt,
+      status: r.status,
+      summary: r.summary,
+    })),
   };
 }
 

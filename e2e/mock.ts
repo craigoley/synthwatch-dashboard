@@ -10,6 +10,7 @@ import {
   defaultChecks,
   defaultDetails,
   defaultIncidents,
+  defaultIncidentDetails,
   defaultSteps,
   emptySla,
   type RawObj,
@@ -31,6 +32,7 @@ export interface World {
   steps: Record<number, RawObj[]>;
   sla: RawObj;
   incidents: RawObj[];
+  incidentDetails: Record<number, RawObj>;
   flows: RawObj[];
   /** Make the screenshot proxy return 404 (blob expired/retention). */
   screenshot404?: boolean;
@@ -47,6 +49,7 @@ export function defaultWorld(): World {
     steps: defaultSteps(),
     sla: emptySla(),
     incidents: defaultIncidents(),
+    incidentDetails: defaultIncidentDetails(),
     flows: [],
   };
 }
@@ -105,6 +108,10 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
       });
     }
     if (path === "/api/sla") return json(route, { ...world.sla, window: url.searchParams.get("window") ?? "24h" });
+    if ((m = path.match(/^\/api\/incidents\/(\d+)$/))) {
+      const d = world.incidentDetails[Number(m[1])];
+      return d ? json(route, d) : json(route, { error: "not_found" }, 404);
+    }
     if (path === "/api/incidents") return json(route, world.incidents);
     if (path === "/api/flows") return json(route, world.flows);
 
