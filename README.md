@@ -120,5 +120,3 @@ src/
 
 Next.js (App Router) · TypeScript (strict) · Tailwind CSS v4 · recharts · SWR ·
 zod · pnpm. No server-side DB driver — the C# API owns data access.
-
-<!-- verdict-union live check: trivial no-op, expect parsed_verdict=PASS (safe to revert) -->
