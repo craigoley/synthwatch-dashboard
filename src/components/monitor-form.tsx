@@ -115,7 +115,7 @@ function Segmented<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="inline-flex rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5">
+    <div className="inline-flex max-w-full flex-wrap gap-0.5 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5">
       {options.map((o) => (
         <button
           key={o.value}
@@ -330,8 +330,11 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
       </Field>
 
       <div className="flex flex-wrap items-center gap-6">
-        <div>
-          <span className="sw-label">Kind</span>
+        {/* Label reads "Type" to the user; the field still binds to `kind` (the DB
+            column / API key / runner all stay `kind` — display string only). The
+            block is full-width on mobile so the 7 options wrap inside the modal. */}
+        <div className="w-full sm:w-auto">
+          <span className="sw-label">Type</span>
           <Segmented
             value={form.kind}
             onChange={(v) => set("kind", v)}
