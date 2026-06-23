@@ -25,7 +25,6 @@ export function ChannelForm({ initial, onDone, onCancel }: Props) {
   const [name, setName] = useState(initial?.name ?? "");
   const [type, setType] = useState<ChannelType>(initial?.type ?? "email");
   const [recipients, setRecipients] = useState((initial?.config.to ?? []).join(", "));
-  const [from, setFrom] = useState(initial?.config.from ?? "");
   const [url, setUrl] = useState(initial?.config.url ?? "");
   const [authHeader, setAuthHeader] = useState(initial?.config.authHeader ?? "");
   const [enabled, setEnabled] = useState(initial?.enabled ?? true);
@@ -40,15 +39,12 @@ export function ChannelForm({ initial, onDone, onCancel }: Props) {
       setError("Name is required.");
       return;
     }
-    // Validation mirrors the API: email needs ≥1 recipient + from; webhook needs a URL.
+    // Validation mirrors the API: email needs ≥1 recipient (the sender is transport env, not here);
+    // webhook needs a URL.
     const to = parseRecipients(recipients);
     if (type === "email") {
       if (to.length === 0) {
         setError("Add at least one recipient email address.");
-        return;
-      }
-      if (from.trim() === "") {
-        setError("A 'from' address is required for email.");
         return;
       }
     } else if (url.trim() === "") {
@@ -58,7 +54,7 @@ export function ChannelForm({ initial, onDone, onCancel }: Props) {
 
     const config =
       type === "email"
-        ? { to, from: from.trim() }
+        ? { to }
         : { url: url.trim(), authHeader: authHeader.trim() || null };
 
     setSubmitting(true);
@@ -140,21 +136,12 @@ export function ChannelForm({ initial, onDone, onCancel }: Props) {
               Comma-separated. Who receives the alert.
             </span>
           </label>
-          <label className="block">
-            <span className="sw-label">From address</span>
-            <input
-              className="sw-input sw-mono"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              placeholder="alerts@example.com"
-              aria-label="from address"
-            />
-          </label>
-          {/* ★ No credential field — email delivery uses the ACS transport configured
-              in infrastructure. The user sets recipients here, not credentials. */}
+          {/* ★ No sender or credential field — both are transport properties (a verified sender on
+              the ACS-owned domain + the ACS connection string) configured in infrastructure, not
+              per-channel. The user sets recipients only. */}
           <p className="rounded-lg border border-dashed border-[var(--color-border)] px-3 py-2 text-[11px] text-[var(--color-ink-dim)]">
-            Email delivery uses the ACS transport configured in infrastructure — no
-            credentials are stored here. You set the recipients; ops sets the transport.
+            Sent from the configured ACS sender (set in infrastructure) — the sender and transport
+            credentials are not editable here. You set the recipients only.
           </p>
         </>
       ) : (
