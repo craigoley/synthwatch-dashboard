@@ -6,6 +6,13 @@ name: Claude Review
 # so a prompt-injected untrusted diff has no path to a merge. Runs on the Max
 # subscription OAuth token (no per-use API cost).
 #
+# LAYER 2 (findings gate): the review ends with a single `REVIEW_VERDICT: BLOCK|PASS`
+# line; the "Enforce review verdict" step parses the LAST one and FAILS the job on
+# BLOCK. Because "Claude review" (this job's name) is a REQUIRED status check,
+# native auto-merge then HOLDS the merge on BLOCK and proceeds on PASS. FAIL-OPEN:
+# a missing/malformed/errored review never blocks (the gate exits 0 with a warning).
+# Layer 1 (the merge waits for this check to COMPLETE) is the required-context setup.
+#
 # IMPORTANT (root cause of the earlier no-op): supplying `prompt` on a
 # pull_request event runs the action in AUTOMATION mode, which by design does
 # NOT create a tracking comment and does NOT wire up the GitHub comment /
@@ -36,6 +43,11 @@ jobs:
           fetch-depth: 1
 
       - name: Claude review
+        id: review
+        # FAIL-OPEN: if the action itself errors (token, network, timeout), the step
+        # fails but does NOT fail the job — the enforce step (if: always()) then finds
+        # no verdict and exits 0. A review error must never block a merge.
+        continue-on-error: true
         uses: anthropics/claude-code-action@2fee15510437d71399d9139ed60433470484a8fb # v1
         env:
           # Authenticate the `gh` CLI used by the Bash tool (gh pr comment/diff/view).
@@ -83,6 +95,18 @@ jobs:
             find actionable issues you can fix safely, commit the fix to the PR
             branch (verify with `pnpm typecheck` / `pnpm build` where relevant);
             otherwise leave the comments for the author. Never run `gh pr merge`.
+
+            ★ VERDICT (REQUIRED): after posting your review, the FINAL line of your
+            response must be your verdict, in EXACTLY this format and with nothing
+            after it:
+              REVIEW_VERDICT: <BLOCK or PASS>
+            Replace <BLOCK or PASS> with one word. Use BLOCK ONLY for issues that must
+            not merge: correctness bugs, security vulnerabilities, data loss, or
+            breaking changes / broken invariants (including the hard invariants above).
+            For everything else — style, nits, suggestions, minor improvements — use
+            PASS and leave them as comments (do not block). If you are unsure, use PASS.
+            An honest PASS with nits beats a wrong BLOCK. The gate reads the LAST
+            REVIEW_VERDICT line.
           # --allowedTools MUST be a single QUOTED value. claude_args is parsed with
           # shell-quote, which splits on UNQUOTED whitespace (it escapes () but not
           # spaces). So any tool pattern containing a space — Bash(gh pr comment:*),
@@ -101,3 +125,32 @@ jobs:
             --model claude-opus-4-8
             --max-turns 50
             --allowedTools "Edit,Write,Read,Bash(git:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(pnpm:*),Bash(npx tsc:*),mcp__github_inline_comment__create_inline_comment"
+
+      # ★ Layer 2 — findings gate. This step's exit code IS this job's outcome, and
+      # this job ("Claude review") is a REQUIRED status check: exit 1 (BLOCK) fails
+      # it -> native auto-merge holds; exit 0 (PASS / fail-open) lets the merge
+      # proceed. The prompt asks for `REVIEW_VERDICT: <BLOCK or PASS>`, so the only
+      # exact "REVIEW_VERDICT: BLOCK|PASS" tokens in the execution log are Claude's
+      # actual verdict (the placeholder in the prompt doesn't match) — take the LAST.
+      - name: Enforce review verdict
+        if: ${{ always() }}
+        env:
+          EXEC_FILE: ${{ steps.review.outputs.execution_file }}
+        run: |
+          set -uo pipefail
+          if [ -z "${EXEC_FILE:-}" ] || [ ! -f "$EXEC_FILE" ]; then
+            echo "::warning::No review execution file (the review errored or produced none) — failing OPEN (treating as PASS)."
+            exit 0
+          fi
+          VERDICT=$(grep -oE 'REVIEW_VERDICT: (BLOCK|PASS)' "$EXEC_FILE" | tail -n1 | awk '{print $2}')
+          echo "Parsed review verdict: '${VERDICT:-<none>}'"
+          if [ "$VERDICT" = "BLOCK" ]; then
+            echo "::error::Claude review verdict is BLOCK — holding the merge until the blocking findings are addressed."
+            exit 1
+          fi
+          if [ "$VERDICT" = "PASS" ]; then
+            echo "Claude review verdict is PASS — gate green."
+            exit 0
+          fi
+          echo "::warning::No / malformed REVIEW_VERDICT in the review output — failing OPEN (treating as PASS)."
+          exit 0
