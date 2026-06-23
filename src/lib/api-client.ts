@@ -607,6 +607,49 @@ export async function listFlows(): Promise<Flow[]> {
   return (raw ?? []).map(mapFlow);
 }
 
+// ─── locations (multi-location: the run-location ASSIGNMENT, not per-run status) ──
+// Contract (served by the parallel API PR):
+//   GET /api/locations            -> { locations: [{ name, enabled }] }  (selector options)
+//   GET /api/checks/{id}/locations-> { locations: ["eastus2", …] }       (current assignment)
+//   PUT /api/checks/{id}/locations  body { locations:[…] } -> { locations:[…] }
+//     (400 on empty or on unknown/disabled names). `name`/`enabled` are already the
+//     UI shape — no camel→snake adaptation needed.
+
+/** An available run location (selector option). */
+export interface LocationOption {
+  name: string;
+  enabled: boolean;
+}
+
+interface RawLocationsResponse {
+  locations?: { name: string; enabled: boolean }[];
+}
+interface RawCheckLocations {
+  locations?: string[];
+}
+
+/** GET /api/locations — every available location (callers filter to enabled). */
+export async function getLocations(): Promise<LocationOption[]> {
+  const raw = await request<RawLocationsResponse>("/locations");
+  return (raw?.locations ?? []).map((l) => ({ name: l.name, enabled: l.enabled }));
+}
+
+/** GET /api/checks/{id}/locations — the check's current location assignment. */
+export async function getCheckLocations(id: number): Promise<string[]> {
+  const raw = await request<RawCheckLocations>(`/checks/${id}/locations`);
+  return raw?.locations ?? [];
+}
+
+/** PUT /api/checks/{id}/locations — set the assignment; returns the new set. */
+export async function setCheckLocations(id: number, locations: string[]): Promise<string[]> {
+  const raw = await request<RawCheckLocations>(`/checks/${id}/locations`, undefined, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ locations }),
+  });
+  return raw?.locations ?? [];
+}
+
 /** GET /api/sla?window= — per-check availability + server fleet rollup. */
 export async function getSla(window: SlaWindow = "24h"): Promise<SlaResponse> {
   const raw = await request<RawSlaResponse>("/sla", { window });

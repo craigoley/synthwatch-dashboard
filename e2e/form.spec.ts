@@ -211,3 +211,77 @@ test.describe("monitor form", () => {
     await expect(err).toBeVisible(); // ★ error still visible when collapsed
   });
 });
+
+// ★ Multi-location: the run-location SELECTOR in the monitor editor. Built to the
+// API contract (GET /api/locations, GET/PUT /api/checks/{id}/locations); mock-verified.
+test.describe("location selector", () => {
+  test("shows only ENABLED locations (disabled hidden)", async ({ page }) => {
+    await mockApi(page);
+    await openNewMonitor(page);
+    await expect(page.getByRole("checkbox", { name: "eastus2" })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "centralus" })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "westeurope" })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "decommissioned" })).toHaveCount(0); // disabled
+  });
+
+  test("a NEW check defaults to ALL enabled locations selected", async ({ page }) => {
+    await mockApi(page);
+    await openNewMonitor(page);
+    for (const name of ["eastus2", "centralus", "westeurope"]) {
+      await expect(page.getByRole("checkbox", { name })).toHaveAttribute("aria-checked", "true");
+    }
+  });
+
+  test("editing shows the check's current assignment", async ({ page }) => {
+    const world = defaultWorld();
+    world.checkLocations = { 1: ["eastus2"] }; // check 1 = "API health"
+    await mockApi(page, world);
+    await page.goto("/monitors");
+    await page.getByRole("button", { name: "Edit" }).first().click(); // first row = check 1
+    await page.getByRole("heading", { name: /Edit ·/ }).waitFor();
+    await expect(page.getByRole("checkbox", { name: "eastus2" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("checkbox", { name: "centralus" })).toHaveAttribute("aria-checked", "false");
+    await expect(page.getByRole("checkbox", { name: "westeurope" })).toHaveAttribute("aria-checked", "false");
+  });
+
+  test("deselecting to zero disables save (the ≥1-location guard)", async ({ page }) => {
+    await mockApi(page);
+    await openNewMonitor(page);
+    for (const name of ["eastus2", "centralus", "westeurope"]) {
+      await page.getByRole("checkbox", { name }).click(); // deselect all
+    }
+    await expect(page.getByText("Select at least one location.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Create monitor" })).toBeDisabled();
+  });
+
+  test("saving PUTs the selected location set", async ({ page }) => {
+    await mockApi(page);
+    await openNewMonitor(page);
+    await page.locator("input").first().fill("Geo check");
+    await page.locator('input[inputmode="url"]').fill("https://example.com/health");
+    await page.getByRole("checkbox", { name: "westeurope" }).click(); // deselect → eastus2 + centralus remain
+
+    const put = page.waitForRequest(
+      (r) => /\/api\/checks\/\d+\/locations$/.test(r.url()) && r.method() === "PUT",
+    );
+    await page.getByRole("button", { name: "Create monitor" }).click();
+    const body = (await put).postDataJSON();
+    expect([...body.locations].sort()).toEqual(["centralus", "eastus2"]);
+  });
+
+  // ★ Built to the CONTRACT — before the parallel API PR merges, /api/locations 404s.
+  // The selector must stay hidden and saving must NOT be blocked (backend defaults to all).
+  test("locations endpoint absent (pre-API) -> selector hidden, create still works", async ({ page }) => {
+    const world = defaultWorld();
+    world.locations = undefined; // endpoint 404s
+    await mockApi(page, world);
+    await openNewMonitor(page);
+    await page.locator("input").first().fill("No-geo check");
+    await page.locator('input[inputmode="url"]').fill("https://example.com/health");
+    await expect(page.getByRole("checkbox", { name: "eastus2" })).toHaveCount(0); // no selector
+    const post = page.waitForRequest((r) => r.url().endsWith("/api/checks") && r.method() === "POST");
+    await page.getByRole("button", { name: "Create monitor" }).click();
+    await post; // create proceeded (not blocked)
+    await expect(page.getByRole("heading", { name: "New monitor" })).toHaveCount(0); // modal closed = success
+  });
+});

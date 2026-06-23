@@ -1,8 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { createCheck, updateCheck, useFlows } from "@/lib/client";
+import {
+  createCheck,
+  updateCheck,
+  setCheckLocations,
+  useFlows,
+  useLocations,
+  useCheckLocations,
+} from "@/lib/client";
 import { ApiRequestError } from "@/lib/api-client";
 import {
   AssertionBuilder,
@@ -49,6 +56,8 @@ interface FormState {
   dns_expected_value: string;
   tcp_port: string;
   ping_port: string;
+  /** Run-location assignment (seeded from /api/locations once it loads). */
+  locations: string[];
 }
 
 function asRecordType(r: string | null | undefined): DnsRecordType {
@@ -102,6 +111,9 @@ function fromCheck(c: Check | null | undefined): FormState {
     dns_expected_value: c?.net_config?.expectedValue ?? "",
     tcp_port: c?.kind === "tcp" && c.net_config?.port != null ? String(c.net_config.port) : "",
     ping_port: c?.kind === "ping" && c.net_config?.port != null ? String(c.net_config.port) : "",
+    // Seeded asynchronously once /api/locations (and, on edit, the current
+    // assignment) load — see the seeding effect in MonitorForm.
+    locations: [],
   };
 }
 
@@ -163,6 +175,44 @@ function Toggle({
   );
 }
 
+/** Multi-select of run locations — same chip styling as Segmented, but toggles
+    multiple. Wraps full-width on mobile (like the Type row). */
+function LocationSelect({
+  options,
+  selected,
+  onToggle,
+}: {
+  options: string[];
+  selected: string[];
+  onToggle: (name: string) => void;
+}) {
+  return (
+    <div className="inline-flex max-w-full flex-wrap gap-0.5 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5">
+      {options.map((name) => {
+        const on = selected.includes(name);
+        return (
+          <button
+            key={name}
+            type="button"
+            role="checkbox"
+            aria-checked={on}
+            aria-label={name}
+            onClick={() => onToggle(name)}
+            className={`sw-mono rounded-md px-3 py-1.5 text-xs font-medium transition ${
+              on
+                ? "bg-[var(--color-panel-2)] text-[var(--color-ink)]"
+                : "text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]"
+            }`}
+          >
+            {on ? "✓ " : ""}
+            {name}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function Field({
   label,
   hint,
@@ -194,6 +244,39 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
   const isEdit = Boolean(initial);
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  // ─── locations (run-location assignment) ───────────────────────────────────
+  const { data: locationOptions } = useLocations();
+  const { data: currentLocations } = useCheckLocations(isEdit && initial ? initial.id : null);
+  const [locationsSeeded, setLocationsSeeded] = useState(false);
+  const enabledLocations = (locationOptions ?? []).filter((l) => l.enabled).map((l) => l.name);
+
+  // Seed the selection ONCE the options (and, on edit, the assignment) load:
+  // a NEW check defaults to ALL enabled (matches the backend default); an edit
+  // shows its current assignment (intersected with still-enabled locations).
+  useEffect(() => {
+    if (locationsSeeded || !locationOptions) return;
+    const enabled = locationOptions.filter((l) => l.enabled).map((l) => l.name);
+    if (isEdit) {
+      if (currentLocations === undefined) return; // wait for the assignment too
+      setForm((f) => ({ ...f, locations: currentLocations.filter((n) => enabled.includes(n)) }));
+    } else {
+      setForm((f) => ({ ...f, locations: enabled }));
+    }
+    setLocationsSeeded(true);
+  }, [locationOptions, currentLocations, isEdit, locationsSeeded]);
+
+  // Only enforce / render the selector once it's seeded AND there are options —
+  // so before the parallel API PR serves /api/locations (404 → never seeded), the
+  // field stays hidden and save is never blocked (the backend defaults to all).
+  const locationsActive = locationsSeeded && enabledLocations.length > 0;
+  const toggleLocation = (name: string) =>
+    setForm((f) => ({
+      ...f,
+      locations: f.locations.includes(name)
+        ? f.locations.filter((n) => n !== name)
+        : [...f.locations, name],
+    }));
 
   // Picking a flow suggests the manifest's entry URL — without overwriting a
   // target URL the author already typed.
@@ -228,6 +311,11 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
       }
     } else if (form.target_url.trim() === "") {
       setError("A target URL is required.");
+      return;
+    }
+    // Mirror the API's ≥1-location rule — never PUT an empty set it would 400 on.
+    if (locationsActive && form.locations.length === 0) {
+      setError("Select at least one location for this check to run from.");
       return;
     }
 
@@ -282,10 +370,12 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
 
     setSubmitting(true);
     try {
-      if (isEdit && initial) {
-        await updateCheck(initial.id, payload);
-      } else {
-        await createCheck(payload);
+      const saved =
+        isEdit && initial ? await updateCheck(initial.id, payload) : await createCheck(payload);
+      // The location assignment is a separate endpoint (PUT /checks/{id}/locations).
+      // Skipped when the feature isn't live yet — the backend defaults to all.
+      if (locationsActive) {
+        await setCheckLocations(saved.id, form.locations);
       }
       onDone();
     } catch (err) {
@@ -368,6 +458,28 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
           />
         </div>
       </div>
+
+      {/* Run-location assignment — full-width so the chips wrap on mobile like Type.
+          Hidden until /api/locations is served (parallel API PR); see locationsActive. */}
+      {locationsActive && (
+        <div className="w-full">
+          <span className="sw-label">Locations</span>
+          <LocationSelect
+            options={enabledLocations}
+            selected={form.locations}
+            onToggle={toggleLocation}
+          />
+          {form.locations.length === 0 ? (
+            <span className="mt-1 block text-[11px]" style={{ color: "var(--color-fail)" }}>
+              Select at least one location.
+            </span>
+          ) : (
+            <span className="mt-1 block text-[11px] text-[var(--color-ink-faint)]">
+              This check runs from the selected location{form.locations.length === 1 ? "" : "s"}.
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Multistep has no single target — the chain defines its own per-step URLs. */}
       {form.kind !== "multistep" && (
@@ -654,7 +766,11 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
         <button type="button" onClick={onCancel} className="sw-btn">
           Cancel
         </button>
-        <button type="submit" disabled={submitting} className="sw-btn sw-btn-primary">
+        <button
+          type="submit"
+          disabled={submitting || (locationsActive && form.locations.length === 0)}
+          className="sw-btn sw-btn-primary"
+        >
           {submitting ? "Saving…" : isEdit ? "Save changes" : "Create monitor"}
         </button>
       </div>

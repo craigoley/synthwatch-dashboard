@@ -24,6 +24,9 @@ import {
   listFlows,
   getSla,
   getAvailabilitySeries,
+  getLocations,
+  getCheckLocations,
+  setCheckLocations as apiSetCheckLocations,
   createCheck as apiCreateCheck,
   updateCheck as apiUpdateCheck,
   deleteCheck as apiDeleteCheck,
@@ -43,6 +46,8 @@ const keys = {
   flows: ["flows"] as const,
   sla: (window: SlaWindow) => ["sla", window] as const,
   availability: (id: number, window: SlaWindow) => ["availability", id, window] as const,
+  locations: ["locations"] as const,
+  checkLocations: (id: number) => ["check-locations", id] as const,
 };
 
 // Live dashboards: refresh on an interval, revalidate when the tab refocuses.
@@ -90,6 +95,25 @@ export function useFlows() {
   return useSWR(keys.flows, () => listFlows(), { revalidateOnFocus: false });
 }
 
+// Available run locations (selector options). shouldRetryOnError:false so that,
+// until the parallel API PR serves /api/locations, a 404 just leaves data
+// undefined (feature stays hidden) instead of retry-looping.
+export function useLocations() {
+  return useSWR(keys.locations, () => getLocations(), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+}
+
+/** A check's current location assignment (edit only). */
+export function useCheckLocations(id: number | null) {
+  return useSWR(
+    id ? keys.checkLocations(id) : null,
+    () => getCheckLocations(id as number),
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+}
+
 export function useSla(window: SlaWindow = "24h") {
   return useSWR(keys.sla(window), () => getSla(window), live);
 }
@@ -122,6 +146,17 @@ export async function createCheck(input: CreateCheckInput) {
 export async function updateCheck(id: number, input: UpdateCheckInput) {
   const result = await apiUpdateCheck(id, input);
   await revalidateChecks(id);
+  return result;
+}
+
+/** Set a check's location assignment, then refresh the affected caches. */
+export async function setCheckLocations(id: number, locations: string[]) {
+  const result = await apiSetCheckLocations(id, locations);
+  await Promise.all([
+    globalMutate(keys.checkLocations(id)),
+    globalMutate(keys.check(id)),
+    globalMutate(keys.checks),
+  ]);
   return result;
 }
 
