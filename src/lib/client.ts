@@ -20,6 +20,7 @@ import {
   getSteps,
   getMetrics,
   listIncidents,
+  getIncident,
   listFlows,
   getSla,
   createCheck as apiCreateCheck,
@@ -37,6 +38,7 @@ const keys = {
   steps: (runId: number) => ["steps", runId] as const,
   metrics: (id: number) => ["metrics", id] as const,
   incidents: ["incidents"] as const,
+  incident: (id: number) => ["incident", id] as const,
   flows: ["flows"] as const,
   sla: (window: SlaWindow) => ["sla", window] as const,
 };
@@ -76,6 +78,10 @@ export function useMetrics(id: number | null) {
 
 export function useIncidents() {
   return useSWR(keys.incidents, () => listIncidents(), live);
+}
+
+export function useIncident(id: number | null) {
+  return useSWR(id ? keys.incident(id) : null, () => getIncident(id as number), live);
 }
 
 export function useFlows() {
