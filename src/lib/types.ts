@@ -128,6 +128,26 @@ export interface Check {
   auth: CheckAuth | null;
   /** Multistep checks: ordered API-chain steps (null/empty otherwise). */
   steps: ChainStep[] | null;
+  /** Opt-in SLO target + error-budget / burn-rate; null when no SLO is set. */
+  slo: Slo | null;
+}
+
+/**
+ * SLO error-budget + burn-rate over a window (opt-in per check). Complements SLA
+ * (availability %). `target` is a fraction (0.999 = 99.9%). `budget` is the
+ * run-weighted error budget = (1-target)·total_runs; `consumed` = down runs;
+ * `remaining` = budget − consumed (NEGATIVE = over budget / blown). `burnRate` is
+ * normalized (1.0 = on track to exactly exhaust the budget); `fastBurn` (1h) /
+ * `slowBurn` (6h) flag whether the multi-window burn alerts are firing.
+ */
+export interface Slo {
+  target: number;
+  budget: number;
+  consumed: number;
+  remaining: number;
+  burnRate: number;
+  fastBurn: boolean;
+  slowBurn: boolean;
 }
 
 /** Latest status for one runner location (the check-list per-location rollup). */

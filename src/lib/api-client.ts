@@ -40,6 +40,7 @@ import type {
   RunStep,
   RunStepStatus,
   RunsPage,
+  Slo,
   SlaFleet,
   SlaResponse,
   SlaRow,
@@ -165,6 +166,7 @@ interface RawCheck {
   certExpiryWarnDays?: number | null;
   netConfig?: NetConfig | null;
   steps?: ChainStep[] | null;
+  slo?: Slo | null;
   assertions?: Assertion[] | null;
   requestHeaders?: Record<string, string> | null;
   requestBody?: string | null;
@@ -316,6 +318,7 @@ function mapCheck(raw: RawCheck): Check {
     cert_expiry_warn_days: raw.certExpiryWarnDays ?? null,
     net_config: raw.netConfig ?? null,
     steps: raw.steps ?? null,
+    slo: raw.slo ?? null,
     // JSONB columns: the API returns these verbatim (nested keys already in the
     // UI's shape — assertion {source,comparison,target,expected}, auth.token_env,
     // header dict), so pass them through unchanged.

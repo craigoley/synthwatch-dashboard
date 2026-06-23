@@ -6,7 +6,7 @@ import { useSla } from "@/lib/client";
 import { TONE_VAR } from "@/components/status-badge";
 import { availabilityTone } from "@/lib/status";
 import { formatCount, formatPct } from "@/lib/format";
-import type { SlaFleet, SlaWindow } from "@/lib/types";
+import type { SlaFleet, SlaWindow, Slo } from "@/lib/types";
 
 const WINDOWS: SlaWindow[] = ["24h", "7d", "30d"];
 
@@ -187,6 +187,100 @@ function Stat({
         {value}
       </div>
       <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">{label}</div>
+    </div>
+  );
+}
+
+function fmtBudget(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  return Number(n.toFixed(1)).toLocaleString();
+}
+
+function BurnPill({
+  label,
+  firing,
+  firingTone,
+}: {
+  label: string;
+  firing: boolean;
+  firingTone: "fail" | "warn";
+}) {
+  return (
+    <span
+      className="sw-mono rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider"
+      style={
+        firing
+          ? { borderColor: TONE_VAR[firingTone], color: TONE_VAR[firingTone] }
+          : { borderColor: "var(--color-border-strong)", color: "var(--color-ink-faint)" }
+      }
+    >
+      {label}: {firing ? "firing ⚠" : "ok"}
+    </span>
+  );
+}
+
+/**
+ * SLO error-budget + burn-rate panel (check detail). Complements the SLA panel
+ * (availability %) — this adds the target, budget-remaining gauge, and multi-window
+ * burn state. Only rendered when the check has an SLO (opt-in); see the detail page.
+ *   green = plenty · amber = ≤20% left · red = exhausted/blown (remaining < 0).
+ */
+export function SloPanel({ slo }: { slo: Slo }) {
+  const targetPct = Number.isFinite(slo.target) ? slo.target * 100 : null;
+  const hasBudget = Number.isFinite(slo.budget) && slo.budget > 0;
+  const remainingFraction = hasBudget ? slo.remaining / slo.budget : null;
+  const blown = Number.isFinite(slo.remaining) && slo.remaining < 0;
+  const tone: "pass" | "warn" | "fail" = blown
+    ? "fail"
+    : remainingFraction !== null && remainingFraction <= 0.2
+      ? "warn"
+      : "pass";
+  const barPct = remainingFraction === null ? 0 : Math.max(0, Math.min(100, remainingFraction * 100));
+  const burnRate = Number.isFinite(slo.burnRate) ? slo.burnRate : null;
+  const burnTone: "pass" | "warn" | "fail" = slo.fastBurn ? "fail" : slo.slowBurn ? "warn" : "pass";
+
+  return (
+    <div className="sw-panel p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-[var(--color-ink)]">Error budget (SLO)</h3>
+        <span className="sw-mono text-[11px] text-[var(--color-ink-dim)]">
+          {targetPct === null ? "—" : formatPct(targetPct)} target
+        </span>
+      </div>
+
+      {hasBudget ? (
+        <>
+          <div className="mb-1 flex items-baseline justify-between gap-2">
+            <span className="sw-mono text-2xl font-medium tabular-nums" style={{ color: TONE_VAR[tone] }}>
+              {blown ? "Budget blown" : formatPct((remainingFraction as number) * 100, 1)}
+            </span>
+            <span className="text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+              {blown ? "over budget" : "budget remaining"}
+            </span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full border border-[var(--color-border)] bg-[var(--color-bg)]">
+            <div className="h-full rounded-full" style={{ width: `${barPct}%`, background: TONE_VAR[tone] }} />
+          </div>
+        </>
+      ) : (
+        <p className="text-sm text-[var(--color-ink-dim)]">
+          Building budget — not enough completed runs in the window yet.
+        </p>
+      )}
+
+      <div className="mt-3 grid grid-cols-3 gap-3 border-t border-[var(--color-border)] pt-3">
+        <Stat label="Consumed" value={fmtBudget(slo.consumed)} tone={slo.consumed > 0 ? "fail" : "idle"} />
+        <Stat label="Remaining" value={fmtBudget(slo.remaining)} tone={blown ? "fail" : "idle"} />
+        <Stat label="Budget" value={fmtBudget(slo.budget)} tone="idle" />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--color-border)] pt-3">
+        <span className="sw-mono text-sm font-medium" style={{ color: TONE_VAR[burnTone] }}>
+          {burnRate === null ? "—" : `${burnRate.toFixed(1)}×`} burn rate
+        </span>
+        <BurnPill label="Fast burn (1h)" firing={slo.fastBurn} firingTone="fail" />
+        <BurnPill label="Slow burn (6h)" firing={slo.slowBurn} firingTone="warn" />
+      </div>
     </div>
   );
 }

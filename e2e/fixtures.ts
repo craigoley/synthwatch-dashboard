@@ -48,6 +48,7 @@ export function listItem(over: RawObj = {}): RawObj {
     auth: null,
     netConfig: null,
     steps: null,
+    slo: null,
     locations: [{ location: "default", status: "pass" }],
     ...over,
   };
@@ -369,6 +370,27 @@ export function defaultDetails(): Record<number, RawObj> {
     8: detail({ id: 8, name: "Paused check", kind: "http", enabled: false, currentStatus: "paused" }, []),
     // a check with NO runs yet (graceful-degradation case)
     9: detail({ id: 9, name: "Brand new", kind: "http", currentStatus: null, lastRunId: null }, []),
+    // SLO set, healthy budget but a fast burn firing (a fresh spike)
+    12: detail(
+      {
+        id: 12,
+        name: "SLO API",
+        kind: "http",
+        slo: { target: 0.999, budget: 10, consumed: 2, remaining: 8, burnRate: 15, fastBurn: true, slowBurn: false },
+      },
+      [run({ id: 1200, status: "pass" })],
+    ),
+    // SLO with an EXHAUSTED budget (remaining < 0 = blown), both burns firing
+    13: detail(
+      {
+        id: 13,
+        name: "Blown SLO",
+        kind: "http",
+        currentStatus: "fail",
+        slo: { target: 0.999, budget: 5, consumed: 8, remaining: -3, burnRate: 40, fastBurn: true, slowBurn: true },
+      },
+      [run({ id: 1300, status: "fail" })],
+    ),
     // MULTI-LOCATION: eastus2 healthy, westus2 failing → "regional" (partial) state.
     10: detail({ id: 10, name: "Global API", kind: "http", currentStatus: "fail" }, [
       run({ id: 1001, checkId: 10, status: "pass", location: "eastus2" }),
