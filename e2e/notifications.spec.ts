@@ -13,9 +13,8 @@ test.describe("notifications settings", () => {
     await page.getByRole("button", { name: "+ New channel" }).first().click();
     await page.getByRole("heading", { name: "New channel" }).waitFor();
     await page.getByLabel("Name", { exact: true }).fill("On-call email");
-    // type defaults to email
+    // type defaults to email; recipients only — the sender is a transport property
     await page.getByLabel("recipients").fill("oncall@example.com, sre@example.com");
-    await page.getByLabel("from address").fill("alerts@example.com");
     await page.getByRole("button", { name: "Create channel" }).click();
 
     await expect(page.getByTestId("channel-list").getByText("On-call email")).toBeVisible();
@@ -104,14 +103,15 @@ test.describe("notifications settings", () => {
     await expect(page.getByText("Bad email")).toHaveCount(0);
   });
 
-  test("★ no credential field — only the ACS transport note", async ({ page }) => {
+  test("★ no sender/credential field — only the ACS transport note", async ({ page }) => {
     await mockApi(page);
     await page.goto("/notifications");
     await page.getByRole("button", { name: "+ New channel" }).first().click();
     const dialog = page.getByRole("dialog");
-    // honest note that creds live in infra, not here
-    await expect(dialog.getByText(/ACS transport configured in infrastructure/)).toBeVisible();
-    // no password/secret input anywhere in the form
+    // honest note that the sender + creds live in infra, not here
+    await expect(dialog.getByText(/configured ACS sender/)).toBeVisible();
+    // no sender field and no password/secret input anywhere in the form
+    await expect(dialog.getByLabel("from address")).toHaveCount(0);
     await expect(dialog.locator('input[type="password"]')).toHaveCount(0);
     await expect(dialog.getByText(/connection string|api key|secret/i)).toHaveCount(0);
   });

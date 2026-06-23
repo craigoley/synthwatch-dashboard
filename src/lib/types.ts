@@ -418,10 +418,8 @@ export interface Flow {
 export type ChannelType = "email" | "webhook";
 
 export interface ChannelConfig {
-  /** email: recipients */
+  /** email: recipients (the sender is transport env — ALERT_EMAIL_FROM — not a channel field) */
   to?: string[];
-  /** email: from address (display/sender) */
-  from?: string | null;
   /** webhook: target URL */
   url?: string | null;
   /** webhook: optional header sent to the target (e.g. "Authorization: Bearer …") */
