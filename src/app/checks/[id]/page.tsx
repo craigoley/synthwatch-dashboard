@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 
 import { useCheck, useMetrics, updateCheck, revalidateChecks } from "@/lib/client";
 import { apiUrl } from "@/lib/api-client";
-import { LatencyChart, MetricsCharts } from "@/components/charts";
+import { AvailabilityChart, LatencyChart, MetricsCharts } from "@/components/charts";
 import { CheckSlaPanel, SloPanel } from "@/components/sla";
 import { FunnelBar } from "@/components/funnel-bar";
 import { StatusBadge, StatusDot, TONE_VAR } from "@/components/status-badge";
@@ -463,6 +463,9 @@ export default function CheckDetailPage() {
       <PerLocationPanel runs={recent_runs} />
 
       <CheckSlaPanel checkId={check.id} />
+
+      {/* Availability SHAPE over time — complements the SLA panel's point-in-time %. */}
+      <AvailabilityChart checkId={check.id} />
 
       {/* SLO complements SLA: only when an SLO target is set (opt-in) */}
       {check.slo && <SloPanel slo={check.slo} />}

@@ -152,6 +152,22 @@ export function slaResponse(window: string, items: RawObj[] = [], fleet: RawObj 
   return { window, items, fleet };
 }
 
+/** Availability-over-time series: healthy with one dip + a null gap (no-data bucket). */
+export function availabilitySeries(window = "24h"): RawObj {
+  return {
+    window,
+    bucket: "hour",
+    points: [
+      { ts: "2026-06-23T10:00:00Z", availabilityPct: 100, upRuns: 6, downRuns: 0 },
+      { ts: "2026-06-23T11:00:00Z", availabilityPct: 100, upRuns: 6, downRuns: 0 },
+      { ts: "2026-06-23T12:00:00Z", availabilityPct: 83.33, upRuns: 5, downRuns: 1 }, // dip
+      { ts: "2026-06-23T13:00:00Z", availabilityPct: null, upRuns: 0, downRuns: 0 }, // gap (no data)
+      { ts: "2026-06-23T14:00:00Z", availabilityPct: 100, upRuns: 6, downRuns: 0 },
+      { ts: "2026-06-23T15:00:00Z", availabilityPct: 100, upRuns: 6, downRuns: 0 },
+    ],
+  };
+}
+
 /** /incidents is a RAW ARRAY (api-client splits it into open/resolved). */
 export function emptyIncidents(): RawObj[] {
   return [];

@@ -380,6 +380,22 @@ export interface SlaResponse {
   fleet: SlaFleet | null;
 }
 
+/** One bucket of the availability-over-time series. `availability_pct` null = no
+ *  completed runs in that bucket (a GAP in the line, NOT a 0% dip). */
+export interface AvailabilityPoint {
+  ts: string;
+  availability_pct: number | null;
+  up_runs: number;
+  down_runs: number;
+}
+
+/** GET /api/checks/{id}/availability-series — uptime shape over a window. */
+export interface AvailabilitySeries {
+  window: SlaWindow;
+  bucket: "hour" | "day";
+  points: AvailabilityPoint[];
+}
+
 export interface ApiError {
   error: string;
   details?: unknown;

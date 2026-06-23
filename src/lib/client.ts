@@ -23,6 +23,7 @@ import {
   getIncident,
   listFlows,
   getSla,
+  getAvailabilitySeries,
   createCheck as apiCreateCheck,
   updateCheck as apiUpdateCheck,
   deleteCheck as apiDeleteCheck,
@@ -41,6 +42,7 @@ const keys = {
   incident: (id: number) => ["incident", id] as const,
   flows: ["flows"] as const,
   sla: (window: SlaWindow) => ["sla", window] as const,
+  availability: (id: number, window: SlaWindow) => ["availability", id, window] as const,
 };
 
 // Live dashboards: refresh on an interval, revalidate when the tab refocuses.
@@ -90,6 +92,14 @@ export function useFlows() {
 
 export function useSla(window: SlaWindow = "24h") {
   return useSWR(keys.sla(window), () => getSla(window), live);
+}
+
+export function useAvailabilitySeries(id: number | null, window: SlaWindow = "24h") {
+  return useSWR(
+    id ? keys.availability(id, window) : null,
+    () => getAvailabilitySeries(id as number, window),
+    live,
+  );
 }
 
 // ─── mutations (transport via api-client, then refresh affected caches) ─────────

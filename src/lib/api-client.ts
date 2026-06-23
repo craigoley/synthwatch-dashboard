@@ -20,6 +20,7 @@
 
 import type {
   Assertion,
+  AvailabilitySeries,
   ChainStep,
   Check,
   CheckAuth,
@@ -611,6 +612,36 @@ export async function getSla(window: SlaWindow = "24h"): Promise<SlaResponse> {
     window,
     items: (raw.items ?? []).map(mapSla),
     fleet: mapFleet(raw.fleet),
+  };
+}
+
+interface RawAvailabilityPoint {
+  ts: string;
+  availabilityPct: number | null;
+  upRuns: number;
+  downRuns: number;
+}
+interface RawAvailabilitySeries {
+  window: string;
+  bucket: string;
+  points: RawAvailabilityPoint[];
+}
+
+/** GET /api/checks/{id}/availability-series — availability % over time for a window. */
+export async function getAvailabilitySeries(
+  id: number,
+  window: SlaWindow = "24h",
+): Promise<AvailabilitySeries> {
+  const raw = await request<RawAvailabilitySeries>(`/checks/${id}/availability-series`, { window });
+  return {
+    window,
+    bucket: raw.bucket === "day" ? "day" : "hour",
+    points: (raw.points ?? []).map((p) => ({
+      ts: p.ts,
+      availability_pct: p.availabilityPct ?? null,
+      up_runs: p.upRuns,
+      down_runs: p.downRuns,
+    })),
   };
 }
 
