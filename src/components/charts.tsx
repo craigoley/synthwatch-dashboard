@@ -60,10 +60,12 @@ function ChartCard({
   title,
   unit,
   children,
+  legend,
 }: {
   title: string;
   unit?: string;
   children: React.ReactNode;
+  legend?: React.ReactNode;
 }) {
   return (
     <div className="sw-panel p-4">
@@ -71,7 +73,10 @@ function ChartCard({
         <h3 className="text-sm font-semibold text-[var(--color-ink)]">{title}</h3>
         {unit && <span className="sw-mono text-[10px] text-[var(--color-ink-faint)]">{unit}</span>}
       </div>
+      {/* The plot occupies a FIXED-height box; the legend sits BELOW it, inside the
+          card padding (not inside the 180px box, where it used to overflow). */}
       <div style={{ height: 180 }}>{children}</div>
+      {legend && <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">{legend}</div>}
     </div>
   );
 }
@@ -156,8 +161,14 @@ function MultiLineChart({
   fmt: (v: number | null) => string;
 }) {
   const rows = data.map((d) => ({ ts: new Date(d.started_at).getTime(), ...d }));
+  const legend = series.map((s) => (
+    <span key={String(s.key)} className="flex items-center gap-1.5 text-[11px] text-[var(--color-ink-dim)]">
+      <span className="sw-dot" style={{ background: s.color }} />
+      {s.label}
+    </span>
+  ));
   return (
-    <ChartCard title={title} unit={unit}>
+    <ChartCard title={title} unit={unit} legend={legend}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={rows} margin={{ top: 4, right: 8, bottom: 0, left: -8 }}>
           <CartesianGrid stroke={GRID} vertical={false} />
@@ -188,14 +199,6 @@ function MultiLineChart({
           ))}
         </LineChart>
       </ResponsiveContainer>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-        {series.map((s) => (
-          <span key={String(s.key)} className="flex items-center gap-1.5 text-[11px] text-[var(--color-ink-dim)]">
-            <span className="sw-dot" style={{ background: s.color }} />
-            {s.label}
-          </span>
-        ))}
-      </div>
     </ChartCard>
   );
 }
