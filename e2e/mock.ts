@@ -51,8 +51,14 @@ export interface World {
   checkLocations?: Record<number, string[]>;
   /** Alerting channels (stateful across CRUD); undefined → endpoint 404s. */
   channels?: RawObj[];
-  /** Alerting routing ({ defaults, overrides }); undefined → endpoint 404s. */
+  /** Alerting routing ({ severity, perCheck }); undefined → endpoint 404s. */
   routing?: RawObj;
+  /** Force PUT /routing to fail (proves the save-FAILURE feedback path). */
+  routingPutError?: { status: number; body: unknown };
+  /** POST /channels/{id}/test response; undefined → 404 (endpoint not deployed). */
+  channelTest?: { status: number; body?: unknown };
+  /** GET /notifications/health response; undefined → 404 (readiness unknown). */
+  notificationsHealth?: RawObj;
 }
 
 export function defaultWorld(): World {
@@ -73,7 +79,7 @@ export function defaultWorld(): World {
     ],
     checkLocations: {},
     channels: [],
-    routing: { defaults: {}, overrides: {} },
+    routing: { severity: {}, perCheck: {} },
   };
 }
 
@@ -128,12 +134,30 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
     }
     if ((m = path.match(/^\/api\/channels\/(\d+)$/)) && method === "DELETE") {
       const id = Number(m[1]);
+      // Mirror the API's 409 delete-guard: refuse if routing references the channel.
+      const r = (world.routing ?? {}) as { severity?: Record<string, RawObj>; perCheck?: Record<string, RawObj> };
+      const refs = (rule: RawObj | undefined) => ((rule?.channelIds as number[]) ?? []).includes(id);
+      const referenced =
+        Object.values(r.severity ?? {}).some(refs) || Object.values(r.perCheck ?? {}).some(refs);
+      if (referenced) {
+        return json(
+          route,
+          { error: "conflict", message: `channel ${id} is referenced by routing rule(s); remove it from routing before deleting.` },
+          409,
+        );
+      }
       world.channels = (world.channels ?? []).filter((c) => Number(c.id) !== id);
       return route.fulfill({ status: 204 });
     }
     if (path === "/api/routing" && method === "PUT") {
+      if (world.routingPutError) return json(route, world.routingPutError.body, world.routingPutError.status);
       world.routing = JSON.parse(req.postData() || "{}") as RawObj;
       return json(route, world.routing);
+    }
+    if ((m = path.match(/^\/api\/channels\/(\d+)\/test$/)) && method === "POST") {
+      return world.channelTest
+        ? json(route, world.channelTest.body ?? { ok: true }, world.channelTest.status)
+        : json(route, { error: "not_found" }, 404); // endpoint not deployed (flagged dep)
     }
 
     if (world.failAllReads) return route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"down"}' });
@@ -152,6 +176,11 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
     }
     if (path === "/api/routing" && method === "GET") {
       return world.routing ? json(route, world.routing) : json(route, { error: "not_found" }, 404);
+    }
+    if (path === "/api/notifications/health" && method === "GET") {
+      return world.notificationsHealth
+        ? json(route, world.notificationsHealth)
+        : json(route, { error: "not_found" }, 404); // readiness endpoint not deployed (flagged dep)
     }
     if ((m = path.match(/^\/api\/checks\/(\d+)$/))) {
       const d = world.details[Number(m[1])];

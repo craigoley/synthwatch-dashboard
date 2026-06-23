@@ -24,6 +24,7 @@ import type {
   ChainStep,
   Channel,
   Routing,
+  RoutingRule,
   Check,
   CheckAuth,
   CheckDetail,
@@ -687,18 +688,68 @@ export async function deleteChannel(id: number): Promise<void> {
   await request<unknown>(`/channels/${id}`, undefined, { method: "DELETE" });
 }
 
+// The API serves routing as { severity, perCheck } (null when empty) — NOT
+// { defaults, overrides }. Mismatching these is a silent no-op, so map exactly.
+type RawRouting = { severity?: Record<string, RoutingRule> | null; perCheck?: Record<string, RoutingRule> | null };
+
 export async function getRouting(): Promise<Routing> {
-  const raw = await request<Partial<Routing>>("/routing");
-  return { defaults: raw?.defaults ?? {}, overrides: raw?.overrides ?? {} };
+  const raw = await request<RawRouting>("/routing");
+  return { severity: raw?.severity ?? {}, perCheck: raw?.perCheck ?? {} };
 }
 
 export async function setRouting(routing: Routing): Promise<Routing> {
-  const raw = await request<Partial<Routing>>("/routing", undefined, {
+  const raw = await request<RawRouting>("/routing", undefined, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(routing),
   });
-  return { defaults: raw?.defaults ?? routing.defaults, overrides: raw?.overrides ?? routing.overrides };
+  return { severity: raw?.severity ?? routing.severity, perCheck: raw?.perCheck ?? routing.perCheck };
+}
+
+/** Result of a per-channel test send. */
+export interface ChannelTestResult {
+  ok: boolean;
+  detail?: string | null;
+}
+
+/**
+ * POST /api/channels/{id}/test — send a test delivery. FLAGGED API DEPENDENCY:
+ * the endpoint may not exist yet (404) — callers treat that as "unavailable",
+ * never a hard error. Returns { unavailable: true } on 404.
+ */
+export async function sendChannelTest(
+  id: number,
+): Promise<{ unavailable: true } | (ChannelTestResult & { unavailable?: false })> {
+  try {
+    const raw = await request<ChannelTestResult>(`/channels/${id}/test`, undefined, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+    });
+    return { ok: raw?.ok ?? true, detail: raw?.detail ?? null };
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return { unavailable: true };
+    throw err;
+  }
+}
+
+/**
+ * GET /api/notifications/health — delivery-readiness (is the ACS transport set up?).
+ * FLAGGED API DEPENDENCY: returns null if the endpoint isn't served yet (404), so
+ * the UI can fall back to a neutral note rather than asserting an unverified state.
+ */
+export interface DeliveryReadiness {
+  transportConfigured: boolean;
+  detail?: string | null;
+}
+
+export async function getDeliveryReadiness(): Promise<DeliveryReadiness | null> {
+  try {
+    const raw = await request<DeliveryReadiness>("/notifications/health");
+    return { transportConfigured: Boolean(raw?.transportConfigured), detail: raw?.detail ?? null };
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null;
+    throw err;
+  }
 }
 
 /** GET /api/sla?window= — per-check availability + server fleet rollup. */

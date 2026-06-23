@@ -434,16 +434,24 @@ export interface Channel {
   enabled: boolean;
 }
 
-/** Routing severities for v1 (alert trigger categories). Tag-based routing is Phase 9. */
-export type RoutingSeverity = "fail" | "error" | "warn" | "resolved";
+/**
+ * Routing severities — MUST match the API exactly: the routing endpoint only
+ * accepts `critical | warning` and 400s on anything else. This is the
+ * IncidentSeverity vocab, NOT the run-outcome vocab (fail/error/warn/resolved).
+ * Tag-based routing is Phase 9.
+ */
+export type RoutingSeverity = "critical" | "warning";
 
 export interface RoutingRule {
   channelIds: number[];
 }
 
+/**
+ * Routing config. Field names match the API exactly: `severity` (per-severity
+ * defaults) + `perCheck` (per-check overrides, keyed by checkId). The API serves
+ * these as null when empty.
+ */
 export interface Routing {
-  /** severity → channels (defaults applied to every check). */
-  defaults: Record<string, RoutingRule>;
-  /** checkId → channels (per-check override of the severity defaults). */
-  overrides: Record<string, RoutingRule>;
+  severity: Record<string, RoutingRule>;
+  perCheck: Record<string, RoutingRule>;
 }

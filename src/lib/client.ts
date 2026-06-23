@@ -33,6 +33,8 @@ import {
   deleteChannel as apiDeleteChannel,
   getRouting,
   setRouting as apiSetRouting,
+  getDeliveryReadiness,
+  sendChannelTest,
   type ChannelInput,
   createCheck as apiCreateCheck,
   updateCheck as apiUpdateCheck,
@@ -57,6 +59,7 @@ const keys = {
   checkLocations: (id: number) => ["check-locations", id] as const,
   channels: ["channels"] as const,
   routing: ["routing"] as const,
+  deliveryReadiness: ["delivery-readiness"] as const,
 };
 
 // Live dashboards: refresh on an interval, revalidate when the tab refocuses.
@@ -138,6 +141,18 @@ export function useRouting() {
     shouldRetryOnError: false,
   });
 }
+
+/** Delivery-readiness (ACS transport configured?). null when the endpoint 404s. */
+export function useDeliveryReadiness() {
+  return useSWR(keys.deliveryReadiness, () => getDeliveryReadiness(), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+}
+
+// One-shot test-send action (no cache). Re-exported so the page imports from the
+// React data layer like everything else.
+export { sendChannelTest };
 
 export function useSla(window: SlaWindow = "24h") {
   return useSWR(keys.sla(window), () => getSla(window), live);
