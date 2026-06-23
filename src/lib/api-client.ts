@@ -656,9 +656,11 @@ export async function setCheckLocations(id: number, locations: string[]): Promis
 // ─── alerting: channels + routing (dashboard-managed) ────────────────────────
 // Channels are delivery TARGETS — no transport credentials. `config` is JSONB-ish
 // (nested camelCase) and passes through verbatim, like check assertions/auth.
-// Contract (parallel API PR):
+// Contract (matches the API's RoutingDto EXACTLY):
 //   GET/POST /api/channels, PUT/DELETE /api/channels/{id}
-//   GET/PUT  /api/routing  -> { defaults:{[sev]:{channelIds}}, overrides:{[checkId]:{channelIds}} }
+//   GET/PUT  /api/routing  -> { severity:{[critical|warning]:{channelIds}}, perCheck:{[checkId]:{channelIds}} }
+//   ★ NOT { defaults, overrides }: the API drops unrecognized keys, then deletes all
+//   routes and inserts none — a SILENT WIPE that reports 200. Keep these names exact.
 
 /** Fields a channel create/update accepts (everything but the server-assigned id). */
 export type ChannelInput = Omit<Channel, "id">;
