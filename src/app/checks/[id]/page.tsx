@@ -92,6 +92,7 @@ function NetPanel({ check, latest }: { check: Check; latest: Run | null }) {
  */
 function RunArtifacts({ run }: { run: Run }) {
   const [imgFailed, setImgFailed] = useState(false);
+  const [traceOpen, setTraceOpen] = useState(false);
   const screenshot = run.screenshot_url ? apiUrl(run.screenshot_url) : null;
   const trace = run.trace_url ? apiUrl(run.trace_url) : null;
   if (!screenshot && !trace) return null;
@@ -118,12 +119,37 @@ function RunArtifacts({ run }: { run: Run }) {
       )}
       {trace && (
         <div>
-          <div className="mb-1 sw-eyebrow">Playwright trace</div>
-          <a href={trace} download className="sw-btn sw-btn-sm">
-            ↓ Download trace (.zip)
-          </a>
+          <div className="mb-1 sw-eyebrow">Playwright trace — forensics</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setTraceOpen((o) => !o)}
+              aria-expanded={traceOpen}
+              className="sw-btn sw-btn-sm sw-btn-primary"
+              data-testid={`view-trace-${run.id}`}
+            >
+              {traceOpen ? "▾ Hide trace" : "▸ View trace"}
+            </button>
+            <a href={trace} download className="sw-btn sw-btn-sm">
+              ↓ Download (.zip)
+            </a>
+          </div>
+          {traceOpen && (
+            // Self-hosted Playwright trace viewer (public/trace-viewer), fed the trace via
+            // the API proxy URL. The viewer fetches the trace.zip from the dashboard ORIGIN
+            // — the only origin the API CORS allowlist permits (see vendor-trace-viewer.mjs).
+            <div className="mt-2 overflow-hidden rounded-lg border border-[var(--color-border)]">
+              <iframe
+                title={`Playwright trace for run ${run.id}`}
+                src={`/trace-viewer/index.html?trace=${encodeURIComponent(trace)}`}
+                className="h-[70vh] w-full bg-white"
+                data-testid={`trace-viewer-${run.id}`}
+              />
+            </div>
+          )}
           <p className="mt-1.5 text-[11px] text-[var(--color-ink-faint)]">
-            Open with: <span className="sw-mono">npx playwright show-trace &lt;file&gt;</span>
+            Per-action screenshots, console, network waterfall &amp; DOM time-travel — from the trace
+            captured on failure.
           </p>
         </div>
       )}

@@ -83,7 +83,7 @@ test.describe("check detail", () => {
     await expect(page.getByText("✕ failed here")).toBeVisible();
   });
 
-  test("browser failure: screenshot renders via the proxy + trace link", async ({ page }) => {
+  test("browser failure: screenshot renders via the proxy + trace download/view", async ({ page }) => {
     await mockApi(page);
     await page.goto("/checks/2");
 
@@ -93,8 +93,35 @@ test.describe("check detail", () => {
     await expect
       .poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth))
       .toBeGreaterThan(0);
-    await expect(page.getByRole("link", { name: /Download trace/ })).toBeVisible();
-    await expect(page.getByText(/playwright show-trace/)).toBeVisible();
+    // download fallback + the new in-app "View trace" affordance both present
+    await expect(page.getByRole("link", { name: /Download/ })).toBeVisible();
+    await expect(page.getByTestId("view-trace-200")).toBeVisible();
+  });
+
+  // ★ Phase 10: embed the self-hosted Playwright trace viewer for failed runs.
+  test("embeds the trace viewer in-app (forensics), pointed at the proxied trace", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/checks/2");
+
+    // hidden until opened
+    await expect(page.getByTestId("trace-viewer-200")).toHaveCount(0);
+    await page.getByTestId("view-trace-200").click();
+
+    const viewer = page.getByTestId("trace-viewer-200");
+    await expect(viewer).toBeVisible();
+    // self-hosted (on-domain) viewer, fed the proxied trace URL via ?trace=
+    const src = await viewer.getAttribute("src");
+    expect(src).toContain("/trace-viewer/index.html?trace=");
+    expect(decodeURIComponent(src ?? "")).toContain("/api/runs/200/trace");
+    // the vendored viewer bundle is actually served on-domain
+    const res = await page.request.get("/trace-viewer/index.html");
+    expect(res.status()).toBe(200);
+  });
+
+  test("a passing run shows no trace affordance (no trace captured)", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/checks/1"); // http, passing run (no trace_url)
+    await expect(page.getByTestId("view-trace-100")).toHaveCount(0);
   });
 
   test("ssl: shows the TLS certificate panel", async ({ page }) => {
