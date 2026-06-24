@@ -793,14 +793,25 @@ export async function sendChannelTest(
  * the UI can fall back to a neutral note rather than asserting an unverified state.
  */
 export interface DeliveryReadiness {
-  transportConfigured: boolean;
+  /** ≥1 enabled channel with a real target (email recipient / webhook URL) — DB-verified. */
+  channelsConfigured: boolean;
+  /** ≥1 routing rule exists — DB-verified. */
+  routingConfigured: boolean;
+  /** ACS transport: true/false only if the API can see it; null = UNKNOWN (it can't). */
+  transportConfigured: boolean | null;
   detail?: string | null;
 }
 
 export async function getDeliveryReadiness(): Promise<DeliveryReadiness | null> {
   try {
-    const raw = await request<DeliveryReadiness>("/notifications/health");
-    return { transportConfigured: Boolean(raw?.transportConfigured), detail: raw?.detail ?? null };
+    const raw = await request<Partial<DeliveryReadiness>>("/notifications/health");
+    return {
+      channelsConfigured: Boolean(raw?.channelsConfigured),
+      routingConfigured: Boolean(raw?.routingConfigured),
+      // ?? null preserves the UNKNOWN state — never coerce null→false (that would lie).
+      transportConfigured: raw?.transportConfigured ?? null,
+      detail: raw?.detail ?? null,
+    };
   } catch (err) {
     if (err instanceof ApiRequestError && err.status === 404) return null;
     throw err;

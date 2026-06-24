@@ -846,29 +846,58 @@ function Badge({ tone, children, testid }: { tone: string; children: React.React
 }
 
 function DeliveryBanner({ readiness }: { readiness: DeliveryReadiness | null | undefined }) {
-  // Accurate when the readiness endpoint exists; a neutral note (no false certainty)
-  // when it doesn't (404 → null) — a permanent wrong warning trains users to ignore it.
+  // The banner reflects what's KNOWN, flags what's UNKNOWN, and never asserts a
+  // deliverability state the API couldn't verify.
   if (readiness === undefined) return null; // loading
-  if (readiness && readiness.transportConfigured) {
+
+  // Endpoint not served yet (pre-merge 404) → neutral, no claim either way.
+  if (readiness === null) {
+    return (
+      <Banner tone="var(--color-border-strong)" testid="delivery-unknown" muted>
+        Email delivery uses the ACS transport configured in infrastructure. Configure channels and routing
+        here; delivery readiness is managed by ops.
+      </Banner>
+    );
+  }
+
+  // Config the API CAN see — incomplete config means alerts definitely won't fire.
+  if (!readiness.channelsConfigured || !readiness.routingConfigured) {
+    const what =
+      !readiness.channelsConfigured && !readiness.routingConfigured
+        ? "No deliverable channels and no routing are configured"
+        : !readiness.channelsConfigured
+          ? "No deliverable channel is configured (a channel needs a recipient / URL)"
+          : "No routing is configured (no severity, per-check, or tag rule points at a channel)";
+    return (
+      <Banner tone="var(--color-warn)" testid="delivery-incomplete">
+        <strong>Alerts won&apos;t fire.</strong> {what} — set it up below.
+      </Banner>
+    );
+  }
+
+  // Config is complete; the verdict now hinges on the transport.
+  if (readiness.transportConfigured === true) {
     return (
       <Banner tone="var(--color-pass)" testid="delivery-active">
-        <strong>Alerting is active.</strong> The email transport is configured — routed alerts will be
-        delivered.
+        <strong>Alerting is active.</strong> Channels, routing, and the email transport are all configured —
+        routed alerts will be delivered.
       </Banner>
     );
   }
-  if (readiness && !readiness.transportConfigured) {
+  if (readiness.transportConfigured === false) {
     return (
       <Banner tone="var(--color-warn)" testid="delivery-not-configured">
-        <strong>Transport not configured.</strong> {readiness.detail || "The ACS email transport isn't set up, so alerts won't be delivered until ops configures it."}
+        <strong>Transport not configured.</strong>{" "}
+        {readiness.detail || "The ACS email transport isn't set up, so alerts won't be delivered until ops configures it."}
       </Banner>
     );
   }
-  // readiness === null → can't verify; neutral, no failure claim.
+  // transportConfigured === null → config is ready but the transport is UNVERIFIABLE
+  // here (it lives on the runner). Honest: don't claim "active" OR "won't deliver".
   return (
-    <Banner tone="var(--color-border-strong)" testid="delivery-unknown" muted>
-      Email delivery uses the ACS transport configured in infrastructure. Configure channels and routing
-      here; delivery readiness is managed by ops.
+    <Banner tone="var(--color-border-strong)" testid="delivery-transport-unknown" muted>
+      Channels and routing are configured.{" "}
+      {readiness.detail || "Email delivery depends on the ACS transport configured in infrastructure — the dashboard can't verify that from here."}
     </Banner>
   );
 }
