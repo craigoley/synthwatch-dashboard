@@ -109,13 +109,21 @@ test.describe("check detail", () => {
 
     const viewer = page.getByTestId("trace-viewer-200");
     await expect(viewer).toBeVisible();
-    // self-hosted (on-domain) viewer, fed the proxied trace URL via ?trace=
     const src = await viewer.getAttribute("src");
+    const decoded = decodeURIComponent(src ?? "");
     expect(src).toContain("/trace-viewer/index.html?trace=");
-    expect(decodeURIComponent(src ?? "")).toContain("/api/runs/200/trace");
-    // the vendored viewer bundle is actually served on-domain
-    const res = await page.request.get("/trace-viewer/index.html");
-    expect(res.status()).toBe(200);
+    // ★ SAME-ORIGIN: the viewer fetches the dashboard's own /trace-proxy, NOT the
+    // cross-origin API — the documented CORS trap (Playwright #38622) is dodged.
+    expect(decoded).toContain("/trace-proxy/200");
+    expect(decoded).not.toContain("mock.synthwatch.test"); // not the API origin
+    const pageOrigin = new URL(page.url()).origin;
+    expect(decoded).toContain(`${pageOrigin}/trace-proxy/200`); // absolute, same-origin
+
+    // the vendored viewer bundle is served on-domain
+    expect((await page.request.get("/trace-viewer/index.html")).status()).toBe(200);
+    // the same-origin trace proxy route is wired (server-side; upstream is unreachable
+    // in the hermetic mock → 502, NOT 404 — proving the route exists and proxies).
+    expect((await page.request.get("/trace-proxy/200")).status()).not.toBe(404);
   });
 
   test("a passing run shows no trace affordance (no trace captured)", async ({ page }) => {

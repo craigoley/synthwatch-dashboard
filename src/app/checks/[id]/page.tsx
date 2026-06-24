@@ -94,8 +94,12 @@ function RunArtifacts({ run }: { run: Run }) {
   const [imgFailed, setImgFailed] = useState(false);
   const [traceOpen, setTraceOpen] = useState(false);
   const screenshot = run.screenshot_url ? apiUrl(run.screenshot_url) : null;
-  const trace = run.trace_url ? apiUrl(run.trace_url) : null;
-  if (!screenshot && !trace) return null;
+  // ★ Serve the trace SAME-ORIGIN via the dashboard's own proxy (app/trace-proxy/[id]).
+  // The viewer fetch()es the trace, and fetching the cross-origin (API-origin) trace is
+  // the documented-broken CORS trap (Playwright #38622); same-origin dodges it entirely
+  // and works on prod / preview / localhost alike.
+  const traceProxy = run.trace_url ? `/trace-proxy/${run.id}` : null;
+  if (!screenshot && !traceProxy) return null;
   return (
     <div className="mt-3 space-y-3">
       {screenshot && (
@@ -117,7 +121,7 @@ function RunArtifacts({ run }: { run: Run }) {
           )}
         </div>
       )}
-      {trace && (
+      {traceProxy && (
         <div>
           <div className="mb-1 sw-eyebrow">Playwright trace — forensics</div>
           <div className="flex flex-wrap items-center gap-2">
@@ -130,18 +134,20 @@ function RunArtifacts({ run }: { run: Run }) {
             >
               {traceOpen ? "▾ Hide trace" : "▸ View trace"}
             </button>
-            <a href={trace} download className="sw-btn sw-btn-sm">
+            <a href={traceProxy} download className="sw-btn sw-btn-sm">
               ↓ Download (.zip)
             </a>
           </div>
           {traceOpen && (
-            // Self-hosted Playwright trace viewer (public/trace-viewer), fed the trace via
-            // the API proxy URL. The viewer fetches the trace.zip from the dashboard ORIGIN
-            // — the only origin the API CORS allowlist permits (see vendor-trace-viewer.mjs).
+            // Self-hosted viewer (public/trace-viewer) fed the SAME-ORIGIN proxy URL —
+            // the viewer's fetch() stays on the dashboard origin (no CORS). Absolute URL
+            // required: the viewer resolves ?trace= relative to /trace-viewer/, not the page.
             <div className="mt-2 overflow-hidden rounded-lg border border-[var(--color-border)]">
               <iframe
                 title={`Playwright trace for run ${run.id}`}
-                src={`/trace-viewer/index.html?trace=${encodeURIComponent(trace)}`}
+                src={`/trace-viewer/index.html?trace=${encodeURIComponent(
+                  (typeof window !== "undefined" ? window.location.origin : "") + traceProxy,
+                )}`}
                 className="h-[70vh] w-full bg-white"
                 data-testid={`trace-viewer-${run.id}`}
               />
