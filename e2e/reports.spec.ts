@@ -2,78 +2,100 @@ import { test, expect } from "@playwright/test";
 
 import { mockApi, defaultWorld } from "./mock";
 
-// Reporting Layer 2 — availability + performance, grouped by tag, windowed, with trend
-// charts. Built to the contract; the mock generates deterministic reports from the query.
-test.describe("reports", () => {
-  test("availability by team: groups render with a trend chart", async ({ page }) => {
-    await mockApi(page);
-    await page.goto("/reports"); // defaults: availability, 30d, groupBy=team
-    const report = page.getByTestId("availability-report");
-    await expect(report).toBeVisible();
-    await expect(report.getByTestId("group-platform")).toContainText("team: platform");
-    await expect(report.getByTestId("group-platform")).toContainText("98.20%");
-    await expect(report.getByTestId("group-web")).toContainText("75");
-    await expect(report.getByTestId("group-platform").getByTestId("trend-chart")).toBeVisible();
+// Reports rework: per-monitor DETAIL list (ungrouped default) with TAGS AS A FILTER
+// (not a grouping axis), sortable, with a per-monitor drill-down. The mock's
+// groupBy=none report mirrors world.checks, so rows ↔ check tags align by id.
+function world() {
+  const w = defaultWorld();
+  // check 1 = "API health" (http) → env:prod ; check 2 = "Homepage flow" (browser) → env:prod + team:web
+  w.checks = w.checks.map((c) =>
+    c.id === 1
+      ? { ...c, tags: [{ key: "env", value: "prod" }] }
+      : c.id === 2
+        ? { ...c, tags: [{ key: "env", value: "prod" }, { key: "team", value: "web" }] }
+        : { ...c, tags: [] },
+  );
+  w.tags = [
+    { key: "env", value: "prod", count: 2 },
+    { key: "team", value: "web", count: 1 },
+  ];
+  return w;
+}
+
+test.describe("reports — detail-first + tag filter", () => {
+  test("renders a per-monitor row for every monitor (ungrouped default)", async ({ page }) => {
+    await mockApi(page, world());
+    await page.goto("/reports");
+    await expect(page.getByTestId("monitor-list")).toBeVisible();
+    await expect(page.getByTestId("row-1")).toBeVisible();
+    await expect(page.getByTestId("row-2")).toBeVisible();
+    // tags show as chips on the row (not a grouping bucket)
+    await expect(page.getByTestId("row-2")).toContainText("env");
+    await expect(page.getByTestId("row-2")).toContainText("web");
   });
 
-  test("performance: latency trend renders", async ({ page }) => {
-    await mockApi(page);
+  test("the filter offers ONLY real in-use tags (never invented dimensions)", async ({ page }) => {
+    await mockApi(page, world());
     await page.goto("/reports");
-    await page.getByRole("button", { name: "Performance" }).click();
-    const report = page.getByTestId("performance-report");
-    await expect(report).toBeVisible();
-    await expect(report.getByTestId("group-platform")).toContainText(/p95/i);
-    await expect(report.getByTestId("group-platform").getByTestId("trend-chart")).toBeVisible();
+    const filter = page.getByTestId("tag-filter");
+    await expect(filter.getByRole("checkbox", { name: "filter env:prod" })).toBeVisible();
+    await expect(filter.getByRole("checkbox", { name: "filter team:web" })).toBeVisible();
+    await expect(filter.getByRole("checkbox")).toHaveCount(2); // exactly the two real tags
   });
 
-  test("★ web-vitals shown for the browser group, absent for the http group, never INP", async ({ page }) => {
-    await mockApi(page);
+  test("tags FILTER the list (not group it) — multi-tag AND", async ({ page }) => {
+    await mockApi(page, world());
     await page.goto("/reports");
-    await page.getByRole("button", { name: "Performance" }).click();
+    await expect(page.getByTestId("row-1")).toBeVisible();
 
-    // platform = browser checks → web-vitals panel (LCP/FCP/TTFB/CLS)
-    const platform = page.getByTestId("group-platform");
-    await expect(platform.getByTestId("web-vitals")).toBeVisible();
-    await expect(platform.getByTestId("web-vitals")).toContainText("LCP");
-    await expect(platform.getByTestId("web-vitals")).toContainText("CLS");
+    await page.getByRole("checkbox", { name: "filter team:web" }).click();
+    await expect(page.getByTestId("row-2")).toBeVisible(); // has team:web
+    await expect(page.getByTestId("row-1")).toHaveCount(0); // only env:prod → filtered out
+    await expect(page.getByTestId("filter-result")).toContainText(/1 of \d+ monitors/);
+  });
 
-    // web = http checks → NO web-vitals card, just the honest note
-    const web = page.getByTestId("group-web");
-    await expect(web.getByTestId("web-vitals")).toHaveCount(0);
-    await expect(web.getByTestId("no-vitals-note")).toBeVisible();
+  test("sortable: name vs availability reorder the rows", async ({ page }) => {
+    await mockApi(page, world());
+    await page.goto("/reports");
+    // narrow to checks 1 & 2 so order is deterministic
+    await page.getByRole("checkbox", { name: "filter env:prod" }).click();
+    const firstRow = () => page.getByTestId("monitor-list").locator('[data-testid^="row-"]').first();
 
-    // ★ INP is never captured → must not appear anywhere on the page
+    // default sort = availability asc → lowest-availability check (2) first
+    await expect(firstRow()).toHaveAttribute("data-testid", "row-2");
+    // sort by name asc → "API health" (1) first
+    await page.getByTestId("sort-name").click();
+    await expect(firstRow()).toHaveAttribute("data-testid", "row-1");
+  });
+
+  test("drill-down: ★ web-vitals for the browser monitor, absent for http, never INP", async ({ page }) => {
+    const w = world();
+    // INP IS in the data — the UI must still omit it.
+    w.metrics = [{ capturedAt: "2026-06-20T10:00:00Z", lcpMs: 1800, fcpMs: 900, ttfbMs: 200, cls: 0.05, inpMs: 120 }];
+    await mockApi(page, w);
+    await page.goto("/reports");
+
+    // browser monitor (check 2) → vitals panel with LCP, no INP
+    await page.getByTestId("row-2").getByRole("button").first().click();
+    await expect(page.getByTestId("detail-2")).toBeVisible();
+    await expect(page.getByTestId("vitals-2")).toContainText("LCP");
+    await expect(page.getByTestId("vitals-2")).toContainText("1.80s"); // LCP 1800ms
+    await expect(page.getByTestId("errors-2")).toBeVisible();
     await expect(page.getByText("INP", { exact: false })).toHaveCount(0);
-  });
 
-  test("window switch re-queries with the chosen window", async ({ page }) => {
-    await mockApi(page);
-    await page.goto("/reports");
-    await expect(page.getByTestId("availability-report")).toBeVisible();
-    const req = page.waitForRequest(
-      (r) => r.url().includes("/api/reports/availability") && r.url().includes("window=7d"),
-    );
-    await page.getByRole("button", { name: "7d", exact: true }).click();
-    await req; // a fetch for the 7d window fired
-    await expect(page.getByTestId("availability-report")).toBeVisible();
-  });
-
-  test("groupBy switch changes the groups (team → none = All checks)", async ({ page }) => {
-    await mockApi(page);
-    await page.goto("/reports");
-    await expect(page.getByTestId("group-platform")).toBeVisible();
-    // NB: getByRole name "none" is unreliable (ARIA reserved token) — click by text.
-    await page.getByText("none", { exact: true }).click();
-    await expect(page.getByTestId("group-all")).toContainText("All checks");
-    await expect(page.getByTestId("group-platform")).toHaveCount(0);
+    // http monitor (check 1) → NO web-vitals section (honest scoping)
+    await page.getByTestId("row-1").getByRole("button").first().click();
+    await expect(page.getByTestId("detail-1")).toBeVisible();
+    await expect(page.getByTestId("vitals-1")).toHaveCount(0);
+    await expect(page.getByTestId("errors-1")).toBeVisible();
   });
 
   test("graceful pre-API: reports endpoint 404 → 'reports pending'", async ({ page }) => {
-    const world = defaultWorld();
-    world.reportsServed = false;
-    await mockApi(page, world);
+    const w = world();
+    w.reportsServed = false;
+    await mockApi(page, w);
     await page.goto("/reports");
     await expect(page.getByTestId("reports-pending")).toBeVisible();
-    await expect(page.getByTestId("availability-report")).toHaveCount(0);
+    await expect(page.getByTestId("monitor-list")).toHaveCount(0);
   });
 });
