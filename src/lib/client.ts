@@ -40,13 +40,15 @@ import {
   setCheckTags as apiSetCheckTags,
   getTags,
   getSuggestedKeys,
+  getAvailabilityReport,
+  getPerformanceReport,
   type ChannelInput,
   createCheck as apiCreateCheck,
   updateCheck as apiUpdateCheck,
   deleteCheck as apiDeleteCheck,
 } from "@/lib/api-client";
 import type { CreateCheckInput, UpdateCheckInput } from "@/lib/schemas";
-import type { Routing, SlaWindow, Tag } from "@/lib/types";
+import type { ReportWindow, Routing, SlaWindow, Tag } from "@/lib/types";
 
 // Logical SWR cache keys (NOT URLs). Centralized so reads and revalidation agree.
 const keys = {
@@ -68,6 +70,8 @@ const keys = {
   checkTags: (id: number) => ["check-tags", id] as const,
   tags: ["tags"] as const,
   suggestedKeys: ["tags-suggested"] as const,
+  availabilityReport: (w: string, g: string) => ["report-availability", w, g] as const,
+  performanceReport: (w: string, g: string) => ["report-performance", w, g] as const,
 };
 
 // Live dashboards: refresh on an interval, revalidate when the tab refocuses.
@@ -184,6 +188,21 @@ export function useCheckTags(id: number | null) {
 /** Distinct in-use tags — for the future 9b filter bar (built now, unused in the UI). */
 export function useTags() {
   return useSWR(keys.tags, () => getTags(), { revalidateOnFocus: false, shouldRetryOnError: false });
+}
+
+// Reports. shouldRetryOnError:false so a pre-API 404 (→ null) shows "reports pending".
+export function useAvailabilityReport(window: ReportWindow, groupBy: string) {
+  return useSWR(keys.availabilityReport(window, groupBy), () => getAvailabilityReport(window, groupBy), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+}
+
+export function usePerformanceReport(window: ReportWindow, groupBy: string) {
+  return useSWR(keys.performanceReport(window, groupBy), () => getPerformanceReport(window, groupBy), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
 }
 
 export function useSla(window: SlaWindow = "24h") {

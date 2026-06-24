@@ -28,6 +28,10 @@ import type {
   TagRule,
   Tag,
   TagInUse,
+  ReportWindow,
+  ReportSeriesPoint,
+  AvailabilityReport,
+  PerformanceReport,
   Check,
   CheckAuth,
   CheckDetail,
@@ -847,6 +851,90 @@ export async function getDeliveryReadiness(): Promise<DeliveryReadiness | null> 
       transportConfigured: raw?.transportConfigured ?? null,
       detail: raw?.detail ?? null,
     };
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+// ─── reporting (Layer 2): availability + performance, grouped by tag ─────────
+// Contract (parallel API PR): GET /api/reports/availability?window=&groupBy= and
+// GET /api/reports/performance?window=&groupBy= . Both serve camelCase; mapped to
+// the snake_case report types. FLAGGED DEP: return null on 404 (endpoint not served
+// yet → the page shows "reports pending", never a broken view).
+
+interface RawSeriesPoint { date: string; value: number | null }
+const mapSeries = (s?: RawSeriesPoint[] | null): ReportSeriesPoint[] =>
+  (s ?? []).map((p) => ({ date: p.date, value: p.value ?? null }));
+
+export async function getAvailabilityReport(
+  window: ReportWindow,
+  groupBy: string,
+): Promise<AvailabilityReport | null> {
+  try {
+    const raw = await request<Record<string, unknown>>("/reports/availability", { window, groupBy });
+    const groups = ((raw?.groups as Record<string, unknown>[]) ?? []).map((g) => ({
+      group: String(g.group ?? "ungrouped"),
+      availability_pct: (g.availabilityPct as number) ?? null,
+      downtime_minutes: (g.downtimeMinutes as number) ?? 0,
+      incident_count: (g.incidentCount as number) ?? 0,
+      check_count: (g.checkCount as number) ?? 0,
+      series: mapSeries(g.series as RawSeriesPoint[]),
+      checks: ((g.checks as Record<string, unknown>[]) ?? []).map((c) => ({
+        check_id: c.checkId as number,
+        name: String(c.name ?? ""),
+        kind: c.kind as CheckKind,
+        availability_pct: (c.availabilityPct as number) ?? null,
+        downtime_minutes: (c.downtimeMinutes as number) ?? 0,
+        incident_count: (c.incidentCount as number) ?? 0,
+      })),
+    }));
+    return { window, group_by: String(raw?.groupBy ?? groupBy), groups };
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+export async function getPerformanceReport(
+  window: ReportWindow,
+  groupBy: string,
+): Promise<PerformanceReport | null> {
+  try {
+    const raw = await request<Record<string, unknown>>("/reports/performance", { window, groupBy });
+    const groups = ((raw?.groups as Record<string, unknown>[]) ?? []).map((g) => {
+      const wv = g.webVitals as Record<string, unknown> | null | undefined;
+      return {
+        group: String(g.group ?? "ungrouped"),
+        avg_ms: (g.avgMs as number) ?? null,
+        p50_ms: (g.p50Ms as number) ?? null,
+        p95_ms: (g.p95Ms as number) ?? null,
+        p99_ms: (g.p99Ms as number) ?? null,
+        series: mapSeries(g.series as RawSeriesPoint[]),
+        // null when the group has no browser checks → the UI renders NO vitals.
+        // ★ INP is intentionally absent (never captured) — not mapped at all.
+        web_vitals: wv
+          ? {
+              lcp_ms: (wv.lcpMs as number) ?? null,
+              fcp_ms: (wv.fcpMs as number) ?? null,
+              ttfb_ms: (wv.ttfbMs as number) ?? null,
+              cls: (wv.cls as number) ?? null,
+            }
+          : null,
+        browser_check_count: (g.browserCheckCount as number) ?? 0,
+        check_count: (g.checkCount as number) ?? 0,
+        checks: ((g.checks as Record<string, unknown>[]) ?? []).map((c) => ({
+          check_id: c.checkId as number,
+          name: String(c.name ?? ""),
+          kind: c.kind as CheckKind,
+          avg_ms: (c.avgMs as number) ?? null,
+          p50_ms: (c.p50Ms as number) ?? null,
+          p95_ms: (c.p95Ms as number) ?? null,
+          p99_ms: (c.p99Ms as number) ?? null,
+        })),
+      };
+    });
+    return { window, group_by: String(raw?.groupBy ?? groupBy), groups };
   } catch (err) {
     if (err instanceof ApiRequestError && err.status === 404) return null;
     throw err;

@@ -80,6 +80,8 @@ export interface World {
   checkTags?: Record<number, RawObj[]>;
   /** Distinct in-use tags (GET /tags, for the 9b filter bar). */
   tags?: RawObj[];
+  /** Reports served? false → /reports/* 404 (pre-API "reports pending"). Default true. */
+  reportsServed?: boolean;
 }
 
 export function defaultWorld(): World {
@@ -237,6 +239,35 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
       return json(route, world.checkTags?.[Number(m[1])] ?? []);
     }
     if (path === "/api/tags" && method === "GET") return json(route, { tags: world.tags ?? [] });
+    // Reports (Layer 2) — deterministic from the query so window/groupBy switches are observable.
+    if ((path === "/api/reports/availability" || path === "/api/reports/performance") && method === "GET") {
+      if (world.reportsServed === false) return json(route, { error: "not_found" }, 404);
+      const win = url.searchParams.get("window") ?? "30d";
+      const gb = url.searchParams.get("groupBy") ?? "none";
+      const days = win === "7d" ? 7 : win === "90d" ? 90 : 30;
+      const base = Date.parse("2026-03-01T00:00:00Z");
+      const series = (v: number) =>
+        Array.from({ length: days }, (_, i) => ({ date: new Date(base + i * 86400000).toISOString().slice(0, 10), value: v }));
+      if (path === "/api/reports/availability") {
+        const grp = (name: string, pct: number) => ({
+          group: name, availabilityPct: pct, downtimeMinutes: Math.round(((100 - pct) / 100) * days * 1440),
+          incidentCount: pct < 90 ? 2 : 0, checkCount: 2, series: series(pct),
+          checks: [{ checkId: 1, name: "API health", kind: "http", availabilityPct: pct, downtimeMinutes: 5, incidentCount: 0 }],
+        });
+        const groups = gb === "none" ? [grp("all", 99.9)] : gb === "team" ? [grp("platform", 98.2), grp("web", 75)] : [grp(`${gb}-x`, 99)];
+        return json(route, { window: win, groupBy: gb, groups });
+      }
+      // performance: a browser group (web-vitals present) + a non-browser group (vitals null).
+      const grp = (name: string, p95: number, browser: boolean) => ({
+        group: name, avgMs: Math.round(p95 * 0.6), p50Ms: Math.round(p95 * 0.7), p95Ms: p95, p99Ms: Math.round(p95 * 1.4),
+        series: series(p95),
+        webVitals: browser ? { lcpMs: 1800, fcpMs: 900, ttfbMs: 200, cls: 0.05 } : null,
+        browserCheckCount: browser ? 2 : 0, checkCount: 2,
+        checks: [{ checkId: 1, name: "Homepage", kind: browser ? "browser" : "http", avgMs: Math.round(p95 * 0.6), p50Ms: Math.round(p95 * 0.7), p95Ms: p95, p99Ms: Math.round(p95 * 1.4) }],
+      });
+      const groups = gb === "none" ? [grp("all", 420, true)] : gb === "team" ? [grp("platform", 380, true), grp("web", 250, false)] : [grp(`${gb}-x`, 300, true)];
+      return json(route, { window: win, groupBy: gb, groups });
+    }
     // Alerting reads (undefined → 404, exercising the "setup pending" path).
     if (path === "/api/channels" && method === "GET") {
       return world.channels ? json(route, world.channels) : json(route, { error: "not_found" }, 404);

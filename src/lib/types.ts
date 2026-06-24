@@ -478,3 +478,84 @@ export interface Routing {
   perCheck: Record<string, RoutingRule>;
   tagRules: TagRule[];
 }
+
+// ─── reporting (Layer 2): availability + performance, grouped by tag, windowed ──
+export type ReportWindow = "7d" | "30d" | "90d";
+
+/** One point in a daily report time-series (date = YYYY-MM-DD). */
+export interface ReportSeriesPoint {
+  date: string;
+  value: number | null;
+}
+
+/** Per-check row inside an availability group's drill-down. */
+export interface AvailabilityCheckRow {
+  check_id: number;
+  name: string;
+  kind: CheckKind;
+  availability_pct: number | null;
+  downtime_minutes: number;
+  incident_count: number;
+}
+
+/** One group (a tag value, or "ungrouped") in the availability report. */
+export interface AvailabilityGroup {
+  group: string;
+  availability_pct: number | null;
+  downtime_minutes: number;
+  incident_count: number;
+  check_count: number;
+  /** Daily availability% over the window. */
+  series: ReportSeriesPoint[];
+  checks: AvailabilityCheckRow[];
+}
+
+export interface AvailabilityReport {
+  window: ReportWindow;
+  group_by: string; // "team" | "service" | "env" | "criticality" | "none"
+  groups: AvailabilityGroup[];
+}
+
+/**
+ * Browser-only web vitals. Latency (duration) is universal, but vitals are captured
+ * ONLY for browser checks — so this is null for groups with no browser checks (the
+ * UI then renders NO vitals). ★ INP is never captured: it is omitted entirely (no field).
+ */
+export interface WebVitals {
+  lcp_ms: number | null;
+  fcp_ms: number | null;
+  ttfb_ms: number | null;
+  cls: number | null;
+}
+
+export interface PerformanceCheckRow {
+  check_id: number;
+  name: string;
+  kind: CheckKind;
+  avg_ms: number | null;
+  p50_ms: number | null;
+  p95_ms: number | null;
+  p99_ms: number | null;
+}
+
+export interface PerformanceGroup {
+  group: string;
+  avg_ms: number | null;
+  p50_ms: number | null;
+  p95_ms: number | null;
+  p99_ms: number | null;
+  /** Daily p95 latency over the window. */
+  series: ReportSeriesPoint[];
+  /** Web vitals for the BROWSER checks in this group; null if the group has none. */
+  web_vitals: WebVitals | null;
+  /** How many of the group's checks are browser checks (for "covers only the browser subset"). */
+  browser_check_count: number;
+  check_count: number;
+  checks: PerformanceCheckRow[];
+}
+
+export interface PerformanceReport {
+  window: ReportWindow;
+  group_by: string;
+  groups: PerformanceGroup[];
+}
