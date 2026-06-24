@@ -395,14 +395,26 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
   // stays undefined → never seeded → editor hidden, save skips the tag PUT).
   const tagsActive = tagsSeeded;
 
+  const [tagError, setTagError] = useState<string | null>(null);
+
+  // Persist a tag change. On EDIT the check already exists, so save IMMEDIATELY (a dedicated PUT — no
+  // modal submit needed; "add chip = saved"). On CREATE there's no id yet, so just stage into form.tags;
+  // the create submit persists them. (Fixes the silent UX trap: a staged-but-unsubmitted edit was lost.)
+  const persistTags = (next: Tag[]) => {
+    setForm((f) => ({ ...f, tags: next }));
+    if (isEdit && initial) {
+      setTagError(null);
+      void setCheckTags(initial.id, next).catch(() => setTagError("Couldn't save tags — check your connection and retry."));
+    }
+  };
   // Add/replace a tag — normalized lowercase; one value per key (replace on collision).
   const addTag = (key: string, value: string) => {
     const k = key.trim().toLowerCase();
     const v = value.trim().toLowerCase();
     if (!k || !v) return;
-    setForm((f) => ({ ...f, tags: [...f.tags.filter((t) => t.key !== k), { key: k, value: v }] }));
+    persistTags([...form.tags.filter((t) => t.key !== k), { key: k, value: v }]);
   };
-  const removeTag = (key: string) => setForm((f) => ({ ...f, tags: f.tags.filter((t) => t.key !== key) }));
+  const removeTag = (key: string) => persistTags(form.tags.filter((t) => t.key !== key));
 
   // Picking a flow suggests the manifest's entry URL — without overwriting a
   // target URL the author already typed.
@@ -613,12 +625,22 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
 
       {/* key:value tags — hidden until /api/tags/suggested is served (pre-API 404). */}
       {tagsActive && (
-        <TagEditor
-          tags={form.tags}
-          suggestedKeys={suggestedKeys ?? []}
-          onAdd={addTag}
-          onRemove={removeTag}
-        />
+        <div>
+          <TagEditor
+            tags={form.tags}
+            suggestedKeys={suggestedKeys ?? []}
+            onAdd={addTag}
+            onRemove={removeTag}
+          />
+          {/* Make staged-vs-saved unmistakable: on edit, each change is saved immediately; on create
+              they persist with the new monitor. (Previously a chip was only staged and silently lost.) */}
+          <p className="mt-1 text-[11px] text-[var(--color-ink-faint)]">
+            {isEdit ? "Tags save automatically." : "Tags are saved when you create the monitor."}
+          </p>
+          {tagError && (
+            <p className="mt-1 text-[11px]" style={{ color: "var(--color-fail)" }}>{tagError}</p>
+          )}
+        </div>
       )}
 
       {/* Multistep has no single target — the chain defines its own per-step URLs. */}

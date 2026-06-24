@@ -50,6 +50,7 @@ export function listItem(over: RawObj = {}): RawObj {
     steps: null,
     slo: null,
     locations: [{ location: "default", status: "pass" }],
+    tags: [],
     ...over,
   };
 }

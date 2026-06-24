@@ -90,6 +90,23 @@ test.describe("tags editor", () => {
     expect(body.tags).toEqual([{ key: "service", value: "api" }]);
   });
 
+  test("editing a check auto-saves a tag on add — no modal submit needed (Fix A)", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/checks/1");
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    const modal = page.getByRole("dialog");
+    await modal.getByLabel("tag key").waitFor();
+    await expect(modal.getByText("Tags save automatically.")).toBeVisible();
+
+    // Adding a chip fires the PUT IMMEDIATELY (the old bug: it only staged, lost if unsubmitted).
+    const put = page.waitForRequest((r) => /\/api\/checks\/1\/tags$/.test(r.url()) && r.method() === "PUT");
+    await modal.getByLabel("tag key").fill("team");
+    await modal.getByLabel("tag value").fill("test");
+    await modal.getByRole("button", { name: "+ Add tag" }).click();
+    const body = (await put).postDataJSON();
+    expect(body.tags).toContainEqual({ key: "team", value: "test" });
+  });
+
   test("graceful pre-API: /tags/suggested 404 → editor hidden", async ({ page }) => {
     const world = defaultWorld();
     world.suggestedKeys = undefined; // 404
