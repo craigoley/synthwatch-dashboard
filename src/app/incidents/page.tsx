@@ -1,13 +1,15 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 
-import { useIncidents } from "@/lib/client";
+import { useIncidents, useChecks, useTags } from "@/lib/client";
 import { ToneBadge } from "@/components/status-badge";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
+import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { severityMeta } from "@/lib/status";
 import { formatLocalDateTime, formatRelative, formatSpan } from "@/lib/format";
-import type { IncidentWithCheck } from "@/lib/types";
+import type { IncidentWithCheck, Tag } from "@/lib/types";
 import { RcaPanel } from "@/components/rca-panel";
 
 function IncidentRow({ incident }: { incident: IncidentWithCheck }) {
@@ -73,6 +75,23 @@ function IncidentRow({ incident }: { incident: IncidentWithCheck }) {
 
 export default function IncidentsPage() {
   const { data, error, isLoading } = useIncidents();
+  const { data: checks } = useChecks();
+  const { data: inUseTags } = useTags();
+  const { selected, toggle, clear } = useTagFilter();
+
+  // Filter incidents by their CHECK's tags — looked up in the already-cached checks
+  // list (no per-incident fetch). Empty checks (not loaded) → no match while loading.
+  const tagsByCheck = useMemo(() => {
+    const m = new Map<number, Tag[]>();
+    for (const c of checks ?? []) m.set(c.id, c.tags);
+    return m;
+  }, [checks]);
+  const match = (i: IncidentWithCheck) => matchesTags(tagsByCheck.get(i.check_id), selected);
+
+  const open = (data?.open ?? []).filter(match);
+  const resolved = (data?.resolved ?? []).filter(match);
+  const total = (data?.open.length ?? 0) + (data?.resolved.length ?? 0);
+  const shown = open.length + resolved.length;
 
   return (
     <div className="space-y-6">
@@ -80,6 +99,16 @@ export default function IncidentsPage() {
         <p className="sw-eyebrow">Reliability</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Incidents</h1>
       </header>
+
+      {data && total > 0 && (
+        <TagFilter
+          available={inUseTags ?? []}
+          selected={selected}
+          onToggle={toggle}
+          onClear={clear}
+          resultLabel={`${shown} of ${total} incidents match`}
+        />
+      )}
 
       {isLoading && !data ? (
         <div className="py-16"><Spinner label="Loading incidents…" /></div>
@@ -90,15 +119,16 @@ export default function IncidentsPage() {
           <section>
             <div className="mb-3 flex items-center gap-2">
               <h2 className="text-sm font-semibold text-[var(--color-ink)]">Open</h2>
-              <span className="sw-mono text-xs text-[var(--color-ink-faint)]">({data.open.length})</span>
+              <span className="sw-mono text-xs text-[var(--color-ink-faint)]">({open.length})</span>
             </div>
-            {data.open.length === 0 ? (
+            {open.length === 0 ? (
               <div className="sw-panel flex items-center gap-2 px-4 py-5 text-sm text-[var(--color-ink-dim)]">
-                <span className="sw-dot sw-dot-pass" /> All clear — no open incidents.
+                <span className="sw-dot sw-dot-pass" />{" "}
+                {selected.length > 0 ? "No open incidents match this filter." : "All clear — no open incidents."}
               </div>
             ) : (
               <div className="sw-panel divide-y divide-[var(--color-border)] overflow-hidden">
-                {data.open.map((i) => (
+                {open.map((i) => (
                   <IncidentRow key={i.id} incident={i} />
                 ))}
               </div>
@@ -108,13 +138,15 @@ export default function IncidentsPage() {
           <section>
             <div className="mb-3 flex items-center gap-2">
               <h2 className="text-sm font-semibold text-[var(--color-ink)]">Resolved</h2>
-              <span className="sw-mono text-xs text-[var(--color-ink-faint)]">({data.resolved.length})</span>
+              <span className="sw-mono text-xs text-[var(--color-ink-faint)]">({resolved.length})</span>
             </div>
-            {data.resolved.length === 0 ? (
-              <EmptyState title="No resolved incidents yet." />
+            {resolved.length === 0 ? (
+              <EmptyState
+                title={selected.length > 0 ? "No resolved incidents match this filter." : "No resolved incidents yet."}
+              />
             ) : (
               <div className="sw-panel divide-y divide-[var(--color-border)] overflow-hidden">
-                {data.resolved.map((i) => (
+                {resolved.map((i) => (
                   <IncidentRow key={i.id} incident={i} />
                 ))}
               </div>

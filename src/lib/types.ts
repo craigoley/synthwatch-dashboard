@@ -94,6 +94,11 @@ export interface Tag {
   value: string;
 }
 
+/** A distinct in-use tag with how many checks carry it (GET /api/tags → filter bar). */
+export interface TagInUse extends Tag {
+  count: number;
+}
+
 export type RunStatus = "running" | "pass" | "warn" | "fail" | "error";
 export type RunStepStatus = "pass" | "fail" | "skip";
 export type IncidentSeverity = "warning" | "critical";

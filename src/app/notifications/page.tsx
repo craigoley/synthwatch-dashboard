@@ -371,9 +371,9 @@ export default function NotificationsPage() {
                           {channelList.map((c) => (
                             <th
                               key={c.id}
-                              className="px-2 py-1.5 text-center text-[11px] font-medium text-[var(--color-ink-dim)]"
+                              className="w-24 px-2 py-1.5 text-center text-[11px] font-medium text-[var(--color-ink-dim)]"
                             >
-                              <span className="block max-w-[120px] truncate">{c.name}</span>
+                              <span className="block truncate text-center" title={c.name}>{c.name}</span>
                             </th>
                           ))}
                         </tr>
@@ -392,7 +392,7 @@ export default function NotificationsPage() {
                             {channelList.map((c) => {
                               const on = (draft?.severity[s.key]?.channelIds ?? []).includes(c.id);
                               return (
-                                <td key={c.id} className="px-2 py-2 text-center">
+                                <td key={c.id} className="w-24 px-2 py-2 text-center">
                                   <button
                                     type="button"
                                     role="checkbox"

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 
-import { useChecks, updateCheck, deleteCheck } from "@/lib/client";
+import { useChecks, updateCheck, deleteCheck, useTags } from "@/lib/client";
+import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { ApiRequestError } from "@/lib/api-client";
 import { StatusDot } from "@/components/status-badge";
 import { Modal } from "@/components/modal";
@@ -106,10 +107,15 @@ function DeleteDialog({
 
 export default function MonitorsPage() {
   const { data, error, isLoading } = useChecks();
+  const { data: inUseTags } = useTags();
+  const { selected, toggle, clear } = useTagFilter();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Check | null>(null);
   const [deleting, setDeleting] = useState<CheckWithStatus | null>(null);
   const [pausingId, setPausingId] = useState<number | null>(null);
+
+  // Monitors filter off their own embedded tags (check.tags), AND of all selected.
+  const visible = (data ?? []).filter((c) => matchesTags(c.tags, selected));
 
   async function togglePause(check: CheckWithStatus) {
     setPausingId(check.id);
@@ -132,6 +138,16 @@ export default function MonitorsPage() {
         </button>
       </header>
 
+      {data && data.length > 0 && (
+        <TagFilter
+          available={inUseTags ?? []}
+          selected={selected}
+          onToggle={toggle}
+          onClear={clear}
+          resultLabel={`${visible.length} of ${data.length} monitors match`}
+        />
+      )}
+
       {isLoading && !data ? (
         <div className="py-16"><Spinner label="Loading monitors…" /></div>
       ) : error ? (
@@ -146,6 +162,16 @@ export default function MonitorsPage() {
             </button>
           }
         />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          title="No monitors match this filter."
+          hint="No monitor carries all the selected tags."
+          action={
+            <button onClick={clear} className="sw-btn">
+              Clear filter
+            </button>
+          }
+        />
       ) : (
         <div className="sw-panel overflow-hidden">
           <div className="hidden grid-cols-[1fr_90px_120px_110px_220px] gap-3 border-b border-[var(--color-border)] px-4 py-2.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)] sm:grid">
@@ -156,7 +182,7 @@ export default function MonitorsPage() {
             <span className="text-right">Actions</span>
           </div>
           <div className="divide-y divide-[var(--color-border)]">
-            {data.map((c) => (
+            {visible.map((c) => (
               <div
                 key={c.id}
                 className="grid grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[1fr_90px_120px_110px_220px] sm:items-center sm:gap-3"
