@@ -88,6 +88,12 @@ export interface CheckAuth {
   header?: string | null; // api_key header name
   value_env?: string | null; // api_key
 }
+/** A key:value label on a check (Phase 9a). Keys/values are normalized lowercase. */
+export interface Tag {
+  key: string;
+  value: string;
+}
+
 export type RunStatus = "running" | "pass" | "warn" | "fail" | "error";
 export type RunStepStatus = "pass" | "fail" | "skip";
 export type IncidentSeverity = "warning" | "critical";
@@ -130,6 +136,8 @@ export interface Check {
   steps: ChainStep[] | null;
   /** Opt-in SLO target + error-budget / burn-rate; null when no SLO is set. */
   slo: Slo | null;
+  /** key:value tags (Phase 9a); empty until the tags API serves them. */
+  tags: Tag[];
 }
 
 /**

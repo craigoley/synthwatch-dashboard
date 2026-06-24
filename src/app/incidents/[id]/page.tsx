@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
-import { useIncident } from "@/lib/client";
+import { useIncident, useCheckTags } from "@/lib/client";
 import { apiUrl } from "@/lib/api-client";
 import { StatusBadge, ToneBadge, TONE_VAR } from "@/components/status-badge";
 import { RcaPanel } from "@/components/rca-panel";
+import { TagChips } from "@/components/tag-chips";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { runStatusMeta, severityMeta } from "@/lib/status";
 import { formatDuration, formatLocalDateTime, formatRelative, formatSpan } from "@/lib/format";
@@ -153,6 +154,8 @@ export default function IncidentDetailPage() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const { data: incident, error, isLoading } = useIncident(Number.isFinite(id) ? id : null);
+  // The check's tags (the incident payload doesn't embed them) — graceful 404 pre-API.
+  const { data: checkTags } = useCheckTags(incident?.check_id ?? null);
 
   if (isLoading && !incident) return <div className="py-16"><Spinner label="Loading incident…" /></div>;
   if (error) {
@@ -190,6 +193,7 @@ export default function IncidentDetailPage() {
           </span>
           <span>· lasted {formatSpan(incident.opened_at, incident.resolved_at)}</span>
         </div>
+        <TagChips tags={checkTags ?? []} className="mt-2" />
       </header>
 
       <PerLocation locations={incident.per_location ?? []} />

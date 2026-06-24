@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { CheckWithStatus } from "@/lib/types";
 import { StatusBadge, TONE_VAR } from "@/components/status-badge";
 import { Sparkline } from "@/components/sparkline";
+import { TagChips } from "@/components/tag-chips";
 import { AvailabilityValue } from "@/components/sla";
 import { runStatusMeta } from "@/lib/status";
 import { formatCertExpiry, formatDuration, formatRelative } from "@/lib/format";
@@ -96,6 +97,7 @@ export function CheckCard({
               {formatCertExpiry(check.last_cert_days_remaining) ?? "no cert reading"}
             </div>
           )}
+          <TagChips tags={check.tags} className="mt-2" />
         </div>
         {/* Two distinct facts, labeled so they don't read as contradictory:
             the badge is the LATEST run's state; the % is 24h historical uptime. */}
