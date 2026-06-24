@@ -10,25 +10,29 @@ function worldWithNarrative() {
   w.narratives = {
     fleet: {
       scope: "fleet",
-      window: "30d",
+      window: "7d",
       headline: "Fleet mostly healthy, one latency regression",
       body: "Availability held at **99.2%** this window.\n\n- API p95 rose to `420ms`\n- One incident on checkout",
       highlights: ["p95 +15%", "1 incident"],
-      factPack: [
-        { label: "p95", value: "420ms", delta: "+15%" },
-        { label: "availability", value: "99.2%", delta: "-0.3pp" },
-      ],
+      // ★ The runner writes fact_pack as an OBJECT (current/deltas), NOT a chip array — the API passes it
+      // through verbatim and the client derives chips from it. Fixture mirrors the real shape.
+      factPack: {
+        current: { availabilityPct: 99.2, p95: 420, incidents: 1, downtimeMin: 45 },
+        deltas: { availabilityPts: -0.3, p95Pct: 15, incidents: 1, downtimeMin: 30 },
+        scopeType: "fleet",
+        window: "7d",
+      },
       generatedAt: "2026-06-20T09:00:00Z",
       stale: false,
     },
     monitor: {
       "1": {
         scope: "monitor",
-        window: "30d",
+        window: "7d",
         headline: "API health steady",
         body: "No regressions; p95 stable.",
         highlights: [],
-        factPack: [{ label: "p95", value: "180ms", delta: "0%" }],
+        factPack: { current: { availabilityPct: 100, p95: 180, incidents: 0, downtimeMin: 0 }, deltas: {} },
         generatedAt: "2026-06-20T09:00:00Z",
         stale: true,
       },
@@ -55,11 +59,13 @@ test.describe("reporting layer 3 — narrative card", () => {
     await mockApi(page, worldWithNarrative());
     await page.goto("/reports");
 
+    // Derived from the fact_pack object: Availability, p95, Incidents, Downtime.
     const facts = page.locator('[data-scope="fleet"] [data-testid="narrative-fact"]');
-    await expect(facts).toHaveCount(2);
+    await expect(facts).toHaveCount(4);
     const p95 = facts.filter({ hasText: "p95" });
     await expect(p95).toContainText("420ms"); // the actual number, verifiable against the prose
     await expect(p95).toContainText("+15%"); // the cited delta
+    await expect(facts.filter({ hasText: "Availability" })).toContainText("99.2%");
   });
 
   test("graceful: no narrative served → card hidden (no error, no empty box)", async ({ page }) => {
