@@ -176,13 +176,35 @@ test.describe("notifications settings", () => {
     await expect(page.getByTestId("delivery-not-configured")).toHaveCount(0); // no false "won't deliver"
   });
 
-  test("delivery banner: accurate when readiness reports configured", async ({ page }) => {
+  test("delivery banner: ACTIVE when channels + routing + transport are all configured", async ({ page }) => {
     const world = defaultWorld();
     world.channels = [emailCh()];
-    world.notificationsHealth = { transportConfigured: true };
+    world.notificationsHealth = { channelsConfigured: true, routingConfigured: true, transportConfigured: true };
     await mockApi(page, world);
     await page.goto("/notifications");
     await expect(page.getByTestId("delivery-active")).toBeVisible();
+  });
+
+  test("delivery banner: INCOMPLETE when config is missing (API can see this)", async ({ page }) => {
+    const world = defaultWorld();
+    world.channels = [emailCh()];
+    world.notificationsHealth = { channelsConfigured: true, routingConfigured: false, transportConfigured: null };
+    await mockApi(page, world);
+    await page.goto("/notifications");
+    await expect(page.getByTestId("delivery-incomplete")).toContainText(/won.t fire/i);
+    await expect(page.getByTestId("delivery-active")).toHaveCount(0);
+  });
+
+  test("delivery banner: UNKNOWN transport → honest note, no false active/down", async ({ page }) => {
+    const world = defaultWorld();
+    world.channels = [emailCh()];
+    // config complete, transport unverifiable (null) — the API can't see the runner's transport
+    world.notificationsHealth = { channelsConfigured: true, routingConfigured: true, transportConfigured: null };
+    await mockApi(page, world);
+    await page.goto("/notifications");
+    await expect(page.getByTestId("delivery-transport-unknown")).toBeVisible();
+    await expect(page.getByTestId("delivery-active")).toHaveCount(0); // not falsely "active"
+    await expect(page.getByTestId("delivery-not-configured")).toHaveCount(0); // not falsely "won't deliver"
   });
 
   test("validation: an email channel with no recipient is blocked", async ({ page }) => {
