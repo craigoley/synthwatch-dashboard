@@ -111,21 +111,68 @@ test.describe("notifications settings", () => {
     expect(body.perCheck["1"].channelIds).toEqual([1]);
   });
 
-  test("send-test: success shows an inline result + toast", async ({ page }) => {
+  // Async test-send (runs on the runner): POST → 202 { requestId }, then poll
+  // GET .../test/status until delivered|failed. The button shows a pending state
+  // while polling; the inline result + toast reflect the terminal outcome.
+  test("send-test: pending → delivered (polls, then success result + toast)", async ({ page }) => {
     const world = defaultWorld();
     world.channels = [emailCh()];
-    world.channelTest = { status: 200, body: { ok: true } };
+    // first poll still sending, second poll delivered — exercises the transition.
+    world.channelTest = {
+      statusSequence: [
+        { status: "sending" },
+        { status: "delivered", detail: "sent via email" },
+      ],
+    };
     await mockApi(page, world);
     await page.goto("/notifications");
 
     await page.getByTestId("send-test-1").click();
-    await expect(page.getByTestId("test-result-1")).toContainText("Test sent");
+    // PENDING UI: button shows the in-flight label and is disabled.
+    const btn = page.getByTestId("send-test-1");
+    await expect(btn).toContainText(/Sending test/);
+    await expect(btn).toBeDisabled();
+    // Eventually resolves to the delivered result + a success toast.
+    await expect(page.getByTestId("test-result-1")).toContainText(/Test delivered/);
+    await expect(page.getByTestId("test-result-1")).toContainText(/sent via email/);
     await expect(page.getByTestId("toast-success")).toBeVisible();
+    await expect(btn).toBeEnabled(); // re-enabled after the terminal state
+  });
+
+  test("send-test: pending → failed (error result + toast with the reason)", async ({ page }) => {
+    const world = defaultWorld();
+    world.channels = [emailCh()];
+    world.channelTest = {
+      statusSequence: [
+        { status: "pending" },
+        { status: "failed", detail: "smtp 550 rejected" },
+      ],
+    };
+    await mockApi(page, world);
+    await page.goto("/notifications");
+
+    await page.getByTestId("send-test-1").click();
+    await expect(page.getByTestId("test-result-1")).toContainText(/Test failed/);
+    await expect(page.getByTestId("test-result-1")).toContainText(/smtp 550 rejected/);
+    await expect(page.getByTestId("toast-error")).toBeVisible();
+  });
+
+  test("send-test: network error on enqueue → failure surfaced (nothing hangs)", async ({ page }) => {
+    const world = defaultWorld();
+    world.channels = [emailCh()];
+    world.channelTest = { enqueueError: { status: 500, body: { message: "runner unavailable" } } };
+    await mockApi(page, world);
+    await page.goto("/notifications");
+
+    await page.getByTestId("send-test-1").click();
+    await expect(page.getByTestId("test-result-1")).toContainText(/Test failed/);
+    await expect(page.getByTestId("toast-error")).toContainText(/runner unavailable/);
+    await expect(page.getByTestId("send-test-1")).toBeEnabled(); // button recovers
   });
 
   test("send-test: graceful when the endpoint isn't deployed (404)", async ({ page }) => {
     const world = defaultWorld();
-    world.channels = [emailCh()]; // channelTest undefined → 404
+    world.channels = [emailCh()]; // channelTest undefined → POST 404
     await mockApi(page, world);
     await page.goto("/notifications");
 

@@ -35,6 +35,7 @@ import {
   setRouting as apiSetRouting,
   getDeliveryReadiness,
   sendChannelTest,
+  getChannelTestStatus,
   getCheckTags,
   setCheckTags as apiSetCheckTags,
   getTags,
@@ -157,9 +158,10 @@ export function useDeliveryReadiness() {
   });
 }
 
-// One-shot test-send action (no cache). Re-exported so the page imports from the
-// React data layer like everything else.
-export { sendChannelTest };
+// Async test-send: enqueue (POST → 202 { requestId }) + poll the runner job's
+// status (GET .../test/status). No cache — these are imperative one-offs, but
+// re-exported so the page imports from the React data layer like everything else.
+export { sendChannelTest, getChannelTestStatus };
 
 // Tags (Phase 9a). shouldRetryOnError:false so a pre-API 404 leaves data undefined
 // (the editor hides) rather than retry-looping.
