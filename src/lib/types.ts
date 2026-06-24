@@ -559,3 +559,28 @@ export interface PerformanceReport {
   group_by: string;
   groups: PerformanceGroup[];
 }
+
+// ─── reporting Layer 3: AI narrative (GET /api/reports/narrative) ─────────────
+/** One cited figure behind the prose (auditability): the actual number + optional delta. */
+export interface NarrativeFact {
+  label: string;
+  value: string;
+  /** e.g. "+15%" / "-3pp"; raw string, shown neutrally beside the prose. */
+  delta?: string | null;
+}
+
+/**
+ * An AI-generated summary for a scope (fleet, or one monitor). `body` is markdown;
+ * `factPack` are the figures the prose cites (rendered as audit chips). `generatedAt`
+ * + `stale` drive the freshness hint. Card HIDES entirely when there's no narrative.
+ */
+export interface Narrative {
+  scope: "fleet" | "monitor";
+  window: string;
+  headline: string;
+  body: string;
+  highlights: string[];
+  factPack: NarrativeFact[];
+  generatedAt: string | null;
+  stale: boolean;
+}

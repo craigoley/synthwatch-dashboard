@@ -8,6 +8,7 @@ import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { TagChips } from "@/components/tag-chips";
 import { StatusDot } from "@/components/status-badge";
 import { MonitorReportDetail } from "@/components/monitor-report-detail";
+import { NarrativeCard } from "@/components/narrative-card";
 import { formatDuration, formatPct } from "@/lib/format";
 import type { CheckKind, ReportWindow, RunStatus, Tag } from "@/lib/types";
 
@@ -126,6 +127,9 @@ export default function ReportsPage() {
         </div>
       </header>
 
+      {/* AI narrative summary (Layer 3) — hides entirely until the endpoint serves one. */}
+      <NarrativeCard scope="fleet" window={window} />
+
       {/* Tags FILTER the list (multi-tag AND); only real in-use tags are offered. */}
       {(inUseTags?.length ?? 0) > 0 && (
         <TagFilter
@@ -207,7 +211,7 @@ export default function ReportsPage() {
                       {r.incident_count}
                     </span>
                   </button>
-                  {open && <MonitorReportDetail checkId={r.check_id} kind={r.kind} />}
+                  {open && <MonitorReportDetail checkId={r.check_id} kind={r.kind} window={window} />}
                 </div>
               );
             })}

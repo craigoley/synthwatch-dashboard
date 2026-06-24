@@ -42,6 +42,7 @@ import {
   getSuggestedKeys,
   getAvailabilityReport,
   getPerformanceReport,
+  getNarrative,
   type ChannelInput,
   createCheck as apiCreateCheck,
   updateCheck as apiUpdateCheck,
@@ -72,6 +73,7 @@ const keys = {
   suggestedKeys: ["tags-suggested"] as const,
   availabilityReport: (w: string, g: string) => ["report-availability", w, g] as const,
   performanceReport: (w: string, g: string) => ["report-performance", w, g] as const,
+  narrative: (scope: string, w: string, key: number | null) => ["narrative", scope, w, key] as const,
 };
 
 // Live dashboards: refresh on an interval, revalidate when the tab refocuses.
@@ -203,6 +205,16 @@ export function usePerformanceReport(window: ReportWindow, groupBy: string) {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });
+}
+
+// AI narrative (Layer 3). shouldRetryOnError:false → a 404 (not enabled/generated) leaves
+// data undefined and the card hides, never a retry loop or an error box.
+export function useNarrative(scope: "fleet" | "monitor", window: ReportWindow, key: number | null = null) {
+  return useSWR(
+    keys.narrative(scope, window, key),
+    () => getNarrative(scope, window, scope === "monitor" ? (key ?? undefined) : undefined),
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
 }
 
 export function useSla(window: SlaWindow = "24h") {

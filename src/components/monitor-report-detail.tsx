@@ -4,9 +4,10 @@ import Link from "next/link";
 
 import { useRuns, useMetrics, useIncidents } from "@/lib/client";
 import { AvailabilityChart, LatencyChart } from "@/components/charts";
+import { NarrativeCard } from "@/components/narrative-card";
 import { StatusBadge, TONE_VAR } from "@/components/status-badge";
 import { formatDuration, formatLocalDateTime } from "@/lib/format";
-import type { CheckKind, MetricPoint } from "@/lib/types";
+import type { CheckKind, MetricPoint, ReportWindow } from "@/lib/types";
 
 const isFail = (s: string) => s === "fail" || s === "error";
 
@@ -38,7 +39,15 @@ function Vital({ label, value }: { label: string; value: string }) {
  * browser-only web vitals (no INP, no empty cards for http/ssl), recent error
  * details, and incident history with RCA links. All from existing per-check endpoints.
  */
-export function MonitorReportDetail({ checkId, kind }: { checkId: number; kind: CheckKind }) {
+export function MonitorReportDetail({
+  checkId,
+  kind,
+  window,
+}: {
+  checkId: number;
+  kind: CheckKind;
+  window: ReportWindow;
+}) {
   const { data: runsPage } = useRuns(checkId, 50, 0);
   const { data: metrics } = useMetrics(kind === "browser" ? checkId : null);
   const { data: incidents } = useIncidents();
@@ -50,6 +59,9 @@ export function MonitorReportDetail({ checkId, kind }: { checkId: number; kind: 
 
   return (
     <div className="space-y-4 border-t border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-4" data-testid={`detail-${checkId}`}>
+      {/* Compact per-monitor AI narrative — hides until the endpoint serves one. */}
+      <NarrativeCard scope="monitor" checkKey={checkId} window={window} compact />
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AvailabilityChart checkId={checkId} />
         <LatencyChart runs={runs} />
