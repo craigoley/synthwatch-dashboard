@@ -84,6 +84,8 @@ export interface World {
   reportsServed?: boolean;
   /** Per-check run metrics (CWV) for the report drill-down web-vitals (raw camelCase). */
   metrics?: RawObj[];
+  /** AI narratives (Layer 3). Unset → /reports/narrative 404 → card hides (graceful). */
+  narratives?: { fleet?: RawObj; monitor?: Record<string, RawObj> };
 }
 
 export function defaultWorld(): World {
@@ -241,6 +243,15 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
       return json(route, world.checkTags?.[Number(m[1])] ?? []);
     }
     if (path === "/api/tags" && method === "GET") return json(route, { tags: world.tags ?? [] });
+    // Narrative (Layer 3). Unset narratives → 404 → the card hides (graceful default).
+    if (path === "/api/reports/narrative" && method === "GET") {
+      const scope = url.searchParams.get("scope") ?? "fleet";
+      const key = url.searchParams.get("key");
+      const n =
+        scope === "monitor" ? world.narratives?.monitor?.[String(key)] : world.narratives?.fleet;
+      if (!n) return json(route, { error: "not_found" }, 404);
+      return json(route, n);
+    }
     // Reports (Layer 2) — deterministic from the query so window/groupBy switches are observable.
     if ((path === "/api/reports/availability" || path === "/api/reports/performance") && method === "GET") {
       if (world.reportsServed === false) return json(route, { error: "not_found" }, 404);

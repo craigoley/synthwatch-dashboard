@@ -32,6 +32,7 @@ import type {
   ReportSeriesPoint,
   AvailabilityReport,
   PerformanceReport,
+  Narrative,
   Check,
   CheckAuth,
   CheckDetail,
@@ -890,6 +891,42 @@ export async function getAvailabilityReport(
       })),
     }));
     return { window, group_by: String(raw?.groupBy ?? groupBy), groups };
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+// AI narrative (Layer 3). FLAGGED DEP: 404 → null (endpoint not enabled / not generated
+// yet → the card hides). scope=fleet, or scope=monitor&key=<checkId>.
+export async function getNarrative(
+  scope: "fleet" | "monitor",
+  window: ReportWindow,
+  key?: number,
+): Promise<Narrative | null> {
+  try {
+    const raw = await request<Record<string, unknown>>("/reports/narrative", {
+      scope,
+      window,
+      key: scope === "monitor" ? key : undefined,
+    });
+    if (!raw || !raw.headline) return null; // empty/unusable response → hide
+    return {
+      scope: (raw.scope as Narrative["scope"]) ?? scope,
+      window: String(raw.window ?? window),
+      headline: String(raw.headline),
+      body: String(raw.body ?? ""),
+      highlights: Array.isArray(raw.highlights) ? (raw.highlights as string[]) : [],
+      factPack: Array.isArray(raw.factPack)
+        ? (raw.factPack as Record<string, unknown>[]).map((f) => ({
+            label: String(f.label ?? ""),
+            value: String(f.value ?? ""),
+            delta: f.delta == null ? null : String(f.delta),
+          }))
+        : [],
+      generatedAt: raw.generatedAt == null ? null : String(raw.generatedAt),
+      stale: Boolean(raw.stale),
+    };
   } catch (err) {
     if (err instanceof ApiRequestError && err.status === 404) return null;
     throw err;
