@@ -25,6 +25,7 @@ import type {
   Channel,
   Routing,
   RoutingRule,
+  TagRule,
   Tag,
   TagInUse,
   Check,
@@ -694,22 +695,32 @@ export async function deleteChannel(id: number): Promise<void> {
   await request<unknown>(`/channels/${id}`, undefined, { method: "DELETE" });
 }
 
-// The API serves routing as { severity, perCheck } (null when empty) — NOT
-// { defaults, overrides }. Mismatching these is a silent no-op, so map exactly.
-type RawRouting = { severity?: Record<string, RoutingRule> | null; perCheck?: Record<string, RoutingRule> | null };
+// The API serves routing as { severity, perCheck, tagRules } (null/absent when empty).
+// Map exactly — mismatched keys were a silent wipe (the {defaults,overrides} bug).
+type RawRouting = {
+  severity?: Record<string, RoutingRule> | null;
+  perCheck?: Record<string, RoutingRule> | null;
+  tagRules?: TagRule[] | null;
+};
 
 export async function getRouting(): Promise<Routing> {
   const raw = await request<RawRouting>("/routing");
-  return { severity: raw?.severity ?? {}, perCheck: raw?.perCheck ?? {} };
+  return { severity: raw?.severity ?? {}, perCheck: raw?.perCheck ?? {}, tagRules: raw?.tagRules ?? [] };
 }
 
 export async function setRouting(routing: Routing): Promise<Routing> {
+  // Send the FULL object (severity + perCheck + tagRules) so saving one dimension
+  // never wipes another — mirrors the #66-safe save pattern.
   const raw = await request<RawRouting>("/routing", undefined, {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(routing),
+    body: JSON.stringify({ severity: routing.severity, perCheck: routing.perCheck, tagRules: routing.tagRules }),
   });
-  return { severity: raw?.severity ?? routing.severity, perCheck: raw?.perCheck ?? routing.perCheck };
+  return {
+    severity: raw?.severity ?? routing.severity,
+    perCheck: raw?.perCheck ?? routing.perCheck,
+    tagRules: raw?.tagRules ?? routing.tagRules,
+  };
 }
 
 // ─── tags (Phase 9a — key:value labels on checks) ────────────────────────────

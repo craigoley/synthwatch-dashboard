@@ -459,12 +459,22 @@ export interface RoutingRule {
   channelIds: number[];
 }
 
+/** A tag-routing rule: checks carrying (tagKey,tagValue) also route to channelId. */
+export interface TagRule {
+  tagKey: string;
+  tagValue: string;
+  channelId: number;
+}
+
 /**
  * Routing config. Field names match the API exactly: `severity` (per-severity
- * defaults) + `perCheck` (per-check overrides, keyed by checkId). The API serves
- * these as null when empty.
+ * defaults), `perCheck` (per-check overrides, keyed by checkId), `tagRules`
+ * (tag:value → channel). ALL-ADDITIVE: an alert fires to the UNION of all three,
+ * deduped by channel id (the runner's resolveChannels semantics, #85). The API
+ * serves the maps as null when empty.
  */
 export interface Routing {
   severity: Record<string, RoutingRule>;
   perCheck: Record<string, RoutingRule>;
+  tagRules: TagRule[];
 }

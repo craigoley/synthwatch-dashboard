@@ -6,6 +6,7 @@ import {
   useChannels,
   useRouting,
   useChecks,
+  useTags,
   useDeliveryReadiness,
   deleteChannel,
   setRouting,
@@ -16,8 +17,9 @@ import { Modal } from "@/components/modal";
 import { ChannelForm } from "@/components/channel-form";
 import { EmptyState, Spinner } from "@/components/states";
 import { useToasts, ToastStack } from "@/components/toast";
+import { TagChips } from "@/components/tag-chips";
 import type { DeliveryReadiness } from "@/lib/api-client";
-import type { Channel, Routing, RoutingSeverity } from "@/lib/types";
+import type { Channel, CheckWithStatus, Routing, RoutingSeverity, Tag, TagRule } from "@/lib/types";
 
 // Severities MUST match the API vocabulary (it 400s on anything else): critical | warning.
 const SEVERITIES: { key: RoutingSeverity; label: string; tone: string }[] = [
@@ -27,6 +29,58 @@ const SEVERITIES: { key: RoutingSeverity; label: string; tone: string }[] = [
 
 const apiReason = (err: unknown, fallback: string) =>
   err instanceof ApiRequestError ? err.message : fallback;
+
+interface FanOutChannel {
+  channel: Channel;
+  viaSeverity: boolean;
+  viaPerCheck: boolean;
+  viaTags: Tag[]; // which of the check's tags matched a tag-rule pointing here
+  escalatedByTag: boolean;
+}
+
+/**
+ * Client mirror of the runner's resolveChannels (#85): the deduped UNION of
+ * severity-default ∪ per-check ∪ tag-rules matching the check's tags, restricted to
+ * ENABLED channels, ordered by id. Also tracks WHICH dimension(s) reached each
+ * channel (legibility) and flags tag-driven escalation of a warning onto a
+ * normally-critical-only channel.
+ */
+function computeFanOut(
+  check: CheckWithStatus,
+  severity: RoutingSeverity,
+  routing: Routing,
+  channelsById: Map<number, Channel>,
+): FanOutChannel[] {
+  const sevIds = new Set(routing.severity[severity]?.channelIds ?? []);
+  const critIds = new Set(routing.severity.critical?.channelIds ?? []);
+  const perCheckIds = new Set(routing.perCheck[String(check.id)]?.channelIds ?? []);
+  const tags = check.tags ?? [];
+  const tagMatch = new Map<number, Tag[]>();
+  for (const r of routing.tagRules) {
+    if (tags.some((t) => t.key === r.tagKey && t.value === r.tagValue)) {
+      const arr = tagMatch.get(r.channelId) ?? [];
+      arr.push({ key: r.tagKey, value: r.tagValue });
+      tagMatch.set(r.channelId, arr);
+    }
+  }
+  const allIds = new Set<number>([...sevIds, ...perCheckIds, ...tagMatch.keys()]);
+  const out: FanOutChannel[] = [];
+  for (const id of allIds) {
+    const channel = channelsById.get(id);
+    if (!channel || !channel.enabled) continue; // resolveChannels: enabled channels only
+    const viaSeverity = sevIds.has(id);
+    const viaTags = tagMatch.get(id) ?? [];
+    out.push({
+      channel,
+      viaSeverity,
+      viaPerCheck: perCheckIds.has(id),
+      viaTags,
+      // a tag pulls a normally-critical-only channel into a WARNING page (3am risk)
+      escalatedByTag: severity === "warning" && !viaSeverity && viaTags.length > 0 && critIds.has(id),
+    });
+  }
+  return out.sort((a, b) => a.channel.id - b.channel.id);
+}
 
 function canDeliver(c: Channel): boolean {
   return c.type === "email" ? (c.config.to?.length ?? 0) > 0 : Boolean(c.config.url);
@@ -86,6 +140,7 @@ export default function NotificationsPage() {
   const { data: channels, isLoading: channelsLoading } = useChannels();
   const { data: routingData } = useRouting();
   const { data: checks } = useChecks();
+  const { data: inUseTags } = useTags();
   const { data: readiness } = useDeliveryReadiness();
   const { toasts, push, dismiss } = useToasts();
 
@@ -105,12 +160,16 @@ export default function NotificationsPage() {
     if (draft || !routingData) return;
     const severity: Routing["severity"] = {};
     for (const s of SEVERITIES) severity[s.key] = { channelIds: routingData.severity[s.key]?.channelIds ?? [] };
-    setDraft({ severity, perCheck: routingData.perCheck ?? {} });
+    setDraft({ severity, perCheck: routingData.perCheck ?? {}, tagRules: routingData.tagRules ?? [] });
   }, [routingData, draft]);
 
   const channelList = useMemo(() => channels ?? [], [channels]);
   const channelById = useMemo(() => new Map(channelList.map((c) => [c.id, c])), [channelList]);
   const apiAvailable = channels !== undefined;
+
+  // tag-rule autocomplete from in-use tags (any key/value still allowed).
+  const tagKeyOptions = useMemo(() => [...new Set((inUseTags ?? []).map((t) => t.key))], [inUseTags]);
+  const tagValueOptions = useMemo(() => [...new Set((inUseTags ?? []).map((t) => t.value))], [inUseTags]);
 
   // Which channels are referenced by ≥1 route (severity default or per-check)?
   const routedIds = useMemo(() => {
@@ -118,6 +177,7 @@ export default function NotificationsPage() {
     if (draft) {
       for (const s of SEVERITIES) (draft.severity[s.key]?.channelIds ?? []).forEach((id) => ids.add(id));
       for (const rule of Object.values(draft.perCheck)) rule.channelIds.forEach((id) => ids.add(id));
+      for (const r of draft.tagRules) ids.add(r.channelId);
     }
     return ids;
   }, [draft]);
@@ -157,6 +217,61 @@ export default function NotificationsPage() {
     setDirty(true);
   }
 
+  // ── tag-rule editor state ──────────────────────────────────────────────────
+  // Groups in the UI are unique (tagKey,tagValue); a pending group exists before
+  // its first channel is picked (no TagRule rows yet). New-rule key/value inputs.
+  const [pendingTagGroups, setPendingTagGroups] = useState<{ tagKey: string; tagValue: string }[]>([]);
+  const [newTagKey, setNewTagKey] = useState("");
+  const [newTagValue, setNewTagValue] = useState("");
+
+  function toggleTagRule(tagKey: string, tagValue: string, channelId: number) {
+    setDraft((d) => {
+      if (!d) return d;
+      const exists = d.tagRules.some(
+        (r) => r.tagKey === tagKey && r.tagValue === tagValue && r.channelId === channelId,
+      );
+      const tagRules = exists
+        ? d.tagRules.filter((r) => !(r.tagKey === tagKey && r.tagValue === tagValue && r.channelId === channelId))
+        : [...d.tagRules, { tagKey, tagValue, channelId }];
+      return { ...d, tagRules };
+    });
+    setDirty(true);
+  }
+
+  function addTagGroup() {
+    const k = newTagKey.trim().toLowerCase();
+    const v = newTagValue.trim().toLowerCase();
+    if (!k || !v) return;
+    setPendingTagGroups((g) =>
+      g.some((x) => x.tagKey === k && x.tagValue === v) ? g : [...g, { tagKey: k, tagValue: v }],
+    );
+    setNewTagKey("");
+    setNewTagValue("");
+  }
+
+  function removeTagGroup(tagKey: string, tagValue: string) {
+    setDraft((d) =>
+      d ? { ...d, tagRules: d.tagRules.filter((r) => !(r.tagKey === tagKey && r.tagValue === tagValue)) } : d,
+    );
+    setPendingTagGroups((g) => g.filter((x) => !(x.tagKey === tagKey && x.tagValue === tagValue)));
+    setDirty(true);
+  }
+
+  // Unique (tagKey,tagValue) groups: those with rules + pending ones not yet saved.
+  const tagGroups = useMemo(() => {
+    const seen = new Set<string>();
+    const groups: { tagKey: string; tagValue: string }[] = [];
+    for (const r of draft?.tagRules ?? []) {
+      const k = `${r.tagKey}:${r.tagValue}`;
+      if (!seen.has(k)) { seen.add(k); groups.push({ tagKey: r.tagKey, tagValue: r.tagValue }); }
+    }
+    for (const g of pendingTagGroups) {
+      const k = `${g.tagKey}:${g.tagValue}`;
+      if (!seen.has(k)) { seen.add(k); groups.push(g); }
+    }
+    return groups;
+  }, [draft?.tagRules, pendingTagGroups]);
+
   async function saveRouting() {
     if (!draft) return;
     setSavingRouting(true);
@@ -169,7 +284,9 @@ export default function NotificationsPage() {
         const ids = valid(rule.channelIds);
         if (ids.length) perCheck[cid] = { channelIds: ids };
       }
-      await setRouting({ severity, perCheck });
+      // tag-rules: drop any pointing at a deleted channel (mirrors severity/perCheck validation).
+      const tagRules = draft.tagRules.filter((r) => channelById.has(r.channelId));
+      await setRouting({ severity, perCheck, tagRules });
       setDirty(false);
       push("success", "Routing saved.");
     } catch (err) {
@@ -474,11 +591,85 @@ export default function NotificationsPage() {
                 )}
               </div>
 
-              <p className="border-t border-[var(--color-border)] pt-3 text-[11px] text-[var(--color-ink-faint)]">
-                Tag-based routing is coming with tags (Phase 9).
-              </p>
+              {/* Tag rules — checks carrying a tag also route to these channels (additive). */}
+              <div className="border-t border-[var(--color-border)] pt-4">
+                <div className="sw-eyebrow mb-2">Tag rules</div>
+                <p className="mb-2 text-[11px] text-[var(--color-ink-faint)]">
+                  Checks carrying a tag also route to these channels — added on top of severity + per-check
+                  (all routing is additive; see the fan-out preview below for the result).
+                </p>
+                {tagGroups.length === 0 && (
+                  <p className="mb-2 text-[11px] text-[var(--color-ink-faint)]">No tag rules yet.</p>
+                )}
+                <div className="space-y-3">
+                  {tagGroups.map((g) => {
+                    const selected = (draft?.tagRules ?? [])
+                      .filter((r) => r.tagKey === g.tagKey && r.tagValue === g.tagValue)
+                      .map((r) => r.channelId);
+                    return (
+                      <div
+                        key={`${g.tagKey}:${g.tagValue}`}
+                        className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4"
+                        data-testid={`tag-rule-${g.tagKey}-${g.tagValue}`}
+                      >
+                        <span className="sw-mono w-40 shrink-0 truncate text-[12px] text-[var(--color-ink)]">
+                          <span className="text-[var(--color-ink-faint)]">{g.tagKey}:</span>
+                          {g.tagValue}
+                        </span>
+                        <ChannelPicker
+                          channels={channelList}
+                          selected={selected}
+                          onToggle={(id) => toggleTagRule(g.tagKey, g.tagValue, id)}
+                          labelFor={(c) => `tag-rule ${g.tagKey}:${g.tagValue} to ${c.name}`}
+                        />
+                        <button
+                          onClick={() => removeTagGroup(g.tagKey, g.tagValue)}
+                          className="sw-btn sw-btn-ghost sw-btn-sm self-start"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <input
+                    className="sw-input sw-mono w-32 text-[13px]"
+                    list="sw-routing-tag-keys"
+                    value={newTagKey}
+                    onChange={(e) => setNewTagKey(e.target.value)}
+                    placeholder="key"
+                    aria-label="tag rule key"
+                  />
+                  <datalist id="sw-routing-tag-keys">
+                    {tagKeyOptions.map((k) => <option key={k} value={k} />)}
+                  </datalist>
+                  <span className="text-[var(--color-ink-faint)]">:</span>
+                  <input
+                    className="sw-input sw-mono w-40 text-[13px]"
+                    list="sw-routing-tag-values"
+                    value={newTagValue}
+                    onChange={(e) => setNewTagValue(e.target.value)}
+                    placeholder="value"
+                    aria-label="tag rule value"
+                  />
+                  <datalist id="sw-routing-tag-values">
+                    {tagValueOptions.map((v) => <option key={v} value={v} />)}
+                  </datalist>
+                  <button
+                    onClick={addTagGroup}
+                    disabled={!newTagKey.trim() || !newTagValue.trim()}
+                    className="sw-btn sw-btn-sm"
+                  >
+                    + Add tag rule
+                  </button>
+                </div>
+              </div>
             </div>
           </section>
+
+          {/* ★ Fan-out preview — the legibility guardrail for all-additive routing. */}
+          <FanOutPreview checks={checks ?? []} channelsById={channelById} routing={draft} />
         </>
       )}
 
@@ -516,6 +707,125 @@ export default function NotificationsPage() {
 
       <ToastStack toasts={toasts} onDismiss={dismiss} />
     </div>
+  );
+}
+
+/**
+ * ★ The legibility guardrail: pick a check + severity → see the EXACT deduped set of
+ * channels that will fire (severity ∪ per-check ∪ matching tag-rules), with the
+ * source(s) per channel and a flag when a tag escalates a warning onto a normally
+ * critical-only channel. Reflects the live draft, so the user sees the effect of a
+ * rule before saving — not at 3am.
+ */
+function FanOutPreview({
+  checks,
+  channelsById,
+  routing,
+}: {
+  checks: CheckWithStatus[];
+  channelsById: Map<number, Channel>;
+  routing: Routing | null;
+}) {
+  const [checkId, setCheckId] = useState<number | null>(null);
+  const [severity, setSeverity] = useState<RoutingSeverity>("critical");
+  const check = checks.find((c) => c.id === checkId) ?? checks[0] ?? null;
+
+  if (!routing || checks.length === 0) return null;
+  const fanOut = check ? computeFanOut(check, severity, routing, channelsById) : [];
+
+  return (
+    <section className="space-y-3" data-testid="fanout-preview">
+      <h2 className="text-sm font-semibold text-[var(--color-ink)]">Alert fan-out preview</h2>
+      <div className="sw-panel space-y-3 p-4">
+        <p className="text-[11px] text-[var(--color-ink-faint)]">
+          The exact channels a {severity} incident would fire — the deduped union of severity, per-check,
+          and matching tag rules. A channel matched by more than one rule appears once.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            className="sw-input max-w-xs text-[13px]"
+            aria-label="preview check"
+            value={check?.id ?? ""}
+            onChange={(e) => setCheckId(Number(e.target.value))}
+          >
+            {checks.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <div className="inline-flex rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5">
+            {SEVERITIES.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => setSeverity(s.key)}
+                aria-pressed={severity === s.key}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                  severity === s.key
+                    ? "bg-[var(--color-panel-2)] text-[var(--color-ink)]"
+                    : "text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {check && (check.tags?.length ?? 0) > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">tags</span>
+            <TagChips tags={check.tags} />
+          </div>
+        )}
+
+        {fanOut.length === 0 ? (
+          <div
+            className="rounded-lg px-3 py-2 text-[13px]"
+            style={{
+              background: "color-mix(in srgb, var(--color-warn) 12%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--color-warn) 40%, transparent)",
+              color: "var(--color-warn)",
+            }}
+            data-testid="fanout-empty"
+          >
+            A {severity} incident here would alert <strong>no one</strong> — no routing reaches an enabled
+            channel.
+          </div>
+        ) : (
+          <div className="space-y-1.5" data-testid="fanout-list">
+            <p className="text-[11px] text-[var(--color-ink-faint)]">
+              Fires {fanOut.length} channel{fanOut.length === 1 ? "" : "s"}:
+            </p>
+            {fanOut.map((f) => (
+              <div
+                key={f.channel.id}
+                className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2"
+                data-testid={`fanout-channel-${f.channel.id}`}
+              >
+                <span className="text-sm font-medium text-[var(--color-ink)]">{f.channel.name}</span>
+                <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+                  {f.channel.type}
+                </span>
+                <span className="ml-auto flex flex-wrap items-center gap-1">
+                  {f.viaSeverity && <Badge tone="var(--color-ink-dim)">severity</Badge>}
+                  {f.viaPerCheck && <Badge tone="var(--color-running)">per-check</Badge>}
+                  {f.viaTags.map((t) => (
+                    <Badge key={`${t.key}:${t.value}`} tone="var(--color-brand)">
+                      {t.key}:{t.value}
+                    </Badge>
+                  ))}
+                  {f.escalatedByTag && (
+                    <Badge tone="var(--color-fail)" testid={`fanout-escalation-${f.channel.id}`}>
+                      ⚠ escalated by tag
+                    </Badge>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
