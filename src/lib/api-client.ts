@@ -33,6 +33,7 @@ import type {
   AvailabilityReport,
   PerformanceReport,
   Narrative,
+  NarrativeFact,
   Check,
   CheckAuth,
   CheckDetail,
@@ -897,6 +898,35 @@ export async function getAvailabilityReport(
   }
 }
 
+// Build the audit chips from the API's passthrough fact_pack. The runner writes fact_pack as a rich
+// OBJECT ({ current:{availabilityPct,p95,incidents,downtimeMin,…}, deltas:{availabilityPts,p95Pct,…}, … }),
+// NOT a pre-shaped chip array — so derive the cited-number chips (value + w/w delta) here. Tolerates a
+// future array shape too. (Field names mirror runner/narrative.ts's FactPack — keep in sync.)
+function toFactChips(fp: unknown): NarrativeFact[] {
+  if (Array.isArray(fp)) {
+    return (fp as Record<string, unknown>[]).map((f) => ({
+      label: String(f.label ?? ""),
+      value: String(f.value ?? ""),
+      delta: f.delta == null ? null : String(f.delta),
+    }));
+  }
+  if (!fp || typeof fp !== "object") return [];
+  const o = fp as Record<string, unknown>;
+  const c = (o.current ?? {}) as Record<string, number | null>;
+  const d = (o.deltas ?? {}) as Record<string, number | null>;
+  const signed = (n: number, unit: string) => `${n >= 0 ? "+" : ""}${n}${unit}`;
+  const facts: NarrativeFact[] = [];
+  if (c.availabilityPct != null)
+    facts.push({ label: "Availability", value: `${c.availabilityPct}%`, delta: d.availabilityPts != null ? signed(d.availabilityPts, "pp") : null });
+  if (c.p95 != null)
+    facts.push({ label: "p95", value: `${c.p95}ms`, delta: d.p95Pct != null ? signed(d.p95Pct, "%") : null });
+  if (c.incidents != null)
+    facts.push({ label: "Incidents", value: String(c.incidents), delta: d.incidents ? signed(d.incidents, "") : null });
+  if (c.downtimeMin != null)
+    facts.push({ label: "Downtime", value: `${c.downtimeMin}m`, delta: d.downtimeMin ? signed(d.downtimeMin, "m") : null });
+  return facts;
+}
+
 // AI narrative (Layer 3). FLAGGED DEP: 404 → null (endpoint not enabled / not generated
 // yet → the card hides). scope=fleet, or scope=monitor&key=<checkId>.
 export async function getNarrative(
@@ -917,13 +947,7 @@ export async function getNarrative(
       headline: String(raw.headline),
       body: String(raw.body ?? ""),
       highlights: Array.isArray(raw.highlights) ? (raw.highlights as string[]) : [],
-      factPack: Array.isArray(raw.factPack)
-        ? (raw.factPack as Record<string, unknown>[]).map((f) => ({
-            label: String(f.label ?? ""),
-            value: String(f.value ?? ""),
-            delta: f.delta == null ? null : String(f.delta),
-          }))
-        : [],
+      factPack: toFactChips(raw.factPack),
       generatedAt: raw.generatedAt == null ? null : String(raw.generatedAt),
       stale: Boolean(raw.stale),
     };
