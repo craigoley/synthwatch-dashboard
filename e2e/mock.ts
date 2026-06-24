@@ -82,6 +82,8 @@ export interface World {
   tags?: RawObj[];
   /** Reports served? false → /reports/* 404 (pre-API "reports pending"). Default true. */
   reportsServed?: boolean;
+  /** Per-check run metrics (CWV) for the report drill-down web-vitals (raw camelCase). */
+  metrics?: RawObj[];
 }
 
 export function defaultWorld(): World {
@@ -248,24 +250,47 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
       const base = Date.parse("2026-03-01T00:00:00Z");
       const series = (v: number) =>
         Array.from({ length: days }, (_, i) => ({ date: new Date(base + i * 86400000).toISOString().slice(0, 10), value: v }));
+      // Per-check rows mirror the real checks so they align with useChecks (tags) by
+      // id; metrics vary by id so sorting reorders observably.
+      const checks = world.checks ?? [];
+      const availPct = (id: number) => Math.round((100 - ((id * 7) % 28) * 0.9) * 10) / 10;
+      const p95Of = (id: number) => 150 + ((id * 37) % 400);
       if (path === "/api/reports/availability") {
-        const grp = (name: string, pct: number) => ({
-          group: name, availabilityPct: pct, downtimeMinutes: Math.round(((100 - pct) / 100) * days * 1440),
-          incidentCount: pct < 90 ? 2 : 0, checkCount: 2, series: series(pct),
-          checks: [{ checkId: 1, name: "API health", kind: "http", availabilityPct: pct, downtimeMinutes: 5, incidentCount: 0 }],
+        const rows = checks.map((c) => {
+          const id = Number(c.id);
+          const pct = availPct(id);
+          return {
+            checkId: id, name: c.name, kind: c.kind, availabilityPct: pct,
+            downtimeMinutes: Math.round(((100 - pct) / 100) * days * 1440), incidentCount: id % 3,
+          };
         });
-        const groups = gb === "none" ? [grp("all", 99.9)] : gb === "team" ? [grp("platform", 98.2), grp("web", 75)] : [grp(`${gb}-x`, 99)];
+        const allGroup = {
+          group: "all", availabilityPct: 98, downtimeMinutes: 200, incidentCount: rows.reduce((s, r) => s + r.incidentCount, 0),
+          checkCount: rows.length, series: series(98), checks: rows,
+        };
+        const groups = gb === "none" ? [allGroup] : gb === "team"
+          ? [{ ...allGroup, group: "platform", checks: rows.slice(0, 1) }, { ...allGroup, group: "web", checks: rows.slice(1) }]
+          : [{ ...allGroup, group: `${gb}-x` }];
         return json(route, { window: win, groupBy: gb, groups });
       }
-      // performance: a browser group (web-vitals present) + a non-browser group (vitals null).
-      const grp = (name: string, p95: number, browser: boolean) => ({
-        group: name, avgMs: Math.round(p95 * 0.6), p50Ms: Math.round(p95 * 0.7), p95Ms: p95, p99Ms: Math.round(p95 * 1.4),
-        series: series(p95),
-        webVitals: browser ? { lcpMs: 1800, fcpMs: 900, ttfbMs: 200, cls: 0.05 } : null,
-        browserCheckCount: browser ? 2 : 0, checkCount: 2,
-        checks: [{ checkId: 1, name: "Homepage", kind: browser ? "browser" : "http", avgMs: Math.round(p95 * 0.6), p50Ms: Math.round(p95 * 0.7), p95Ms: p95, p99Ms: Math.round(p95 * 1.4) }],
+      // performance: per-check rows; web-vitals at group level present iff any browser check.
+      const browserCount = checks.filter((c) => c.kind === "browser").length;
+      const rows = checks.map((c) => {
+        const id = Number(c.id);
+        const p95 = p95Of(id);
+        return {
+          checkId: id, name: c.name, kind: c.kind,
+          avgMs: Math.round(p95 * 0.5), p50Ms: Math.round(p95 * 0.6), p95Ms: p95, p99Ms: Math.round(p95 * 1.5),
+        };
       });
-      const groups = gb === "none" ? [grp("all", 420, true)] : gb === "team" ? [grp("platform", 380, true), grp("web", 250, false)] : [grp(`${gb}-x`, 300, true)];
+      const allGroup = {
+        group: "all", avgMs: 200, p50Ms: 180, p95Ms: 400, p99Ms: 600, series: series(400),
+        webVitals: browserCount ? { lcpMs: 1800, fcpMs: 900, ttfbMs: 200, cls: 0.05 } : null,
+        browserCheckCount: browserCount, checkCount: rows.length, checks: rows,
+      };
+      const groups = gb === "none" ? [allGroup] : gb === "team"
+        ? [{ ...allGroup, group: "platform" }, { ...allGroup, group: "web" }]
+        : [{ ...allGroup, group: `${gb}-x` }];
       return json(route, { window: win, groupBy: gb, groups });
     }
     // Alerting reads (undefined → 404, exercising the "setup pending" path).
@@ -293,7 +318,7 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
       const win = url.searchParams.get("window") ?? "24h";
       return json(route, world.availability ? { ...world.availability, window: win } : { window: win, bucket: "hour", points: [] });
     }
-    if (/^\/api\/checks\/\d+\/metrics$/.test(path)) return json(route, { items: [] });
+    if (/^\/api\/checks\/\d+\/metrics$/.test(path)) return json(route, { items: world.metrics ?? [] });
     if ((m = path.match(/^\/api\/runs\/(\d+)\/steps$/))) return json(route, world.steps[Number(m[1])] ?? []);
     if (/^\/api\/runs\/\d+\/screenshot$/.test(path)) {
       if (world.screenshot404) return route.fulfill({ status: 404 });
