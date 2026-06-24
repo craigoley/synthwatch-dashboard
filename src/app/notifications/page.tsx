@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   useChannels,
@@ -11,6 +11,7 @@ import {
   deleteChannel,
   setRouting,
   sendChannelTest,
+  getChannelTestStatus,
 } from "@/lib/client";
 import { ApiRequestError } from "@/lib/api-client";
 import { Modal } from "@/components/modal";
@@ -29,6 +30,18 @@ const SEVERITIES: { key: RoutingSeverity; label: string; tone: string }[] = [
 
 const apiReason = (err: unknown, fallback: string) =>
   err instanceof ApiRequestError ? err.message : fallback;
+
+// Async test-send tuning. The job runs on the runner (~10-15s), so we poll on a
+// short interval and bail (softly) after a generous ceiling rather than hang.
+const TEST_POLL_INTERVAL_MS = 2_000;
+const TEST_POLL_TIMEOUT_MS = 60_000;
+
+/** UI phase of a per-channel test send (see state declaration for the lifecycle). */
+type TestPhase = "queuing" | "pending" | "sending" | "delivered" | "failed" | "timeout";
+
+/** True while the test is still in flight — keeps the button disabled + spinning. */
+const isTestBusy = (p: TestPhase | undefined): boolean =>
+  p === "queuing" || p === "pending" || p === "sending";
 
 interface FanOutChannel {
   channel: Channel;
@@ -152,9 +165,26 @@ export default function NotificationsPage() {
   const [dirty, setDirty] = useState(false);
   const [savingRouting, setSavingRouting] = useState(false);
 
-  // per-channel test-send state
-  const [testing, setTesting] = useState<Record<number, boolean>>({});
+  // Per-channel test-send state. A test send now runs on the runner (~10-15s), so
+  // each channel tracks an async phase rather than a boolean:
+  //   queuing  — POST in flight (enqueueing)
+  //   pending  — queued, runner not started yet (polling)
+  //   sending  — runner actively delivering (polling)
+  //   delivered/failed — terminal outcome
+  //   timeout  — gave up polling (~60s); the job may still complete on the runner
+  // `testResult` holds the inline outcome line shown under the channel.
+  const [testPhase, setTestPhase] = useState<Record<number, TestPhase>>({});
   const [testResult, setTestResult] = useState<Record<number, { ok: boolean; text: string }>>({});
+  // Active poll timers, keyed by channel id — cleared on terminal state + unmount.
+  const pollTimers = useRef<Record<number, ReturnType<typeof setInterval>>>({});
+
+  // Stop every in-flight poll when the page unmounts / navigates away (no leaks).
+  useEffect(() => {
+    const timers = pollTimers.current;
+    return () => {
+      for (const t of Object.values(timers)) clearInterval(t);
+    };
+  }, []);
 
   useEffect(() => {
     if (draft || !routingData) return;
@@ -297,33 +327,97 @@ export default function NotificationsPage() {
     }
   }
 
+  function clearTestPoll(id: number) {
+    const t = pollTimers.current[id];
+    if (t) {
+      clearInterval(t);
+      delete pollTimers.current[id];
+    }
+  }
+
+  function setPhase(id: number, phase: TestPhase) {
+    setTestPhase((p) => ({ ...p, [id]: phase }));
+  }
+  function setResult(id: number, ok: boolean, text: string) {
+    setTestResult((r) => ({ ...r, [id]: { ok, text } }));
+  }
+
+  /**
+   * Enqueue a test send on the runner, then poll for the outcome. The runner job
+   * takes ~10-15s, so we NEVER block: we flip to a pending state, poll every ~2s,
+   * resolve on delivered/failed, and soft-stop after ~60s rather than hang forever.
+   */
   async function runTest(c: Channel) {
-    setTesting((t) => ({ ...t, [c.id]: true }));
-    setTestResult((r) => {
-      const next = { ...r };
-      delete next[c.id];
-      return next;
-    });
+    if (isTestBusy(testPhase[c.id])) return; // guard re-click while in flight
+    clearTestPoll(c.id); // never run two polls for one channel
+    setPhase(c.id, "queuing");
+    setResult(c.id, true, "Queuing test…");
+
+    let res: Awaited<ReturnType<typeof sendChannelTest>>;
     try {
-      const res = await sendChannelTest(c.id);
-      if ("unavailable" in res && res.unavailable) {
-        setTestResult((r) => ({ ...r, [c.id]: { ok: false, text: "Test delivery isn't available yet." } }));
-        push("error", `Test delivery isn't available yet (the API endpoint isn't deployed).`);
-      } else if (res.ok) {
-        setTestResult((r) => ({ ...r, [c.id]: { ok: true, text: "Test sent ✓" } }));
-        push("success", `Test sent to “${c.name}”.`);
-      } else {
-        const why = res.detail || "delivery failed";
-        setTestResult((r) => ({ ...r, [c.id]: { ok: false, text: `Test failed: ${why}` } }));
+      res = await sendChannelTest(c.id);
+    } catch (err) {
+      // Network / 5xx on the POST itself — nothing was queued.
+      const why = apiReason(err, "the request failed.");
+      setPhase(c.id, "failed");
+      setResult(c.id, false, `Test failed: ${why}`);
+      push("error", `Test to “${c.name}” failed: ${why}`);
+      return;
+    }
+
+    if ("unavailable" in res && res.unavailable) {
+      setPhase(c.id, "failed");
+      setResult(c.id, false, "Test delivery isn't available yet.");
+      push("error", `Test delivery isn't available yet (the API endpoint isn't deployed).`);
+      return;
+    }
+
+    const { requestId } = res;
+    setPhase(c.id, "pending");
+    setResult(c.id, true, "Sending test… (~15s)");
+
+    // Count polls instead of reading the clock (the runner job is ~10-15s; we cap
+    // at TEST_POLL_TIMEOUT_MS worth of fixed-interval polls, then soft-stop).
+    const maxPolls = Math.ceil(TEST_POLL_TIMEOUT_MS / TEST_POLL_INTERVAL_MS);
+    let pollCount = 0;
+    const poll = async () => {
+      pollCount += 1;
+      try {
+        const s = await getChannelTestStatus(c.id, requestId);
+        if (s.status === "delivered") {
+          clearTestPoll(c.id);
+          setPhase(c.id, "delivered");
+          setResult(c.id, true, s.detail ? `Test delivered ✓ (${s.detail})` : "Test delivered ✓");
+          push("success", `Test delivered to “${c.name}”.`);
+          return;
+        }
+        if (s.status === "failed") {
+          clearTestPoll(c.id);
+          const why = s.detail || "delivery failed";
+          setPhase(c.id, "failed");
+          setResult(c.id, false, `Test failed: ${why}`);
+          push("error", `Test to “${c.name}” failed: ${why}`);
+          return;
+        }
+        // still pending / sending — reflect the runner's phase, keep polling.
+        setPhase(c.id, s.status);
+        if (pollCount >= maxPolls) {
+          clearTestPoll(c.id);
+          setPhase(c.id, "timeout");
+          setResult(c.id, true, "Still sending — check back shortly.");
+        }
+      } catch (err) {
+        // Status endpoint failed (e.g. 404 unknown requestId) — stop, surface why.
+        clearTestPoll(c.id);
+        const why = apiReason(err, "couldn't read the test status.");
+        setPhase(c.id, "failed");
+        setResult(c.id, false, `Test failed: ${why}`);
         push("error", `Test to “${c.name}” failed: ${why}`);
       }
-    } catch (err) {
-      const why = apiReason(err, "the request failed.");
-      setTestResult((r) => ({ ...r, [c.id]: { ok: false, text: `Test failed: ${why}` } }));
-      push("error", `Test to “${c.name}” failed: ${why}`);
-    } finally {
-      setTesting((t) => ({ ...t, [c.id]: false }));
-    }
+    };
+
+    pollTimers.current[c.id] = setInterval(poll, TEST_POLL_INTERVAL_MS);
+    void poll(); // fire once immediately — don't wait a full interval for the first read
   }
 
   const overrideCheckIds = draft ? Object.keys(draft.perCheck).map(Number) : [];
@@ -383,6 +477,8 @@ export default function NotificationsPage() {
                   const deliverable = canDeliver(c);
                   const routed = routedIds.has(c.id);
                   const result = testResult[c.id];
+                  const phase = testPhase[c.id];
+                  const busy = isTestBusy(phase);
                   return (
                     <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                       <div className="min-w-0" style={{ opacity: c.enabled ? 1 : 0.55 }}>
@@ -413,10 +509,24 @@ export default function NotificationsPage() {
                         </span>
                         {result && (
                           <span
-                            className="mt-1 block text-[11px]"
-                            style={{ color: result.ok ? "var(--color-pass)" : "var(--color-fail)" }}
+                            className="mt-1 flex items-center gap-1.5 text-[11px]"
+                            style={{
+                              // While in flight (queuing/pending/sending) or timed out, stay
+                              // neutral — green/red is reserved for the terminal verdict.
+                              color: busy || phase === "timeout"
+                                ? "var(--color-ink-dim)"
+                                : result.ok
+                                  ? "var(--color-pass)"
+                                  : "var(--color-fail)",
+                            }}
                             data-testid={`test-result-${c.id}`}
                           >
+                            {busy && (
+                              <span
+                                className="sw-spin inline-block h-3 w-3 shrink-0 rounded-full border-2 border-[var(--color-border-strong)] border-t-[var(--color-brand)]"
+                                aria-hidden="true"
+                              />
+                            )}
                             {result.text}
                           </span>
                         )}
@@ -424,12 +534,27 @@ export default function NotificationsPage() {
                       <div className="flex shrink-0 gap-1.5">
                         <button
                           onClick={() => runTest(c)}
-                          disabled={testing[c.id] || !deliverable}
-                          title={deliverable ? "Send a test delivery" : "Configure a target first"}
+                          disabled={busy || !deliverable}
+                          aria-busy={busy}
+                          title={
+                            deliverable
+                              ? "Send a test delivery (runs on the runner, ~15s)"
+                              : "Configure a target first"
+                          }
                           className="sw-btn sw-btn-ghost sw-btn-sm"
                           data-testid={`send-test-${c.id}`}
                         >
-                          {testing[c.id] ? "Sending…" : "Send test"}
+                          {busy ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <span
+                                className="sw-spin inline-block h-3 w-3 rounded-full border-2 border-[var(--color-border-strong)] border-t-[var(--color-brand)]"
+                                aria-hidden="true"
+                              />
+                              {phase === "queuing" ? "Queuing…" : "Sending test… (~15s)"}
+                            </span>
+                          ) : (
+                            "Send test"
+                          )}
                         </button>
                         <button onClick={() => setEditing(c)} className="sw-btn sw-btn-ghost sw-btn-sm">
                           Edit

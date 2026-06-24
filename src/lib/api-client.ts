@@ -761,30 +761,65 @@ export async function getSuggestedKeys(): Promise<string[]> {
   return raw ?? [];
 }
 
-/** Result of a per-channel test send. */
-export interface ChannelTestResult {
-  ok: boolean;
-  detail?: string | null;
+// ─── async test-send (runs via the runner, not synchronously) ────────────────
+// A test send is now a one-off ACA job (~10-15s), so the dashboard ENQUEUES it
+// and polls for the outcome instead of blocking on a synchronous response.
+// Contract (the API implements EXACTLY this — do not deviate):
+//   POST /api/channels/{id}/test                       -> 202 { requestId }
+//   GET  /api/channels/{id}/test/status?requestId={id} -> { status, detail, requestedAt, completedAt }
+//   status ∈ pending | sending | delivered | failed.
+
+/** Lifecycle of a queued test send (mirrors the runner's job states). */
+export type ChannelTestStatus = "pending" | "sending" | "delivered" | "failed";
+
+/** GET .../test/status response — the polled outcome of one queued test send. */
+export interface ChannelTestStatusResult {
+  status: ChannelTestStatus;
+  detail: string | null;
+  requestedAt: string | null;
+  completedAt: string | null;
 }
 
 /**
- * POST /api/channels/{id}/test — send a test delivery. FLAGGED API DEPENDENCY:
- * the endpoint may not exist yet (404) — callers treat that as "unavailable",
- * never a hard error. Returns { unavailable: true } on 404.
+ * POST /api/channels/{id}/test — ENQUEUE a test delivery on the runner. Returns
+ * the 202 { requestId } the caller then polls via getChannelTestStatus.
+ * FLAGGED API DEPENDENCY: the endpoint may not exist yet (404) — callers treat
+ * that as "unavailable" (returns { unavailable: true }), never a hard error.
  */
 export async function sendChannelTest(
   id: number,
-): Promise<{ unavailable: true } | (ChannelTestResult & { unavailable?: false })> {
+): Promise<{ unavailable: true } | { unavailable?: false; requestId: number }> {
   try {
-    const raw = await request<ChannelTestResult>(`/channels/${id}/test`, undefined, {
+    const raw = await request<{ requestId: number }>(`/channels/${id}/test`, undefined, {
       method: "POST",
       headers: { "content-type": "application/json" },
     });
-    return { ok: raw?.ok ?? true, detail: raw?.detail ?? null };
+    return { requestId: raw.requestId };
   } catch (err) {
     if (err instanceof ApiRequestError && err.status === 404) return { unavailable: true };
     throw err;
   }
+}
+
+/**
+ * GET /api/channels/{id}/test/status?requestId= — poll one queued test send.
+ * Throws ApiRequestError (incl. 404 for an unknown requestId) so the caller can
+ * stop polling and surface the reason.
+ */
+export async function getChannelTestStatus(
+  id: number,
+  requestId: number,
+): Promise<ChannelTestStatusResult> {
+  const raw = await request<Partial<ChannelTestStatusResult>>(
+    `/channels/${id}/test/status`,
+    { requestId },
+  );
+  return {
+    status: (raw?.status ?? "pending") as ChannelTestStatus,
+    detail: raw?.detail ?? null,
+    requestedAt: raw?.requestedAt ?? null,
+    completedAt: raw?.completedAt ?? null,
+  };
 }
 
 /**

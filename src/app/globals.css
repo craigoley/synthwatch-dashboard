@@ -341,6 +341,16 @@
   }
 }
 
+/* Spin (loading) — used by the shared Spinner and inline busy indicators. */
+.sw-spin {
+  animation: sw-rot 0.7s linear infinite;
+}
+@keyframes sw-rot {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .sw-rise {
   animation: sw-rise 0.4s ease both;
 }

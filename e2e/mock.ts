@@ -55,8 +55,23 @@ export interface World {
   routing?: RawObj;
   /** Force PUT /routing to fail (proves the save-FAILURE feedback path). */
   routingPutError?: { status: number; body: unknown };
-  /** POST /channels/{id}/test response; undefined → 404 (endpoint not deployed). */
-  channelTest?: { status: number; body?: unknown };
+  /**
+   * Async test-send (runs on the runner). The POST enqueues and returns 202
+   * { requestId }; the dashboard then polls GET .../test/status. Drive the
+   * outcome per channel with `channelTest`:
+   *   undefined          → POST 404 (endpoint not deployed)
+   *   enqueueError       → POST returns this status/body instead of 202 (network/5xx path)
+   *   statusSequence     → the status objects returned on successive polls; the LAST
+   *                        one repeats. Default: one immediate `delivered`.
+   * The mock assigns requestIds and tracks each request's poll cursor statefully.
+   */
+  channelTest?: {
+    enqueueError?: { status: number; body?: unknown };
+    statusSequence?: {
+      status: "pending" | "sending" | "delivered" | "failed";
+      detail?: string | null;
+    }[];
+  };
   /** GET /notifications/health response; undefined → 404 (readiness unknown). */
   notificationsHealth?: RawObj;
   /** Suggested tag keys; undefined → /tags/suggested 404s (editor hidden). */
@@ -97,6 +112,11 @@ const json = (route: Route, body: unknown, status = 200) =>
 
 /** Install the mock on a page. Pass a tweaked World for per-test variants. */
 export async function mockApi(page: Page, world: World = defaultWorld()): Promise<void> {
+  // Stateful test-send requests: requestId → { channelId, poll cursor }. The POST
+  // enqueues (202) and the GET status walks the configured statusSequence.
+  const testRequests = new Map<number, { channelId: number; polls: number }>();
+  let nextRequestId = 1000;
+
   await page.route(`${API_ORIGIN}/**`, async (route) => {
     const req = route.request();
     const url = new URL(req.url());
@@ -171,10 +191,32 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
       world.routing = JSON.parse(req.postData() || "{}") as RawObj;
       return json(route, world.routing);
     }
+    // Async test-send: POST enqueues (202 { requestId }); undefined → 404 (not deployed).
     if ((m = path.match(/^\/api\/channels\/(\d+)\/test$/)) && method === "POST") {
-      return world.channelTest
-        ? json(route, world.channelTest.body ?? { ok: true }, world.channelTest.status)
-        : json(route, { error: "not_found" }, 404); // endpoint not deployed (flagged dep)
+      if (!world.channelTest) return json(route, { error: "not_found" }, 404);
+      if (world.channelTest.enqueueError) {
+        return json(route, world.channelTest.enqueueError.body ?? { error: "enqueue_failed" }, world.channelTest.enqueueError.status);
+      }
+      const requestId = (nextRequestId += 1);
+      testRequests.set(requestId, { channelId: Number(m[1]), polls: 0 });
+      return json(route, { requestId }, 202);
+    }
+    // Poll the queued test send. Walks statusSequence (last entry repeats); the
+    // default is an immediate `delivered`. Unknown requestId → 404.
+    if ((m = path.match(/^\/api\/channels\/(\d+)\/test\/status$/)) && method === "GET") {
+      const requestId = Number(url.searchParams.get("requestId"));
+      const reqState = testRequests.get(requestId);
+      if (!reqState) return json(route, { error: "not_found", message: "unknown requestId" }, 404);
+      const seq = world.channelTest?.statusSequence ?? [{ status: "delivered" as const, detail: "sent via email" }];
+      const step = seq[Math.min(reqState.polls, seq.length - 1)] ?? seq[seq.length - 1]!;
+      reqState.polls += 1;
+      const terminal = step.status === "delivered" || step.status === "failed";
+      return json(route, {
+        status: step.status,
+        detail: step.detail ?? null,
+        requestedAt: new Date(Date.now() - reqState.polls * 2000).toISOString(),
+        completedAt: terminal ? new Date().toISOString() : null,
+      });
     }
 
     if (world.failAllReads) return route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"down"}' });
