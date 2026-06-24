@@ -35,13 +35,17 @@ import {
   setRouting as apiSetRouting,
   getDeliveryReadiness,
   sendChannelTest,
+  getCheckTags,
+  setCheckTags as apiSetCheckTags,
+  getTags,
+  getSuggestedKeys,
   type ChannelInput,
   createCheck as apiCreateCheck,
   updateCheck as apiUpdateCheck,
   deleteCheck as apiDeleteCheck,
 } from "@/lib/api-client";
 import type { CreateCheckInput, UpdateCheckInput } from "@/lib/schemas";
-import type { Routing, SlaWindow } from "@/lib/types";
+import type { Routing, SlaWindow, Tag } from "@/lib/types";
 
 // Logical SWR cache keys (NOT URLs). Centralized so reads and revalidation agree.
 const keys = {
@@ -60,6 +64,9 @@ const keys = {
   channels: ["channels"] as const,
   routing: ["routing"] as const,
   deliveryReadiness: ["delivery-readiness"] as const,
+  checkTags: (id: number) => ["check-tags", id] as const,
+  tags: ["tags"] as const,
+  suggestedKeys: ["tags-suggested"] as const,
 };
 
 // Live dashboards: refresh on an interval, revalidate when the tab refocuses.
@@ -154,6 +161,29 @@ export function useDeliveryReadiness() {
 // React data layer like everything else.
 export { sendChannelTest };
 
+// Tags (Phase 9a). shouldRetryOnError:false so a pre-API 404 leaves data undefined
+// (the editor hides) rather than retry-looping.
+export function useSuggestedKeys() {
+  return useSWR(keys.suggestedKeys, () => getSuggestedKeys(), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+}
+
+/** A check's current tag set (edit seeding + incident-detail display). */
+export function useCheckTags(id: number | null) {
+  return useSWR(
+    id ? keys.checkTags(id) : null,
+    () => getCheckTags(id as number),
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+}
+
+/** Distinct in-use tags — for the future 9b filter bar (built now, unused in the UI). */
+export function useTags() {
+  return useSWR(keys.tags, () => getTags(), { revalidateOnFocus: false, shouldRetryOnError: false });
+}
+
 export function useSla(window: SlaWindow = "24h") {
   return useSWR(keys.sla(window), () => getSla(window), live);
 }
@@ -222,6 +252,18 @@ export async function deleteChannel(id: number) {
 export async function setRouting(routing: Routing) {
   const result = await apiSetRouting(routing);
   await globalMutate(keys.routing);
+  return result;
+}
+
+/** Set a check's tag set, then refresh the affected caches (incl. embedded-tag lists). */
+export async function setCheckTags(id: number, tags: Tag[]) {
+  const result = await apiSetCheckTags(id, tags);
+  await Promise.all([
+    globalMutate(keys.checkTags(id)),
+    globalMutate(keys.check(id)),
+    globalMutate(keys.checks),
+    globalMutate(keys.tags),
+  ]);
   return result;
 }
 

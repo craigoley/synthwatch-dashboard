@@ -10,6 +10,7 @@ import { AvailabilityChart, LatencyChart, MetricsCharts } from "@/components/cha
 import { CheckSlaPanel, SloPanel } from "@/components/sla";
 import { FunnelBar } from "@/components/funnel-bar";
 import { StatusBadge, StatusDot, TONE_VAR } from "@/components/status-badge";
+import { TagChips } from "@/components/tag-chips";
 import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
@@ -398,6 +399,7 @@ export default function CheckDetailPage() {
             )}
             <span>· last run {formatRelative(recent_runs[0]?.started_at)}</span>
           </div>
+          <TagChips tags={check.tags} className="mt-2" />
         </div>
         <div className="flex items-center gap-2">
           <button onClick={togglePause} disabled={pausing} className="sw-btn">

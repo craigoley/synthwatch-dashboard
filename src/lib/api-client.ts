@@ -25,6 +25,7 @@ import type {
   Channel,
   Routing,
   RoutingRule,
+  Tag,
   Check,
   CheckAuth,
   CheckDetail,
@@ -175,6 +176,7 @@ interface RawCheck {
   requestHeaders?: Record<string, string> | null;
   requestBody?: string | null;
   auth?: CheckAuth | null;
+  tags?: Tag[] | null;
   lastRunAt: string | null;
   createdAt: string;
 }
@@ -330,6 +332,7 @@ function mapCheck(raw: RawCheck): Check {
     request_headers: raw.requestHeaders ?? null,
     request_body: raw.requestBody ?? null,
     auth: raw.auth ?? null,
+    tags: raw.tags ?? [],
   };
 }
 
@@ -706,6 +709,42 @@ export async function setRouting(routing: Routing): Promise<Routing> {
     body: JSON.stringify(routing),
   });
   return { severity: raw?.severity ?? routing.severity, perCheck: raw?.perCheck ?? routing.perCheck };
+}
+
+// ─── tags (Phase 9a — key:value labels on checks) ────────────────────────────
+// Contract (parallel API PR): tag = { key, value }, normalized lowercase.
+//   GET/PUT /api/checks/{id}/tags  (PUT replaces the check's full tag set)
+//   GET /api/tags            -> distinct in-use tags (for the future 9b filter bar)
+//   GET /api/tags/suggested  -> suggested keys: [env, service, team, criticality]
+
+// Tolerant of both a bare [Tag] array and a { tags:[…] } wrapper (the locations
+// endpoint wraps; the tags response shape is unconfirmed until the API serves it).
+const asTags = (raw: Tag[] | { tags?: Tag[] } | null): Tag[] =>
+  Array.isArray(raw) ? raw : (raw?.tags ?? []);
+
+export async function getCheckTags(id: number): Promise<Tag[]> {
+  return asTags(await request<Tag[] | { tags?: Tag[] }>(`/checks/${id}/tags`));
+}
+
+export async function setCheckTags(id: number, tags: Tag[]): Promise<Tag[]> {
+  const raw = await request<Tag[] | { tags?: Tag[] }>(`/checks/${id}/tags`, undefined, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ tags }),
+  });
+  return asTags(raw) ?? tags;
+}
+
+/** Distinct in-use tags across all checks — built for the 9b filter bar (not used in the UI yet). */
+export async function getTags(): Promise<Tag[]> {
+  const raw = await request<Tag[]>("/tags");
+  return raw ?? [];
+}
+
+/** Suggested tag keys (env/service/team/criticality) for the editor's key autocomplete. */
+export async function getSuggestedKeys(): Promise<string[]> {
+  const raw = await request<string[]>("/tags/suggested");
+  return raw ?? [];
 }
 
 /** Result of a per-channel test send. */

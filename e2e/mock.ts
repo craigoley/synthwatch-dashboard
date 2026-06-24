@@ -59,6 +59,12 @@ export interface World {
   channelTest?: { status: number; body?: unknown };
   /** GET /notifications/health response; undefined → 404 (readiness unknown). */
   notificationsHealth?: RawObj;
+  /** Suggested tag keys; undefined → /tags/suggested 404s (editor hidden). */
+  suggestedKeys?: string[];
+  /** Per-check tag sets (stateful across PUT). */
+  checkTags?: Record<number, RawObj[]>;
+  /** Distinct in-use tags (GET /tags, for the 9b filter bar). */
+  tags?: RawObj[];
 }
 
 export function defaultWorld(): World {
@@ -80,6 +86,9 @@ export function defaultWorld(): World {
     checkLocations: {},
     channels: [],
     routing: { severity: {}, perCheck: {} },
+    suggestedKeys: ["env", "service", "team", "criticality"],
+    checkTags: {},
+    tags: [],
   };
 }
 
@@ -108,6 +117,14 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
     }
     if (/^\/api\/checks\/\d+$/.test(path) && method === "DELETE") {
       return route.fulfill({ status: 204 });
+    }
+    // PUT a check's tag set (stateful) — body { tags:[…] }.
+    if ((m = path.match(/^\/api\/checks\/(\d+)\/tags$/)) && method === "PUT") {
+      const id = Number(m[1]);
+      const body = JSON.parse(req.postData() || "{}");
+      const tags = Array.isArray(body.tags) ? (body.tags as RawObj[]) : [];
+      world.checkTags = { ...(world.checkTags ?? {}), [id]: tags };
+      return json(route, tags);
     }
     // PUT location assignment — mirrors the API's ≥1-location rule (empty → 400).
     if ((m = path.match(/^\/api\/checks\/(\d+)\/locations$/)) && method === "PUT") {
@@ -170,6 +187,14 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
     if ((m = path.match(/^\/api\/checks\/(\d+)\/locations$/)) && method === "GET") {
       return json(route, { locations: world.checkLocations?.[Number(m[1])] ?? [] });
     }
+    // Tags (Phase 9a): suggested keys (undefined → 404), per-check set, distinct in-use.
+    if (path === "/api/tags/suggested" && method === "GET") {
+      return world.suggestedKeys ? json(route, world.suggestedKeys) : json(route, { error: "not_found" }, 404);
+    }
+    if ((m = path.match(/^\/api\/checks\/(\d+)\/tags$/)) && method === "GET") {
+      return json(route, world.checkTags?.[Number(m[1])] ?? []);
+    }
+    if (path === "/api/tags" && method === "GET") return json(route, world.tags ?? []);
     // Alerting reads (undefined → 404, exercising the "setup pending" path).
     if (path === "/api/channels" && method === "GET") {
       return world.channels ? json(route, world.channels) : json(route, { error: "not_found" }, 404);

@@ -6,9 +6,12 @@ import {
   createCheck,
   updateCheck,
   setCheckLocations,
+  setCheckTags,
   useFlows,
   useLocations,
   useCheckLocations,
+  useSuggestedKeys,
+  useCheckTags,
 } from "@/lib/client";
 import { ApiRequestError } from "@/lib/api-client";
 import {
@@ -23,7 +26,7 @@ import {
   stepsFromCheck,
   type StepState,
 } from "@/components/multistep-builder";
-import type { Check, CheckKind, DnsRecordType, HttpMethod, LighthouseFormFactor } from "@/lib/types";
+import type { Check, CheckKind, DnsRecordType, HttpMethod, LighthouseFormFactor, Tag } from "@/lib/types";
 
 interface Props {
   initial?: Check | null;
@@ -58,6 +61,8 @@ interface FormState {
   ping_port: string;
   /** Run-location assignment (seeded from /api/locations once it loads). */
   locations: string[];
+  /** key:value tags (seeded from /api/checks/{id}/tags once it loads). */
+  tags: Tag[];
 }
 
 function asRecordType(r: string | null | undefined): DnsRecordType {
@@ -114,6 +119,7 @@ function fromCheck(c: Check | null | undefined): FormState {
     // Seeded asynchronously once /api/locations (and, on edit, the current
     // assignment) load — see the seeding effect in MonitorForm.
     locations: [],
+    tags: [],
   };
 }
 
@@ -172,6 +178,98 @@ function Toggle({
       </span>
       <span className="text-[var(--color-ink-dim)]">{label}</span>
     </button>
+  );
+}
+
+/** key:value tag editor: existing tags as removable chips + a key/value add row.
+    Suggested keys (env/service/team/criticality) offered via a datalist, but any
+    key is allowed. One value per key — re-adding a key replaces its value. */
+function TagEditor({
+  tags,
+  suggestedKeys,
+  onAdd,
+  onRemove,
+}: {
+  tags: Tag[];
+  suggestedKeys: string[];
+  onAdd: (key: string, value: string) => void;
+  onRemove: (key: string) => void;
+}) {
+  const [key, setKey] = useState("");
+  const [value, setValue] = useState("");
+  const add = () => {
+    if (!key.trim() || !value.trim()) return;
+    onAdd(key, value);
+    setKey("");
+    setValue("");
+  };
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      add();
+    }
+  };
+  return (
+    <div className="w-full">
+      <span className="sw-label">Tags</span>
+      {tags.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5" data-testid="tag-editor-chips">
+          {tags.map((t) => (
+            <span
+              key={t.key}
+              className="sw-mono inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-bg)] px-2 py-1 text-[11px]"
+            >
+              <span className="text-[var(--color-ink-faint)]">{t.key}:</span>
+              <span className="text-[var(--color-ink)]">{t.value}</span>
+              <button
+                type="button"
+                onClick={() => onRemove(t.key)}
+                aria-label={`remove tag ${t.key}`}
+                className="text-[var(--color-ink-faint)] transition hover:text-[var(--color-fail)]"
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          className="sw-input sw-mono w-32 text-[13px]"
+          list="sw-tag-keys"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="key"
+          aria-label="tag key"
+        />
+        <datalist id="sw-tag-keys">
+          {suggestedKeys.map((k) => (
+            <option key={k} value={k} />
+          ))}
+        </datalist>
+        <span className="text-[var(--color-ink-faint)]">:</span>
+        <input
+          className="sw-input sw-mono w-40 text-[13px]"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="value"
+          aria-label="tag value"
+        />
+        <button
+          type="button"
+          onClick={add}
+          disabled={!key.trim() || !value.trim()}
+          className="sw-btn sw-btn-sm"
+        >
+          + Add tag
+        </button>
+      </div>
+      <span className="mt-1 block text-[11px] text-[var(--color-ink-faint)]">
+        Lowercased on save. Suggested keys: env, service, team, criticality — or use your own.
+      </span>
+    </div>
   );
 }
 
@@ -278,6 +376,34 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
         : [...f.locations, name],
     }));
 
+  // ─── tags (Phase 9a) ───────────────────────────────────────────────────────
+  const { data: suggestedKeys } = useSuggestedKeys();
+  const { data: currentTags } = useCheckTags(isEdit && initial ? initial.id : null);
+  const [tagsSeeded, setTagsSeeded] = useState(false);
+
+  // Seed once the suggested-keys endpoint responds (and, on edit, the current tags).
+  useEffect(() => {
+    if (tagsSeeded || suggestedKeys === undefined) return;
+    if (isEdit) {
+      if (currentTags === undefined) return; // wait for the check's tags too
+      setForm((f) => ({ ...f, tags: currentTags }));
+    }
+    setTagsSeeded(true);
+  }, [suggestedKeys, currentTags, isEdit, tagsSeeded]);
+
+  // Editor only renders once the tag API has responded (pre-API 404 → suggestedKeys
+  // stays undefined → never seeded → editor hidden, save skips the tag PUT).
+  const tagsActive = tagsSeeded;
+
+  // Add/replace a tag — normalized lowercase; one value per key (replace on collision).
+  const addTag = (key: string, value: string) => {
+    const k = key.trim().toLowerCase();
+    const v = value.trim().toLowerCase();
+    if (!k || !v) return;
+    setForm((f) => ({ ...f, tags: [...f.tags.filter((t) => t.key !== k), { key: k, value: v }] }));
+  };
+  const removeTag = (key: string) => setForm((f) => ({ ...f, tags: f.tags.filter((t) => t.key !== key) }));
+
   // Picking a flow suggests the manifest's entry URL — without overwriting a
   // target URL the author already typed.
   const onFlowChange = (name: string) => {
@@ -376,6 +502,10 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
       // Skipped when the feature isn't live yet — the backend defaults to all.
       if (locationsActive) {
         await setCheckLocations(saved.id, form.locations);
+      }
+      // Tags are likewise a separate endpoint (PUT /checks/{id}/tags); skipped pre-API.
+      if (tagsActive) {
+        await setCheckTags(saved.id, form.tags);
       }
       onDone();
     } catch (err) {
@@ -479,6 +609,16 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
             </span>
           )}
         </div>
+      )}
+
+      {/* key:value tags — hidden until /api/tags/suggested is served (pre-API 404). */}
+      {tagsActive && (
+        <TagEditor
+          tags={form.tags}
+          suggestedKeys={suggestedKeys ?? []}
+          onAdd={addTag}
+          onRemove={removeTag}
+        />
       )}
 
       {/* Multistep has no single target — the chain defines its own per-step URLs. */}
