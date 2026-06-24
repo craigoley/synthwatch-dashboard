@@ -26,6 +26,7 @@ import type {
   Routing,
   RoutingRule,
   Tag,
+  TagInUse,
   Check,
   CheckAuth,
   CheckDetail,
@@ -735,10 +736,12 @@ export async function setCheckTags(id: number, tags: Tag[]): Promise<Tag[]> {
   return asTags(raw) ?? tags;
 }
 
-/** Distinct in-use tags across all checks — built for the 9b filter bar (not used in the UI yet). */
-export async function getTags(): Promise<Tag[]> {
-  const raw = await request<Tag[]>("/tags");
-  return raw ?? [];
+/** Distinct in-use tags (with per-tag check count) for the filter bar. The API
+    wraps them as { tags:[{key,value,count}] }; tolerate a bare array too. */
+export async function getTags(): Promise<TagInUse[]> {
+  const raw = await request<TagInUse[] | { tags?: TagInUse[] }>("/tags");
+  const list = Array.isArray(raw) ? raw : (raw?.tags ?? []);
+  return list.map((t) => ({ key: t.key, value: t.value, count: t.count ?? 0 }));
 }
 
 /** Suggested tag keys (env/service/team/criticality) for the editor's key autocomplete. */

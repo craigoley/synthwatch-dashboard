@@ -194,7 +194,7 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
     if ((m = path.match(/^\/api\/checks\/(\d+)\/tags$/)) && method === "GET") {
       return json(route, world.checkTags?.[Number(m[1])] ?? []);
     }
-    if (path === "/api/tags" && method === "GET") return json(route, world.tags ?? []);
+    if (path === "/api/tags" && method === "GET") return json(route, { tags: world.tags ?? [] });
     // Alerting reads (undefined → 404, exercising the "setup pending" path).
     if (path === "/api/channels" && method === "GET") {
       return world.channels ? json(route, world.channels) : json(route, { error: "not_found" }, 404);
