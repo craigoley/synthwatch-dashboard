@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   createCheck,
@@ -8,6 +8,7 @@ import {
   setCheckLocations,
   setCheckTags,
   useFlows,
+  useSpecCatalog,
   useLocations,
   useCheckLocations,
   useSuggestedKeys,
@@ -26,8 +27,9 @@ import {
   stepsFromCheck,
   type StepState,
 } from "@/components/multistep-builder";
+import { FlowCombobox, type FlowComboOption } from "@/components/flow-combobox";
 import type { Check, CheckKind, DnsRecordType, HttpMethod, LighthouseFormFactor, Tag } from "@/lib/types";
-import type { ActivationContext } from "@/lib/specs";
+import { flowNameFor, type ActivationContext } from "@/lib/specs";
 
 interface Props {
   initial?: Check | null;
@@ -48,6 +50,9 @@ interface FormState {
   kind: CheckKind;
   target_url: string;
   flow_name: string;
+  /** Spec binding when a Git-manifest spec is selected (browser, Option C). null = a plain/typed flow. */
+  spec_path: string | null;
+  source_key: string | null;
   method: HttpMethod;
   expected_status: string;
   body_must_contain: string;
@@ -103,6 +108,8 @@ function fromCheck(c: Check | null | undefined): FormState {
     kind: c?.kind ?? "http",
     target_url: c?.target_url ?? "",
     flow_name: c?.flow_name ?? "",
+    spec_path: c?.spec_path ?? null,
+    source_key: c?.source_key ?? null,
     method: asMethod(c?.method),
     expected_status: String(c?.expected_status ?? 200),
     body_must_contain: c?.body_must_contain ?? "",
@@ -361,7 +368,30 @@ export function MonitorForm({ initial, activation, onDone, onCancel }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { data: flows } = useFlows();
-  const selectedFlow = (flows ?? []).find((f) => f.name === form.flow_name);
+  const { data: specCatalog } = useSpecCatalog();
+
+  // The flow selector lists the SAME specs the catalog knows (the Git manifest via spec_catalog) so a
+  // spec defined in Git but never run — e.g. recipe-nav — is selectable immediately, plus any
+  // runner-baked flows. Monitored specs are omitted: one check per source_key (unique index), so a
+  // second would 409 — mirrors the catalog only offering Unmonitored rows for setup.
+  const flowOptions = useMemo<FlowComboOption[]>(() => {
+    const specOpts: FlowComboOption[] = (specCatalog?.items ?? [])
+      .filter((s) => !s.monitored)
+      .map((s) => ({
+        value: flowNameFor(s.spec_path),
+        description: s.description,
+        kind: "spec",
+        entryUrl: s.target,
+        specPath: s.spec_path,
+        sourceKey: s.source_key,
+        secondary: s.name,
+      }));
+    const specValues = new Set(specOpts.map((o) => o.value));
+    const flowOpts: FlowComboOption[] = (flows ?? [])
+      .filter((f) => !specValues.has(f.name)) // a spec of the same name wins (it's spec-backed)
+      .map((f) => ({ value: f.name, description: f.description, kind: "flow", entryUrl: f.entry_url_hint }));
+    return [...specOpts, ...flowOpts];
+  }, [specCatalog, flows]);
 
   const isEdit = Boolean(initial);
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -440,16 +470,21 @@ export function MonitorForm({ initial, activation, onDone, onCancel }: Props) {
   };
   const removeTag = (key: string) => persistTags(form.tags.filter((t) => t.key !== key));
 
-  // Picking a flow suggests the manifest's entry URL — without overwriting a
-  // target URL the author already typed.
-  const onFlowChange = (name: string) => {
-    const match = (flows ?? []).find((f) => f.name === name);
+  // Free-typed flow name: a genuinely-new flow → clear any spec binding (it's not a manifest spec).
+  const onFlowText = (text: string) =>
+    setForm((f) => ({ ...f, flow_name: text, spec_path: null, source_key: null }));
+
+  // Picking an option. A spec option locks its spec_path + source_key (the Phase 13 activation
+  // contract) so the runner fetches+runs the Git spec; a baked flow clears the binding. Either way,
+  // suggest the entry/target URL without overwriting one the author already typed.
+  const onFlowSelect = (opt: FlowComboOption) =>
     setForm((f) => ({
       ...f,
-      flow_name: name,
-      target_url: match?.entry_url_hint && f.target_url.trim() === "" ? match.entry_url_hint : f.target_url,
+      flow_name: opt.value,
+      spec_path: opt.specPath ?? null,
+      source_key: opt.sourceKey ?? null,
+      target_url: opt.entryUrl && f.target_url.trim() === "" ? opt.entryUrl : f.target_url,
     }));
-  };
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -528,10 +563,16 @@ export function MonitorForm({ initial, activation, onDone, onCancel }: Props) {
       ...(form.kind === "http"
         ? buildHttpConfigPayload(http)
         : { assertions: [], request_headers: null, request_body: null, auth: null }),
-      // Activation: the LOCKED spec binding. spec_path makes the runner fetch+run the Git spec
-      // (Option C); source_key links the catalog row (a duplicate → 409). flow_name above is the
-      // synthetic flowNameFor(spec_path) that satisfies browser_needs_flow.
-      ...(activation ? { source_key: activation.sourceKey, spec_path: activation.specPath } : {}),
+      // Spec binding. spec_path makes the runner fetch+run the Git spec (Option C); source_key links
+      // the catalog row (a duplicate → 409). flow_name above is the synthetic flowNameFor(spec_path)
+      // that satisfies browser_needs_flow. Two entry points converge on the SAME shape: catalog
+      // activation, and a free-form New-monitor that selected a manifest spec (create only — edit
+      // leaves the binding untouched, as PATCH omits unspecified fields).
+      ...(activation
+        ? { source_key: activation.sourceKey, spec_path: activation.specPath }
+        : !isEdit && form.kind === "browser" && form.spec_path
+          ? { source_key: form.source_key, spec_path: form.spec_path }
+          : {}),
     };
 
     setSubmitting(true);
@@ -732,29 +773,25 @@ export function MonitorForm({ initial, activation, onDone, onCancel }: Props) {
       {form.kind === "browser" && !isActivation && (
         <Field
           label="Flow"
-          hint={
-            selectedFlow?.description ??
-            "Pick a flow from the runner's manifest, or type a new one (it appears here after its first run syncs)."
-          }
+          hint="Pick a spec from the Git catalog (or a runner flow), or type a new flow name. Choosing a spec runs it from Git — no first run needed."
         >
-          <input
-            className="sw-input"
-            list="sw-flows"
+          <FlowCombobox
             value={form.flow_name}
-            onChange={(e) => onFlowChange(e.target.value)}
-            placeholder="signup_to_paid"
+            options={flowOptions}
+            onChange={onFlowText}
+            onSelect={onFlowSelect}
+            placeholder="search a spec, or type a new flow name"
           />
-          <datalist id="sw-flows">
-            {(flows ?? []).map((f) => (
-              <option key={f.name} value={f.name}>
-                {f.description ?? ""}
-              </option>
-            ))}
-          </datalist>
-          {selectedFlow?.entry_url_hint && (
-            <span className="mt-1 block text-[11px] text-[var(--color-ink-faint)]">
-              Manifest entry URL: <span className="sw-mono">{selectedFlow.entry_url_hint}</span>
+          {form.spec_path ? (
+            <span className="mt-1 block text-[11px] text-[var(--color-ink-faint)]" data-testid="flow-spec-bound">
+              Spec-backed · fetched from Git each run · <span className="sw-mono">{form.spec_path}</span>
             </span>
+          ) : (
+            form.flow_name.trim() !== "" && (
+              <span className="mt-1 block text-[11px] text-[var(--color-ink-faint)]">
+                Runner flow <span className="sw-mono">{form.flow_name.trim()}</span> (not a Git spec).
+              </span>
+            )
           )}
         </Field>
       )}
