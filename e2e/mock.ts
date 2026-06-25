@@ -146,6 +146,22 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
     if (path === "/api/checks" && method === "POST") {
       if (world.createResponse) return json(route, world.createResponse.body, world.createResponse.status);
       const body = JSON.parse(req.postData() || "{}");
+      // Activation: a create carrying sourceKey flips its catalog row Unmonitored→Active (stateful), so
+      // a re-read of /api/specs after the activation shows the row now monitored — proving the loop.
+      if (body.sourceKey && world.specCatalog) {
+        world.specCatalog.items = world.specCatalog.items.map((it) =>
+          it.sourceKey === body.sourceKey
+            ? {
+                ...it,
+                monitored: true,
+                checkId: 999,
+                checkName: body.name,
+                enabled: body.enabled !== false,
+                health: { currentStatus: "running", p95Ms: null, openIncidentCount: 0, lastRunAt: null },
+              }
+            : it,
+        );
+      }
       return json(route, { ...body, id: 999 });
     }
     if (/^\/api\/checks\/\d+$/.test(path) && method === "PATCH") {

@@ -112,6 +112,11 @@ export const createCheckSchema = z.object({
   request_headers: z.record(z.string(), z.string()).nullable().optional().default(null),
   request_body: z.string().nullable().optional().default(null),
   auth: authSchema.nullable().optional().default(null),
+  // Monitors-as-code activation (Phase 13): bind to a manifest spec. Optional (NO default → the key
+  // stays absent for a hand-made check, so toCamelBody never sends it). The API validates spec_path's
+  // shape + source_key uniqueness (a duplicate → 409).
+  source_key: optionalText.optional(),
+  spec_path: optionalText.optional(),
 });
 
 export type CreateCheckInput = z.infer<typeof createCheckSchema>;

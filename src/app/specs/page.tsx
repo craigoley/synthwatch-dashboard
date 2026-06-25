@@ -1,11 +1,13 @@
 "use client";
 
 /**
- * Spec catalog (Phase 13) — the read-only inventory of every monitor Git declares (the
- * synthwatch-monitors manifest), one row per spec, with its coverage + runnable state. This is the
- * browse home; the focused "what differs from Git" alert lives in the drift surface on /monitors
- * (they coexist — see the cross-link there). Activation ("Set up monitor") is a later PR — this page
- * has NO action column.
+ * Spec catalog (Phase 13) — the inventory of every monitor Git declares (the synthwatch-monitors
+ * manifest), one row per spec, with its coverage + runnable state. This is the browse home; the
+ * focused "what differs from Git" alert lives in the drift surface on /monitors (they coexist — see
+ * the cross-link there). ACTIVATION (steps 4-6): an UNMONITORED + runnable row gets a "Set up monitor"
+ * button → MonitorForm in activation mode → POST /api/checks (with spec_path + source_key) → the row
+ * flips Unmonitored→Active on re-fetch. An ORPHAN (not runnable) row's button is DISABLED with the
+ * reason — don't let someone create a monitor whose spec infra-errors every tick.
  *
  * ★ TWO ORTHOGONAL DIMENSIONS (don't collapse to one badge):
  *  - COVERAGE: Unmonitored (no check) / Active (check, enabled) / Paused (check, disabled).
@@ -16,11 +18,15 @@
  * items (reconcile hasn't populated spec_catalog) → "no specs yet, run reconcile".
  */
 
+import { useState } from "react";
 import Link from "next/link";
 
-import { useSpecCatalog } from "@/lib/client";
+import { useSpecCatalog, revalidateSpecCatalog } from "@/lib/client";
 import { EmptyState, Spinner } from "@/components/states";
 import { StatusDot } from "@/components/status-badge";
+import { Modal } from "@/components/modal";
+import { MonitorForm } from "@/components/monitor-form";
+import { activationFrom } from "@/lib/specs";
 import { formatDuration, formatRelative } from "@/lib/format";
 import type { SpecCatalogEntry, SpecCoverage } from "@/lib/types";
 
@@ -101,13 +107,54 @@ function HealthCell({ entry }: { entry: SpecCatalogEntry }) {
   );
 }
 
-function SpecRow({ entry }: { entry: SpecCatalogEntry }) {
+/**
+ * Action: "Set up monitor" — only on UNMONITORED rows (Active/Paused already have a check). DISABLED
+ * for an ORPHAN (runnable=false) with the probe reason + a fix-in-Git hint, so a knowingly-broken spec
+ * can't be activated into a monitor that infra-errors every tick.
+ */
+function ActionCell({
+  entry,
+  onActivate,
+}: {
+  entry: SpecCatalogEntry;
+  onActivate: (e: SpecCatalogEntry) => void;
+}) {
+  if (entry.monitored) return <span className="text-[13px] text-[var(--color-ink-faint)]">—</span>;
+  const disabled = !entry.runnable;
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <button
+        type="button"
+        data-testid={`setup-${entry.source_key}`}
+        disabled={disabled}
+        title={disabled ? (entry.not_runnable_reason ?? "This spec isn't runnable yet.") : undefined}
+        onClick={() => onActivate(entry)}
+        className="sw-btn sw-btn-sm sw-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        Set up monitor
+      </button>
+      {disabled && (
+        <span className="text-[11px] text-[var(--color-ink-faint)]" data-testid={`setup-blocked-${entry.source_key}`}>
+          Fix the spec in Git first.
+        </span>
+      )}
+    </div>
+  );
+}
+
+function SpecRow({
+  entry,
+  onActivate,
+}: {
+  entry: SpecCatalogEntry;
+  onActivate: (e: SpecCatalogEntry) => void;
+}) {
   return (
     <div
       data-testid={`spec-row-${entry.source_key}`}
       data-coverage={coverageOf(entry)}
       data-runnable={entry.runnable}
-      className="grid grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[1fr_120px_180px_160px_130px] sm:items-center sm:gap-3"
+      className="grid grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[1fr_120px_170px_150px_120px_150px] sm:items-center sm:gap-3"
     >
       {/* Spec: id + path */}
       <div className="min-w-0">
@@ -131,14 +178,23 @@ function SpecRow({ entry }: { entry: SpecCatalogEntry }) {
       )}
 
       <HealthCell entry={entry} />
+      <ActionCell entry={entry} onActivate={onActivate} />
     </div>
   );
 }
 
 export default function SpecCatalogPage() {
   const { data, isLoading } = useSpecCatalog();
+  const [activating, setActivating] = useState<SpecCatalogEntry | null>(null);
 
   const when = data?.probed_at ? formatRelative(data.probed_at) : null;
+
+  // After a successful activation the new check exists → re-read the catalog so the row flips
+  // Unmonitored→Active (and gains health on its first run), then close the modal.
+  async function onActivated() {
+    await revalidateSpecCatalog();
+    setActivating(null);
+  }
 
   return (
     <div className="space-y-6">
@@ -178,20 +234,37 @@ export default function SpecCatalogPage() {
         />
       ) : (
         <div className="sw-panel overflow-hidden" data-testid="spec-catalog">
-          <div className="hidden grid-cols-[1fr_120px_180px_160px_130px] gap-3 border-b border-[var(--color-border)] px-4 py-2.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)] sm:grid">
+          <div className="hidden grid-cols-[1fr_120px_170px_150px_120px_150px] gap-3 border-b border-[var(--color-border)] px-4 py-2.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)] sm:grid">
             <span>Spec</span>
             <span>Coverage</span>
             <span>Runnable?</span>
             <span>Linked monitor</span>
             <span>Health</span>
+            <span>Action</span>
           </div>
           <div className="divide-y divide-[var(--color-border)]">
             {data.items.map((entry) => (
-              <SpecRow key={entry.source_key} entry={entry} />
+              <SpecRow key={entry.source_key} entry={entry} onActivate={setActivating} />
             ))}
           </div>
         </div>
       )}
+
+      {/* Activation: MonitorForm in activation mode — prefilled + locked spec identity. On success the
+          catalog re-reads and the row flips to Active. */}
+      <Modal
+        open={activating !== null}
+        onClose={() => setActivating(null)}
+        title={`Set up monitor · ${activating?.name ?? ""}`}
+      >
+        {activating && (
+          <MonitorForm
+            activation={activationFrom(activating)}
+            onDone={onActivated}
+            onCancel={() => setActivating(null)}
+          />
+        )}
+      </Modal>
     </div>
   );
 }

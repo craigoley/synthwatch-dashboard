@@ -341,6 +341,11 @@ export async function revalidateChecks(id?: number) {
   ]);
 }
 
+/** Re-read the spec catalog (after an activation creates a check → the row flips Unmonitored→Active). */
+export async function revalidateSpecCatalog() {
+  await globalMutate(keys.specCatalog);
+}
+
 export async function createCheck(input: CreateCheckInput) {
   const result = await apiCreateCheck(input);
   await revalidateChecks();
