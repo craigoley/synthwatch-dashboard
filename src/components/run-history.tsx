@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useRunHistory } from "@/lib/client";
 import { apiUrl } from "@/lib/api-client";
 import { FunnelBar } from "@/components/funnel-bar";
 import { StatusDot, TONE_VAR } from "@/components/status-badge";
+import { DateRangeControl, useDateRange } from "@/components/date-range-control";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { runStatusMeta } from "@/lib/status";
-import { formatDuration, formatLocalDateTime, lookbackRange } from "@/lib/format";
-import type { Run, RunRangePreset } from "@/lib/types";
+import { formatDuration, formatLocalDateTime } from "@/lib/format";
+import type { Run } from "@/lib/types";
 
 /**
  * Failure artifacts for a failed browser run: inline screenshot + trace download.
@@ -158,39 +159,17 @@ function RunRow({
   );
 }
 
-const PRESETS: { key: RunRangePreset; label: string; days: number }[] = [
-  { key: "7d", label: "Last 7d", days: 7 },
-  { key: "30d", label: "30d", days: 30 },
-  { key: "90d", label: "90d", days: 90 },
-];
-
-type RangeMode = RunRangePreset | "custom";
-
-/** "YYYY-MM-DD" (from <input type=date>) → an ISO instant at the day's UTC start/end. */
-function dayStart(d: string): string | undefined {
-  return d ? `${d}T00:00:00.000Z` : undefined;
-}
-function dayEnd(d: string): string | undefined {
-  return d ? `${d}T23:59:59.999Z` : undefined;
-}
-
 /**
  * Cursor-paginated run history with a date-range control (default last 7d) and a Load-more
  * button. The default window keeps the very first request BOUNDED — it never asks the API
- * for all-time history. The same control + cursor shape backs incidents next.
+ * for all-time history. Shares the cursor engine + date-range control with the incidents list.
  */
 export function RunHistory({ checkId }: { checkId: number }) {
-  const [mode, setMode] = useState<RangeMode>("7d");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
-
-  const range = useMemo(() => {
-    if (mode === "custom") return { from: dayStart(customFrom), to: dayEnd(customTo) };
-    const days = PRESETS.find((p) => p.key === mode)?.days ?? 7;
-    return lookbackRange(days);
-  }, [mode, customFrom, customTo]);
-
-  const { runs, error, isLoading, isLoadingMore, hasMore, loadMore, reset } = useRunHistory(checkId, range);
+  const dateRange = useDateRange("7d");
+  const { runs, error, isLoading, isLoadingMore, hasMore, loadMore, reset } = useRunHistory(
+    checkId,
+    dateRange.range,
+  );
 
   const [expanded, setExpanded] = useState<number | null>(null);
   // Default-expand the most recent run so failures are visible immediately (parity with
@@ -200,80 +179,25 @@ export function RunHistory({ checkId }: { checkId: number }) {
     if (firstId !== null) setExpanded((cur) => (cur === null ? firstId : cur));
   }, [firstId]);
 
-  function pick(next: RangeMode) {
-    setMode(next);
+  function onRangeChange() {
     setExpanded(null);
     reset(); // restart the cursor walk for the new window
   }
 
   return (
     <section data-testid="run-history">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <h2 className="text-sm font-semibold text-[var(--color-ink)]">
           Run history{" "}
           <span className="sw-mono text-xs text-[var(--color-ink-faint)]">({runs.length}{hasMore ? "+" : ""})</span>
         </h2>
-        <div
-          className="inline-flex rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5"
-          role="group"
-          aria-label="run history date range"
-        >
-          {PRESETS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              aria-pressed={mode === p.key}
-              onClick={() => pick(p.key)}
-              className={`rounded-md px-2.5 py-1 text-xs sw-mono transition ${
-                mode === p.key
-                  ? "bg-[var(--color-panel-2)] text-[var(--color-ink)]"
-                  : "text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-          <button
-            type="button"
-            aria-pressed={mode === "custom"}
-            onClick={() => pick("custom")}
-            className={`rounded-md px-2.5 py-1 text-xs sw-mono transition ${
-              mode === "custom"
-                ? "bg-[var(--color-panel-2)] text-[var(--color-ink)]"
-                : "text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]"
-            }`}
-          >
-            Custom
-          </button>
-        </div>
+        <DateRangeControl
+          state={dateRange}
+          onModeChange={onRangeChange}
+          ariaLabel="run history date range"
+          testIdPrefix="run-history"
+        />
       </div>
-
-      {mode === "custom" && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-[var(--color-ink-dim)]">
-          <label className="flex items-center gap-1.5">
-            From
-            <input
-              type="date"
-              value={customFrom}
-              max={customTo || undefined}
-              onChange={(e) => setCustomFrom(e.target.value)}
-              className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 sw-mono"
-              data-testid="run-history-from"
-            />
-          </label>
-          <label className="flex items-center gap-1.5">
-            To
-            <input
-              type="date"
-              value={customTo}
-              min={customFrom || undefined}
-              onChange={(e) => setCustomTo(e.target.value)}
-              className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 sw-mono"
-              data-testid="run-history-to"
-            />
-          </label>
-        </div>
-      )}
 
       {error ? (
         <ErrorState message={error instanceof Error ? error.message : "Failed to load run history."} />

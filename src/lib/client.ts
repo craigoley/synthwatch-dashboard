@@ -21,6 +21,7 @@ import {
   getSteps,
   getMetrics,
   listIncidents,
+  getIncidents,
   getIncident,
   listFlows,
   getSla,
@@ -52,7 +53,15 @@ import {
   deleteCheck as apiDeleteCheck,
 } from "@/lib/api-client";
 import type { CreateCheckInput, UpdateCheckInput } from "@/lib/schemas";
-import type { ReportWindow, Routing, RunsPage, SlaWindow, Tag } from "@/lib/types";
+import type {
+  IncidentWithCheck,
+  ReportWindow,
+  Routing,
+  Run,
+  RunsPage,
+  SlaWindow,
+  Tag,
+} from "@/lib/types";
 
 /** Default page size for cursor-paginated run history (matches the API default/max bounds). */
 export const RUN_PAGE_SIZE = 50;
@@ -119,65 +128,109 @@ export function useRuns(
   );
 }
 
-// The infinite key: null first page disables the hook; we thread the prior page's
-// next_cursor so each page continues the keyset. Range (from/to) is part of the key,
-// so changing the date-range starts a fresh walk.
-type RunHistoryKey = readonly [
-  "run-history",
-  number,
-  string | null, // from
-  string | null, // to
-  number, // pageSize
-  string | null, // cursor (null = first page)
-];
+// ── shared cursor pagination (runs + incidents) ─────────────────────────────────
+// One useSWRInfinite engine for every cursor list. The fetcher returns the normalized
+// { items, nextCursor } shape; each domain hook adapts its API page to it. The cache key
+// carries the scope + date-range, so changing either starts a fresh walk; the trailing
+// element is the cursor (null = first page) threaded from the prior page's nextCursor.
+
+interface CursorPageData<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+function useCursorHistory<T>(
+  // null disables the hook (e.g. no id yet). Otherwise the stable scope identity for the cache key.
+  scope: readonly (string | number | null)[] | null,
+  fetchPage: (cursor: string | null) => Promise<CursorPageData<T>>,
+  pageSize: number,
+) {
+  const getKey = (index: number, prev: CursorPageData<T> | null) => {
+    if (!scope) return null;
+    if (prev && prev.nextCursor === null) return null; // window exhausted — stop requesting
+    const cursor = index === 0 ? null : (prev?.nextCursor ?? null);
+    return [...scope, pageSize, cursor] as const;
+  };
+
+  const swr = useSWRInfinite<CursorPageData<T>>(
+    getKey,
+    (key) => fetchPage((key[key.length - 1] as string | null) ?? null),
+    { refreshInterval: 15_000, revalidateOnFocus: true, revalidateFirstPage: false, keepPreviousData: true },
+  );
+
+  const pages = swr.data ?? [];
+  const items = pages.flatMap((p) => p.items);
+  const lastPage = pages.length > 0 ? pages[pages.length - 1] : null;
+  // hasMore: the last loaded page still carries a cursor (false before anything loads — the
+  // hook itself gates the first fetch via getKey).
+  const hasMore = lastPage ? lastPage.nextCursor !== null : false;
+
+  return {
+    items,
+    error: swr.error as Error | undefined,
+    isLoading: swr.isLoading,
+    isLoadingMore: swr.isValidating && pages.length > 0, // validating a page beyond the first
+    hasMore,
+    loadMore: () => swr.setSize(swr.size + 1),
+    reset: () => swr.setSize(1),
+  };
+}
 
 /**
- * Cursor-paginated run history with load-more. Accumulates pages client-side; `loadMore`
- * advances one page, `hasMore` is false once the API returns a null next-cursor (window
- * exhausted). `range` is the date-range window; changing it resets the walk (it's keyed in).
+ * Cursor-paginated run history with load-more. `range` is the date-range window; changing it
+ * resets the walk (it's part of the cache key). Thin wrapper over the shared cursor engine.
  */
 export function useRunHistory(
   id: number | null,
   range: { from?: string; to?: string },
   pageSize = RUN_PAGE_SIZE,
 ) {
-  const getKey = (index: number, prev: RunsPage | null): RunHistoryKey | null => {
-    if (!id) return null;
-    if (prev && prev.next_cursor === null) return null; // reached the end — stop requesting
-    const cursor = index === 0 ? null : (prev?.next_cursor ?? null);
-    return ["run-history", id, range.from ?? null, range.to ?? null, pageSize, cursor];
-  };
-
-  const swr = useSWRInfinite<RunsPage>(
-    getKey,
-    (key) => {
-      const [, cid, from, to, ps, cursor] = key as RunHistoryKey;
-      return getRuns(cid, {
-        pageSize: ps,
-        from: from ?? undefined,
-        to: to ?? undefined,
-        cursor: cursor ?? undefined,
-      });
-    },
-    { refreshInterval: 15_000, revalidateOnFocus: true, revalidateFirstPage: false, keepPreviousData: true },
+  const h = useCursorHistory<Run>(
+    id ? ["run-history", id, range.from ?? null, range.to ?? null] : null,
+    (cursor) =>
+      getRuns(id as number, { pageSize, from: range.from, to: range.to, cursor: cursor ?? undefined }).then(
+        (p) => ({ items: p.runs, nextCursor: p.next_cursor }),
+      ),
+    pageSize,
   );
+  return { runs: h.items, ...rest(h) };
+}
 
-  const pages = swr.data ?? [];
-  const runs = pages.flatMap((p) => p.runs);
-  const lastPage = pages.length > 0 ? pages[pages.length - 1] : null;
-  // hasMore: the last loaded page still carries a cursor. Before anything loads we
-  // optimistically allow a first fetch (the hook itself gates on getKey).
-  const hasMore = lastPage ? lastPage.next_cursor !== null : false;
+/**
+ * Cursor-paginated incidents with load-more — the SAME engine as run history, keyed on opened_at.
+ * `filter.status` selects open vs resolved (open is window-exempt server-side); `range` bounds the
+ * resolved/historical window. Changing the filter or range resets the walk (both are keyed in).
+ */
+export function useIncidentHistory(
+  filter: { status?: "open" | "resolved"; checkId?: number },
+  range: { from?: string; to?: string },
+  pageSize = RUN_PAGE_SIZE,
+) {
+  const h = useCursorHistory<IncidentWithCheck>(
+    ["incident-history", filter.status ?? null, filter.checkId ?? null, range.from ?? null, range.to ?? null],
+    (cursor) =>
+      getIncidents({
+        status: filter.status,
+        checkId: filter.checkId,
+        pageSize,
+        from: range.from,
+        to: range.to,
+        cursor: cursor ?? undefined,
+      }).then((p) => ({ items: p.incidents, nextCursor: p.next_cursor })),
+    pageSize,
+  );
+  return { incidents: h.items, ...rest(h) };
+}
 
+// The pagination controls shared by every cursor-history wrapper (everything but the item list).
+function rest<T>(h: ReturnType<typeof useCursorHistory<T>>) {
   return {
-    runs,
-    error: swr.error as Error | undefined,
-    isLoading: swr.isLoading,
-    // Validating a page beyond the first → a load-more is in flight.
-    isLoadingMore: swr.isValidating && pages.length > 0,
-    hasMore,
-    loadMore: () => swr.setSize(swr.size + 1),
-    reset: () => swr.setSize(1),
+    error: h.error,
+    isLoading: h.isLoading,
+    isLoadingMore: h.isLoadingMore,
+    hasMore: h.hasMore,
+    loadMore: h.loadMore,
+    reset: h.reset,
   };
 }
 

@@ -3,8 +3,9 @@
 import { useMemo } from "react";
 import Link from "next/link";
 
-import { useIncidents, useChecks, useTags } from "@/lib/client";
+import { useIncidentHistory, useChecks, useTags } from "@/lib/client";
 import { ToneBadge } from "@/components/status-badge";
+import { DateRangeControl, useDateRange } from "@/components/date-range-control";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { severityMeta } from "@/lib/status";
@@ -12,11 +13,17 @@ import { formatLocalDateTime, formatRelative, formatSpan } from "@/lib/format";
 import type { IncidentWithCheck, Tag } from "@/lib/types";
 import { RcaPanel } from "@/components/rca-panel";
 
+// Open incidents are count-bounded (≤1 open per check, server-enforced) and a long-running one must
+// never be hidden by a date window — so the open list is fetched UNWINDOWED. Resolved incidents grow
+// without bound over time, so they are the cursor-paginated + date-ranged list.
+const NO_RANGE = {} as const;
+
 function IncidentRow({ incident }: { incident: IncidentWithCheck }) {
   const meta = severityMeta(incident.severity);
   const open = incident.resolved_at === null;
   return (
     <div className="sw-rail relative grid grid-cols-1 gap-3 px-4 py-3.5 sm:grid-cols-[auto_1fr_auto] sm:items-center"
+      data-testid="incident-row"
       style={{ ["--rail" as string]: incident.severity === "critical" ? "var(--color-fail)" : "var(--color-warn)" }}
     >
       {/* Stretched link: the whole row navigates to the investigation page. Valid
@@ -74,7 +81,14 @@ function IncidentRow({ incident }: { incident: IncidentWithCheck }) {
 }
 
 export default function IncidentsPage() {
-  const { data, error, isLoading } = useIncidents();
+  // Open: all open incidents, unwindowed (count-bounded: ≤1 open per check). Fetched at a large page
+  // size so the list is effectively complete in one page — the open section has no Load-more and must
+  // never silently truncate a still-open incident. Resolved: cursor-paginated over a date-range window
+  // (default 30d) with Load more — the unbounded-over-time set.
+  const openH = useIncidentHistory({ status: "open" }, NO_RANGE, 200);
+  const dateRange = useDateRange("30d");
+  const resolvedH = useIncidentHistory({ status: "resolved" }, dateRange.range);
+
   const { data: checks } = useChecks();
   const { data: inUseTags } = useTags();
   const { selected, toggle, clear } = useTagFilter();
@@ -88,10 +102,18 @@ export default function IncidentsPage() {
   }, [checks]);
   const match = (i: IncidentWithCheck) => matchesTags(tagsByCheck.get(i.check_id), selected);
 
-  const open = (data?.open ?? []).filter(match);
-  const resolved = (data?.resolved ?? []).filter(match);
-  const total = (data?.open.length ?? 0) + (data?.resolved.length ?? 0);
+  const open = openH.incidents.filter(match);
+  const resolved = resolvedH.incidents.filter(match);
+  // Counts are over what's LOADED (cursor pagination has no total); resolved grows as you Load more.
+  const totalLoaded = openH.incidents.length + resolvedH.incidents.length;
   const shown = open.length + resolved.length;
+
+  const initialLoading = openH.isLoading || resolvedH.isLoading;
+  const error = openH.error ?? resolvedH.error;
+
+  function onResolvedRangeChange() {
+    resolvedH.reset(); // restart the resolved cursor walk for the new window
+  }
 
   return (
     <div className="space-y-6">
@@ -100,23 +122,23 @@ export default function IncidentsPage() {
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Incidents</h1>
       </header>
 
-      {data && total > 0 && (
+      {totalLoaded > 0 && (
         <TagFilter
           available={inUseTags ?? []}
           selected={selected}
           onToggle={toggle}
           onClear={clear}
-          resultLabel={`${shown} of ${total} incidents match`}
+          resultLabel={`${shown} of ${totalLoaded} incidents match`}
         />
       )}
 
-      {isLoading && !data ? (
+      {initialLoading && totalLoaded === 0 ? (
         <div className="py-16"><Spinner label="Loading incidents…" /></div>
       ) : error ? (
         <ErrorState message={error instanceof Error ? error.message : "Failed to load incidents."} />
-      ) : !data ? null : (
+      ) : (
         <div className="space-y-8">
-          <section>
+          <section data-testid="incidents-open">
             <div className="mb-3 flex items-center gap-2">
               <h2 className="text-sm font-semibold text-[var(--color-ink)]">Open</h2>
               <span className="sw-mono text-xs text-[var(--color-ink-faint)]">({open.length})</span>
@@ -135,21 +157,46 @@ export default function IncidentsPage() {
             )}
           </section>
 
-          <section>
-            <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-[var(--color-ink)]">Resolved</h2>
-              <span className="sw-mono text-xs text-[var(--color-ink-faint)]">({resolved.length})</span>
+          <section data-testid="incidents-resolved">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-[var(--color-ink)]">Resolved</h2>
+                <span className="sw-mono text-xs text-[var(--color-ink-faint)]">
+                  ({resolved.length}{resolvedH.hasMore ? "+" : ""})
+                </span>
+              </div>
+              <DateRangeControl
+                state={dateRange}
+                onModeChange={onResolvedRangeChange}
+                ariaLabel="resolved incidents date range"
+                testIdPrefix="incidents"
+              />
             </div>
             {resolved.length === 0 ? (
               <EmptyState
-                title={selected.length > 0 ? "No resolved incidents match this filter." : "No resolved incidents yet."}
+                title={selected.length > 0 ? "No resolved incidents match this filter." : "No resolved incidents in this window."}
               />
             ) : (
-              <div className="sw-panel divide-y divide-[var(--color-border)] overflow-hidden">
-                {resolved.map((i) => (
-                  <IncidentRow key={i.id} incident={i} />
-                ))}
-              </div>
+              <>
+                <div className="sw-panel divide-y divide-[var(--color-border)] overflow-hidden">
+                  {resolved.map((i) => (
+                    <IncidentRow key={i.id} incident={i} />
+                  ))}
+                </div>
+                {resolvedH.hasMore && (
+                  <div className="mt-3 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={resolvedH.loadMore}
+                      disabled={resolvedH.isLoadingMore}
+                      className="sw-btn"
+                      data-testid="incidents-load-more"
+                    >
+                      {resolvedH.isLoadingMore ? "Loading…" : "Load more"}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </section>
         </div>
