@@ -47,6 +47,10 @@ import {
   getNarrative,
   getReconcileDrift,
   getSpecCatalog,
+  listEditors,
+  addEditor as apiAddEditor,
+  removeEditor as apiRemoveEditor,
+  listAccessRequests,
   type ChannelInput,
   createCheck as apiCreateCheck,
   updateCheck as apiUpdateCheck,
@@ -92,6 +96,8 @@ const keys = {
   narrative: (scope: string, w: string, key: number | null) => ["narrative", scope, w, key] as const,
   reconcileDrift: ["reconcile-drift"] as const,
   specCatalog: ["spec-catalog"] as const,
+  editors: ["editors"] as const,
+  accessRequests: ["access-requests"] as const,
 };
 
 // Live dashboards: refresh on an interval, revalidate when the tab refocuses.
@@ -369,6 +375,36 @@ export function useSpecCatalog() {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });
+}
+
+// Editor (user) management — admin-only (Phase 12 slice 3). The API 403s a non-admin; the dashboard
+// only renders these on the admin /users view. enabled=false skips the fetch entirely (non-admins never
+// call it). shouldRetryOnError:false so a stray 401/403 doesn't retry-loop.
+export function useEditors(enabled = true) {
+  return useSWR(enabled ? keys.editors : null, () => listEditors(), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+}
+
+export function useAccessRequests(enabled = true) {
+  return useSWR(enabled ? keys.accessRequests : null, () => listAccessRequests(), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+}
+
+/** Add an editor, then refresh the list (+ access requests, since the email drops off pending). */
+export async function addEditor(email: string) {
+  const result = await apiAddEditor(email);
+  await Promise.all([globalMutate(keys.editors), globalMutate(keys.accessRequests)]);
+  return result;
+}
+
+/** Remove an editor, then refresh the list. */
+export async function removeEditor(email: string) {
+  await apiRemoveEditor(email);
+  await Promise.all([globalMutate(keys.editors), globalMutate(keys.accessRequests)]);
 }
 
 export function useSla(window: SlaWindow = "24h") {

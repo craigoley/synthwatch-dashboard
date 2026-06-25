@@ -11,6 +11,8 @@ import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { ReconcileDriftSurface } from "@/components/reconcile-drift";
+import { useAuth } from "@/components/auth-provider";
+import { SignInToEdit } from "@/components/write-gate";
 import { formatRelative } from "@/lib/format";
 import type { Check, CheckWithStatus } from "@/lib/types";
 
@@ -109,6 +111,7 @@ function DeleteDialog({
 export default function MonitorsPage() {
   const { data, error, isLoading } = useChecks();
   const { data: inUseTags } = useTags();
+  const { canWrite } = useAuth();
   const { selected, toggle, clear } = useTagFilter();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Check | null>(null);
@@ -134,10 +137,15 @@ export default function MonitorsPage() {
           <p className="sw-eyebrow">Configuration</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Monitors</h1>
         </div>
-        <button onClick={() => setCreating(true)} className="sw-btn sw-btn-primary">
-          + New monitor
-        </button>
+        {canWrite && (
+          <button onClick={() => setCreating(true)} className="sw-btn sw-btn-primary">
+            + New monitor
+          </button>
+        )}
       </header>
+
+      {/* Read-only-by-default: viewers see a sign-in prompt; write affordances are gated on canWrite. */}
+      <SignInToEdit />
 
       {/* Monitors-as-code drift (Phase 6b) — read-only; hides until the reconcile endpoint serves. */}
       <ReconcileDriftSurface />
@@ -161,9 +169,11 @@ export default function MonitorsPage() {
           title="No monitors yet."
           hint="Create your first HTTP or browser monitor."
           action={
-            <button onClick={() => setCreating(true)} className="sw-btn sw-btn-primary">
-              + New monitor
-            </button>
+            canWrite ? (
+              <button onClick={() => setCreating(true)} className="sw-btn sw-btn-primary">
+                + New monitor
+              </button>
+            ) : undefined
           }
         />
       ) : visible.length === 0 ? (
@@ -215,25 +225,29 @@ export default function MonitorsPage() {
                 <span className="sw-mono text-xs text-[var(--color-ink-faint)]">
                   {formatRelative(c.last_started_at)}
                 </span>
-                <div className="flex flex-wrap gap-1.5 sm:justify-end">
-                  <button
-                    onClick={() => togglePause(c)}
-                    disabled={pausingId === c.id}
-                    className="sw-btn sw-btn-ghost sw-btn-sm"
-                  >
-                    {pausingId === c.id ? "…" : c.enabled ? "Pause" : "Resume"}
-                  </button>
-                  <button onClick={() => setEditing(c)} className="sw-btn sw-btn-ghost sw-btn-sm">
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => setDeleting(c)}
-                    className="sw-btn sw-btn-ghost sw-btn-sm"
-                    style={{ color: "var(--color-fail)" }}
-                  >
-                    Delete
-                  </button>
-                </div>
+                {canWrite ? (
+                  <div className="flex flex-wrap gap-1.5 sm:justify-end">
+                    <button
+                      onClick={() => togglePause(c)}
+                      disabled={pausingId === c.id}
+                      className="sw-btn sw-btn-ghost sw-btn-sm"
+                    >
+                      {pausingId === c.id ? "…" : c.enabled ? "Pause" : "Resume"}
+                    </button>
+                    <button onClick={() => setEditing(c)} className="sw-btn sw-btn-ghost sw-btn-sm">
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => setDeleting(c)}
+                      className="sw-btn sw-btn-ghost sw-btn-sm"
+                      style={{ color: "var(--color-fail)" }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ) : (
+                  <span aria-hidden />
+                )}
               </div>
             ))}
           </div>

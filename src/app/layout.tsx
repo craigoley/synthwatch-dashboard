@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 
 import { AppShell } from "@/components/app-shell";
+import { AuthProvider } from "@/components/auth-provider";
 import "./globals.css";
 
 const plexSans = IBM_Plex_Sans({
@@ -33,7 +34,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${plexSans.variable} ${plexMono.variable}`}>
       <body>
-        <AppShell>{children}</AppShell>
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );

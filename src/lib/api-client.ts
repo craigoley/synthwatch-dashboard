@@ -67,6 +67,7 @@ import type {
   SparkPoint,
 } from "@/lib/types";
 import type { CreateCheckInput, UpdateCheckInput } from "@/lib/schemas";
+import { getToken, clearSession, emitAuthEvent, type Role } from "@/lib/auth";
 
 /**
  * Base URL for the API. Set via NEXT_PUBLIC_API_BASE_URL (Vercel env + .env.local
@@ -129,9 +130,17 @@ async function request<T>(
   params?: Record<string, QueryValue>,
   init?: RequestInit,
 ): Promise<T> {
+  // Attach the bearer session (Phase 12 slice 3). Sent on EVERY request — harmless on GETs (the API's
+  // gate only checks writes), simpler than per-call opt-in. The token is a credential: header only,
+  // never a URL/query param, never logged.
+  const token = getToken();
   const res = await fetch(buildUrl(path, params), {
     ...init,
-    headers: { accept: "application/json", ...init?.headers },
+    headers: {
+      accept: "application/json",
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
   });
 
   if (!res.ok) {
@@ -141,6 +150,24 @@ async function request<T>(
     } catch {
       /* non-JSON error body */
     }
+
+    // 401/403 interceptor (slice 2's gate shapes). EXEMPT /auth/* — a 401 from /auth/me is the normal
+    // "not signed in" probe and /verify's 400s are the login modal's to show; intercepting them would
+    // loop the modal. Everywhere else:
+    //   401 (expired/invalid session) → drop the session + signal a re-login prompt.
+    //   403 (valid session, wrong role) → signal a permission message; do NOT clear (they ARE logged in).
+    if (!path.startsWith("/auth/")) {
+      if (res.status === 401) {
+        clearSession();
+        emitAuthEvent({ type: "unauthorized" });
+      } else if (res.status === 403) {
+        emitAuthEvent({
+          type: "forbidden",
+          message: body.message ?? "You do not have permission to perform this action.",
+        });
+      }
+    }
+
     throw new ApiRequestError(
       body.message ?? body.error ?? `Request failed (${res.status})`,
       res.status,
@@ -1240,4 +1267,107 @@ export async function updateCheck(id: number, input: UpdateCheckInput): Promise<
 export async function deleteCheck(id: number, hard = false): Promise<DeleteCheckResult> {
   await request<unknown>(`/checks/${id}`, { hard: hard ? true : undefined }, { method: "DELETE" });
   return { id, deleted: hard ? "hard" : "soft" };
+}
+
+// ─── auth (Phase 12 slice 3) — OTP login + session + editor management ────────────────────────────
+// All /auth/* endpoints are anonymous (they're how you GET a token); the 401/403 interceptor skips them.
+// request() attaches the bearer token automatically once a session is stored.
+
+/** POST /api/auth/request-code — issue an OTP. Always the enumeration-safe message (display as-is). */
+export async function authRequestCode(email: string): Promise<{ message: string }> {
+  return request<{ message: string }>("/auth/request-code", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+}
+
+/** POST /api/auth/verify — consume the code, mint a session. 400 (ApiRequestError) on bad/expired code. */
+export async function authVerify(
+  email: string,
+  code: string,
+): Promise<{ token: string; email: string; role: Role; expiresAt: string }> {
+  return request("/auth/verify", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email, code }),
+  });
+}
+
+/** GET /api/auth/me — live {email, role} for the stored token, or null (no/invalid session). */
+export async function authMe(): Promise<{ email: string; role: Role } | null> {
+  try {
+    return await request<{ email: string; role: Role }>("/auth/me");
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 401) return null;
+    throw err;
+  }
+}
+
+/** POST /api/auth/logout — revoke the current session server-side (idempotent; tolerate failure). */
+export async function authLogout(): Promise<void> {
+  try {
+    await request<unknown>("/auth/logout", undefined, { method: "POST" });
+  } catch {
+    /* best-effort — the client clears its session regardless */
+  }
+}
+
+/** POST /api/auth/request-access — enumeration-safe "request edit access" (display the message as-is). */
+export async function authRequestAccess(email: string): Promise<{ message: string }> {
+  return request<{ message: string }>("/auth/request-access", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+}
+
+// ── editor (user) management — admin-only (the API enforces; these 403 for a non-admin) ──
+export interface EditorRow {
+  email: string;
+  added_by: string;
+  added_at: string;
+}
+export interface AccessRequestRow {
+  email: string;
+  requested_at: string;
+  count: number;
+}
+
+interface RawEditor {
+  email: string;
+  addedBy: string;
+  addedAt: string;
+}
+interface RawAccessRequest {
+  email: string;
+  requestedAt: string;
+  count: number;
+}
+
+/** GET /api/editors — the editor allowlist (admin-only). */
+export async function listEditors(): Promise<EditorRow[]> {
+  const raw = await request<RawEditor[]>("/editors");
+  return (raw ?? []).map((e) => ({ email: e.email, added_by: e.addedBy, added_at: e.addedAt }));
+}
+
+/** POST /api/editors — add an editor by email (admin-only). */
+export async function addEditor(email: string): Promise<EditorRow> {
+  const raw = await request<RawEditor>("/editors", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  return { email: raw.email, added_by: raw.addedBy, added_at: raw.addedAt };
+}
+
+/** DELETE /api/editors/{email} — remove an editor (admin-only). */
+export async function removeEditor(email: string): Promise<void> {
+  await request<unknown>(`/editors/${encodeURIComponent(email)}`, undefined, { method: "DELETE" });
+}
+
+/** GET /api/access-requests — pending edit-access requests, admin-only (excludes existing editors/admins). */
+export async function listAccessRequests(): Promise<AccessRequestRow[]> {
+  const raw = await request<RawAccessRequest[]>("/access-requests");
+  return (raw ?? []).map((a) => ({ email: a.email, requested_at: a.requestedAt, count: a.count }));
 }

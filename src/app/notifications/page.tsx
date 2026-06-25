@@ -16,6 +16,8 @@ import {
 import { ApiRequestError } from "@/lib/api-client";
 import { Modal } from "@/components/modal";
 import { ChannelForm } from "@/components/channel-form";
+import { useAuth } from "@/components/auth-provider";
+import { SignInToEdit } from "@/components/write-gate";
 import { EmptyState, Spinner } from "@/components/states";
 import { useToasts, ToastStack } from "@/components/toast";
 import { TagChips } from "@/components/tag-chips";
@@ -155,6 +157,7 @@ export default function NotificationsPage() {
   const { data: checks } = useChecks();
   const { data: inUseTags } = useTags();
   const { data: readiness } = useDeliveryReadiness();
+  const { canWrite } = useAuth();
   const { toasts, push, dismiss } = useToasts();
 
   const [creating, setCreating] = useState(false);
@@ -430,12 +433,14 @@ export default function NotificationsPage() {
           <p className="sw-eyebrow">Configuration</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Notifications</h1>
         </div>
-        {apiAvailable && (
+        {apiAvailable && canWrite && (
           <button onClick={() => setCreating(true)} className="sw-btn sw-btn-primary">
             + New channel
           </button>
         )}
       </header>
+
+      <SignInToEdit />
 
       {!apiAvailable ? (
         channelsLoading ? (
@@ -466,9 +471,11 @@ export default function NotificationsPage() {
                 title="No channels yet"
                 hint="Add an email or webhook destination to start receiving alerts."
                 action={
-                  <button onClick={() => setCreating(true)} className="sw-btn sw-btn-primary">
-                    + New channel
-                  </button>
+                  canWrite ? (
+                    <button onClick={() => setCreating(true)} className="sw-btn sw-btn-primary">
+                      + New channel
+                    </button>
+                  ) : undefined
                 }
               />
             ) : (
@@ -531,6 +538,7 @@ export default function NotificationsPage() {
                           </span>
                         )}
                       </div>
+                      {canWrite && (
                       <div className="flex shrink-0 gap-1.5">
                         <button
                           onClick={() => runTest(c)}
@@ -563,6 +571,7 @@ export default function NotificationsPage() {
                           Delete
                         </button>
                       </div>
+                      )}
                     </div>
                   );
                 })}
@@ -570,7 +579,8 @@ export default function NotificationsPage() {
             )}
           </section>
 
-          {/* ── Routing ───────────────────────────────────────────────────── */}
+          {/* ── Routing (write controls; gated — read-only viewers can't manage routing) ── */}
+          {canWrite && (
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -792,6 +802,7 @@ export default function NotificationsPage() {
               </div>
             </div>
           </section>
+          )}
 
           {/* ★ Fan-out preview — the legibility guardrail for all-additive routing. */}
           <FanOutPreview checks={checks ?? []} channelsById={channelById} routing={draft} />
