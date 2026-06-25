@@ -45,6 +45,7 @@ import {
   getPerformanceReport,
   getNarrative,
   getReconcileDrift,
+  getSpecCatalog,
   type ChannelInput,
   createCheck as apiCreateCheck,
   updateCheck as apiUpdateCheck,
@@ -81,6 +82,7 @@ const keys = {
   performanceReport: (w: string, g: string) => ["report-performance", w, g] as const,
   narrative: (scope: string, w: string, key: number | null) => ["narrative", scope, w, key] as const,
   reconcileDrift: ["reconcile-drift"] as const,
+  specCatalog: ["spec-catalog"] as const,
 };
 
 // Live dashboards: refresh on an interval, revalidate when the tab refocuses.
@@ -301,6 +303,16 @@ export function useNarrative(scope: "fleet" | "monitor", window: ReportWindow, k
 // capability; reconcile runs in report mode).
 export function useReconcileDrift() {
   return useSWR(keys.reconcileDrift, () => getReconcileDrift(), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+}
+
+// Spec catalog (Phase 13 — read-only inventory). shouldRetryOnError:false → a 404 (endpoint not
+// deployed) leaves data null and the page hides gracefully; an empty items array (reconcile hasn't
+// populated spec_catalog yet) renders the "no specs yet" state. Read-only — no write/activation hook.
+export function useSpecCatalog() {
+  return useSWR(keys.specCatalog, () => getSpecCatalog(), {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });

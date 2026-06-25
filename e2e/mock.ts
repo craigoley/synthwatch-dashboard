@@ -91,6 +91,11 @@ export interface World {
    * Set to { items: [] } for the "in sync" empty state, or with rows to list drift.
    */
   reconcileDrift?: { items: RawObj[]; detectedAt?: string | null };
+  /**
+   * Spec catalog (Phase 13). Unset → /api/specs 404 → the catalog page shows a neutral "not
+   * available" notice. Set to { items: [] } for the "no specs yet" empty state, or with rows.
+   */
+  specCatalog?: { items: RawObj[]; probedAt?: string | null };
 }
 
 export function defaultWorld(): World {
@@ -241,6 +246,14 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
       const detectedAt =
         world.reconcileDrift.detectedAt ?? (items.length ? "2026-06-25T12:00:00Z" : null);
       return json(route, { items, detectedAt });
+    }
+    // Spec catalog (Phase 13). Unset → 404 (endpoint not deployed → "not available" notice);
+    // { items: [] } → "no specs yet"; items present → catalog listed. probedAt defaults to a fixed time.
+    if (path === "/api/specs" && method === "GET") {
+      if (!world.specCatalog) return json(route, { error: "not_found" }, 404);
+      const { items } = world.specCatalog;
+      const probedAt = world.specCatalog.probedAt ?? (items.length ? "2026-06-25T12:00:00Z" : null);
+      return json(route, { items, probedAt });
     }
     // Locations: available options + a check's current assignment (undefined → 404).
     if (path === "/api/locations" && method === "GET") {

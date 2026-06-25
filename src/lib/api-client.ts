@@ -37,6 +37,8 @@ import type {
   DriftType,
   DriftRow,
   ReconcileDrift,
+  SpecCatalog,
+  SpecCatalogEntry,
   Check,
   CheckAuth,
   CheckDetail,
@@ -653,6 +655,72 @@ export async function getReconcileDrift(): Promise<ReconcileDrift | null> {
       detected_at: d.detectedAt,
     }));
     return { items, detected_at: raw?.detectedAt ?? null };
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+// ─── spec catalog (Phase 13 — read-only inventory) ───────────────────────────
+// GET /api/specs serves the runner-owned spec_catalog snapshot LEFT JOINed to checks (coverage + health),
+// mirroring the reconcile read path. FLAGGED DEP: a 404 (endpoint not deployed yet) → null, so the catalog
+// page hides gracefully. An empty items array is DIFFERENT from null: the reconcile hasn't populated it yet.
+
+interface RawSpecHealth {
+  currentStatus?: RunStatus | null;
+  p95Ms?: number | null;
+  openIncidentCount?: number | null;
+  lastRunAt?: string | null;
+}
+interface RawSpecItem {
+  sourceKey: string;
+  name: string;
+  specPath: string;
+  kind: string;
+  target?: string | null;
+  suggestedIntervalSeconds?: number | null;
+  tags?: string[] | null;
+  description?: string | null;
+  enabledByDefault?: boolean;
+  runnable: boolean;
+  notRunnableReason?: string | null;
+  monitored: boolean;
+  checkId?: number | null;
+  checkName?: string | null;
+  enabled?: boolean | null;
+  health?: RawSpecHealth | null;
+}
+
+/** GET /api/specs — the latest spec catalog (read-only inventory; activation is a later PR). */
+export async function getSpecCatalog(): Promise<SpecCatalog | null> {
+  try {
+    const raw = await request<{ items?: RawSpecItem[]; probedAt?: string | null }>("/specs");
+    const items: SpecCatalogEntry[] = (raw?.items ?? []).map((s) => ({
+      source_key: s.sourceKey,
+      name: s.name,
+      spec_path: s.specPath,
+      kind: s.kind,
+      target: s.target ?? null,
+      suggested_interval_seconds: s.suggestedIntervalSeconds ?? null,
+      tags: s.tags ?? [],
+      description: s.description ?? null,
+      enabled_by_default: Boolean(s.enabledByDefault),
+      runnable: Boolean(s.runnable),
+      not_runnable_reason: s.notRunnableReason ?? null,
+      monitored: Boolean(s.monitored),
+      check_id: s.checkId ?? null,
+      check_name: s.checkName ?? null,
+      enabled: s.enabled ?? null,
+      health: s.health
+        ? {
+            current_status: s.health.currentStatus ?? null,
+            p95_ms: s.health.p95Ms ?? null,
+            open_incident_count: s.health.openIncidentCount ?? 0,
+            last_run_at: s.health.lastRunAt ?? null,
+          }
+        : null,
+    }));
+    return { items, probed_at: raw?.probedAt ?? null };
   } catch (err) {
     if (err instanceof ApiRequestError && err.status === 404) return null;
     throw err;
