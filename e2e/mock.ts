@@ -336,8 +336,32 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
     }
     if ((m = path.match(/^\/api\/checks\/(\d+)\/runs$/))) {
       const d = world.details[Number(m[1])];
-      const runs = (d?.recentRuns as RawObj[]) ?? [];
-      return json(route, { items: runs, total: runs.length, page: 1, pageSize: 50 });
+      let runs = ((d?.recentRuns as RawObj[]) ?? []).slice();
+      // Date-range filter (ISO strings sort lexicographically): [from, to).
+      const from = url.searchParams.get("from");
+      const to = url.searchParams.get("to");
+      if (from) runs = runs.filter((r) => String(r.startedAt) >= from);
+      if (to) runs = runs.filter((r) => String(r.startedAt) < to);
+      // Keyset order: DESC started_at, then DESC id (mirrors the API).
+      runs.sort(
+        (a, b) =>
+          String(b.startedAt).localeCompare(String(a.startedAt)) || Number(b.id) - Number(a.id),
+      );
+      // Cursor = base64url of the LAST id served; continue strictly after it.
+      const pageSize = Number(url.searchParams.get("pageSize")) || 50;
+      const cursor = url.searchParams.get("cursor");
+      let start = 0;
+      if (cursor) {
+        const afterId = Number(Buffer.from(cursor, "base64url").toString());
+        const idx = runs.findIndex((r) => Number(r.id) === afterId);
+        start = idx >= 0 ? idx + 1 : runs.length;
+      }
+      const slice = runs.slice(start, start + pageSize);
+      const hasMore = runs.length > start + pageSize;
+      const lastId = slice.length ? slice[slice.length - 1]!.id : null;
+      const nextCursor =
+        hasMore && lastId != null ? Buffer.from(String(lastId)).toString("base64url") : null;
+      return json(route, { items: slice, nextCursor, pageSize });
     }
     if (/^\/api\/checks\/\d+\/availability-series$/.test(path)) {
       const win = url.searchParams.get("window") ?? "24h";

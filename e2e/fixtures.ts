@@ -75,6 +75,28 @@ export function run(over: RawObj = {}): RawObj {
   };
 }
 
+/**
+ * Runs for a check spread across time so 7d / 30d / 90d windows bucket deterministically:
+ * 30 within 7d, +20 within 7–30d, +10 within 30–90d (so a window holds 30 / 50 / 60).
+ * Timestamps are relative to real now (the dashboard derives its date-range from Date.now()),
+ * with wide margins so clock jitter never flips a run across a window boundary. The 90d window
+ * (60 > one 50-run page) is what exercises the cursor "Load more".
+ */
+export function spreadRuns(checkId: number): RawObj[] {
+  const now = Date.now();
+  const at = (ageDays: number) => new Date(now - ageDays * 86_400_000).toISOString();
+  const runs: RawObj[] = [];
+  let id = 5000;
+  const add = (ageDays: number) => {
+    const ts = at(ageDays);
+    runs.push(run({ id: id++, checkId, startedAt: ts, finishedAt: ts }));
+  };
+  for (let i = 0; i < 30; i++) add(0.1 + i * 0.2); // ages 0.1‥6.0d  → in 7d
+  for (let i = 0; i < 20; i++) add(8 + i); //          ages 8‥27d   → in 30d, not 7d
+  for (let i = 0; i < 10; i++) add(32 + i * 5); //     ages 32‥77d  → in 90d, not 30d
+  return runs;
+}
+
 /** A /checks/{id} detail (list item + detail-only keys + recentRuns). */
 export function detail(checkOver: RawObj = {}, recentRuns: RawObj[] = []): RawObj {
   return {

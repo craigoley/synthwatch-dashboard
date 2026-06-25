@@ -10,6 +10,18 @@ export function parseDate(iso: string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/**
+ * ISO from/to for a relative look-back of `days` — the date-range a cursor list sends
+ * (runs now, incidents next). Shared so every cursor+date-range surface bounds its
+ * query the same way.
+ */
+export function lookbackRange(days: number, now = Date.now()): { from: string; to: string } {
+  return {
+    from: new Date(now - days * 86_400_000).toISOString(),
+    to: new Date(now).toISOString(),
+  };
+}
+
 /** Local date + time, e.g. "Jun 20, 14:32:05". */
 export function formatLocalDateTime(iso: string | null | undefined): string {
   const d = parseDate(iso);
