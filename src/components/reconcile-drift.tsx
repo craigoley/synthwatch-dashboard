@@ -17,9 +17,31 @@
  * empty snapshot (reconcile ran, nothing differs) renders the positive "in sync with Git" state.
  */
 
+import Link from "next/link";
+
 import { useReconcileDrift } from "@/lib/client";
 import { formatRelative } from "@/lib/format";
 import type { DriftRow, DriftType } from "@/lib/types";
+
+/**
+ * Cross-link to the spec catalog (Phase 13) — the browse home for ALL specs, where this focused drift
+ * banner's "what differs" points you to act. `newCount` (the `new` drift rows = specs Git declares with
+ * no live monitor) surfaces the unmonitored count when there is one.
+ */
+function CatalogLink({ newCount }: { newCount: number }) {
+  return (
+    <Link
+      href="/specs"
+      data-testid="drift-catalog-link"
+      className="inline-flex items-center gap-1 text-[12px] text-[var(--color-brand)] hover:underline"
+    >
+      {newCount > 0
+        ? `${newCount} spec${newCount === 1 ? "" : "s"} unmonitored — open the catalog`
+        : "Browse the spec catalog"}
+      <span aria-hidden>→</span>
+    </Link>
+  );
+}
 
 const TYPE_META: Record<DriftType, { label: string; tone: string }> = {
   new: { label: "New", tone: "var(--color-brand)" },
@@ -122,6 +144,8 @@ export function ReconcileDriftSurface() {
   const config = data.items.filter((r) => r.drift_type !== "orphan");
   const orphans = data.items.filter((r) => r.drift_type === "orphan");
   const configMonitors = new Set(config.map((r) => r.source_key)).size;
+  // `new` drift = a manifest spec with no live monitor = an Unmonitored spec in the catalog.
+  const newCount = new Set(config.filter((r) => r.drift_type === "new").map((r) => r.source_key)).size;
   const when = data.detected_at ? formatRelative(data.detected_at) : null;
 
   // Truly empty — the reconcile ran and nothing differs. Positive, not an error.
@@ -140,6 +164,7 @@ export function ReconcileDriftSurface() {
             <span className="sw-mono text-[10px] text-[var(--color-ink-faint)]">reconciled {when}</span>
           )}
         </div>
+        <div className="mt-2"><CatalogLink newCount={newCount} /></div>
       </section>
     );
   }
@@ -214,6 +239,9 @@ export function ReconcileDriftSurface() {
           </div>
         </div>
       )}
+
+      {/* Cross-link to the catalog (Phase 13) — coexist: this banner alerts, the catalog is the browse home. */}
+      <div><CatalogLink newCount={newCount} /></div>
     </section>
   );
 }

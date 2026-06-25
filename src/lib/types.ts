@@ -624,3 +624,55 @@ export interface ReconcileDrift {
   /** When the last reconcile ran (latest detected_at), null when there's no drift. */
   detected_at: string | null;
 }
+
+// ─── spec catalog (GET /api/specs, Phase 13 — read-only inventory) ────────────
+/**
+ * Coverage state of a spec, derived from whether a check is bound to it (by source_key):
+ *  - `unmonitored` — no check → not set up yet (the activation target, in a later PR).
+ *  - `active` — a check exists and is enabled (running).
+ *  - `paused` — a check exists but is disabled.
+ * Orthogonal to runnability (a spec can be unmonitored+orphan, or active+orphan).
+ */
+export type SpecCoverage = "unmonitored" | "active" | "paused";
+
+/** Per-check health for a MONITORED spec (null when unmonitored). */
+export interface SpecHealth {
+  /** Latest run's status (or null if never run). Coverage carries Active/Paused separately. */
+  current_status: RunStatus | null;
+  p95_ms: number | null;
+  open_incident_count: number;
+  last_run_at: string | null;
+}
+
+/**
+ * One catalog row: a manifest spec joined to the live check (if any) that activated it. Two orthogonal
+ * dimensions drive the UI — coverage (unmonitored/active/paused) and runnable (✓ / ⚠ orphan + reason).
+ */
+export interface SpecCatalogEntry {
+  source_key: string;
+  name: string;
+  spec_path: string;
+  kind: string;
+  /** Suggested defaults from the manifest (for the later activation form). */
+  target: string | null;
+  suggested_interval_seconds: number | null;
+  tags: string[];
+  description: string | null;
+  enabled_by_default: boolean;
+  /** Runnability probe: fetchable+compilable from main. false → orphan (see not_runnable_reason). */
+  runnable: boolean;
+  not_runnable_reason: string | null;
+  /** Coverage join. monitored=false → unmonitored; else check_id/check_name/enabled are set. */
+  monitored: boolean;
+  check_id: number | null;
+  check_name: string | null;
+  enabled: boolean | null;
+  health: SpecHealth | null;
+}
+
+/** The latest spec catalog. Empty `items` = the reconcile job hasn't populated it yet. */
+export interface SpecCatalog {
+  items: SpecCatalogEntry[];
+  /** When the last reconcile populated the catalog (latest probe time), null when empty. */
+  probed_at: string | null;
+}
