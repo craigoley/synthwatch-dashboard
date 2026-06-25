@@ -353,12 +353,19 @@ export interface RunsPage {
   page_size: number;
 }
 
+/** One cursor-paginated page of incidents — same CursorPage envelope as RunsPage, keyed on opened_at. */
+export interface IncidentsPage {
+  incidents: IncidentWithCheck[];
+  next_cursor: string | null;
+  page_size: number;
+}
+
 /**
- * A relative look-back window for cursor lists (runs now, incidents next). `custom`
- * carries explicit from/to; the presets resolve to a from = now − N days. Keep this
- * shape shared so every cursor+date-range surface uses one control.
+ * A relative look-back preset for the shared date-range control (runs, incidents). `custom`
+ * carries explicit from/to; a preset resolves to from = now − N days. Shared so every
+ * cursor+date-range surface uses one control.
  */
-export type RunRangePreset = "7d" | "30d" | "90d";
+export type CursorRangePreset = "7d" | "30d" | "90d";
 
 export interface IncidentsResponse {
   open: IncidentWithCheck[];

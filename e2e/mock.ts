@@ -419,17 +419,41 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
       const d = world.incidentDetails[Number(m[1])];
       return d ? json(route, d) : json(route, { error: "not_found" }, 404);
     }
-    // GET /api/incidents is a CURSOR ENVELOPE ({ items, nextCursor, pageSize }), same shape as runs —
-    // NOT a bare array (the #79/#85 pagination arc). The dashboard fetches status=open and status=resolved
-    // separately; filter `world.incidents` by the requested status so the envelope mirrors the real API.
+    // GET /api/incidents — CURSOR ENVELOPE ({ items, nextCursor, pageSize }), same shape as runs (the
+    // #79/#85 pagination arc), NOT a bare array. Mirrors the API: status/checkId filters, an openedAt
+    // window EXCEPT for status=open (count-bounded, window-exempt), keyset cursor (DESC openedAt,id).
     if (path === "/api/incidents" && method === "GET") {
+      let incs = (world.incidents ?? []).slice();
       const status = url.searchParams.get("status");
-      const isOpen = (i: RawObj) => i.resolvedAt == null && i.resolved_at == null;
-      const items =
-        status === "open" ? world.incidents.filter(isOpen)
-        : status === "resolved" ? world.incidents.filter((i) => !isOpen(i))
-        : world.incidents;
-      return json(route, { items, nextCursor: null, pageSize: 50 });
+      if (status) incs = incs.filter((i) => String(i.status) === status);
+      const checkId = url.searchParams.get("checkId");
+      if (checkId) incs = incs.filter((i) => String(i.checkId) === checkId);
+      // Window on openedAt EXCEPT status=open (mirrors the API's open-exemption).
+      const from = url.searchParams.get("from");
+      const to = url.searchParams.get("to");
+      if (status !== "open") {
+        if (from) incs = incs.filter((i) => String(i.openedAt) >= from);
+        if (to) incs = incs.filter((i) => String(i.openedAt) < to);
+      }
+      // Keyset order: DESC openedAt, then DESC id (mirrors the API).
+      incs.sort(
+        (a, b) =>
+          String(b.openedAt).localeCompare(String(a.openedAt)) || Number(b.id) - Number(a.id),
+      );
+      const pageSize = Number(url.searchParams.get("pageSize")) || 50;
+      const cursor = url.searchParams.get("cursor");
+      let start = 0;
+      if (cursor) {
+        const afterId = Number(Buffer.from(cursor, "base64url").toString());
+        const idx = incs.findIndex((i) => Number(i.id) === afterId);
+        start = idx >= 0 ? idx + 1 : incs.length;
+      }
+      const slice = incs.slice(start, start + pageSize);
+      const hasMore = incs.length > start + pageSize;
+      const lastId = slice.length ? slice[slice.length - 1]!.id : null;
+      const nextCursor =
+        hasMore && lastId != null ? Buffer.from(String(lastId)).toString("base64url") : null;
+      return json(route, { items: slice, nextCursor, pageSize });
     }
     if (path === "/api/flows") return json(route, world.flows);
 

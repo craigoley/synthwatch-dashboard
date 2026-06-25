@@ -49,6 +49,7 @@ import type {
   IncidentDetail,
   IncidentRca,
   IncidentSeverity,
+  IncidentsPage,
   IncidentsResponse,
   IncidentWithCheck,
   LocationStatus,
@@ -537,33 +538,56 @@ export async function getMetrics(id: number): Promise<MetricPoint[]> {
   return (raw.items ?? []).map(mapMetric);
 }
 
-// Pull the incident array out of the cursor envelope. Tolerates a bare array (the pre-cursor shape) and
-// degrades any non-array (a shape blip / error object) to [] — so a bad response yields an empty list, not
-// a thrown `raw.map is not a function` that takes down the incidents page.
-function incidentItems(raw: RawIncidentsPage | RawIncident[] | null | undefined): RawIncident[] {
-  if (Array.isArray(raw)) return raw;
-  return Array.isArray(raw?.items) ? raw.items : [];
+/** Filters + cursor for the paginated incidents list (mirrors the API contract). */
+export interface IncidentsQuery {
+  status?: "open" | "resolved";
+  checkId?: number;
+  /** ISO-8601 window start; the API defaults to the last 30d (status=open is exempt). */
+  from?: string;
+  to?: string;
+  cursor?: string;
+  pageSize?: number;
+}
+
+interface RawIncidentsPage {
+  items: RawIncident[];
+  nextCursor: string | null;
+  pageSize: number;
 }
 
 /**
- * GET /api/incidents — open + resolved incidents for the dashboard's { open, resolved } split.
- *
- * The endpoint is a CURSOR ENVELOPE ({ items, nextCursor, pageSize }) since the #79/#85 pagination arc —
- * reading `.map` off the top-level response is what broke the page. We fetch the two statuses SEPARATELY
- * because the server windows them differently: `status=open` is EXEMPT from the default 30d window (a
- * long-running open incident must never be hidden by a recent window), while `status=resolved` gets the
- * recent window (the unbounded set the cursor design bounds). One no-param call would window OPEN too and
- * could hide an active incident behind a false "all clear" — so the split is correctness, not just style.
+ * GET /api/incidents — one cursor-paginated page of incidents over a date-range window. Keyset
+ * cursor on opened_at (sparse, append-only-over-time); omit `from` and the API bounds the query to
+ * the last 30d so it never loads all-time. `status=open` is exempt from the window (open incidents
+ * are count-bounded). Pass the returned `next_cursor` back as `cursor` for the following page.
+ */
+export async function getIncidents(query: IncidentsQuery = {}): Promise<IncidentsPage> {
+  const raw = await request<RawIncidentsPage>("/incidents", {
+    status: query.status,
+    checkId: query.checkId,
+    from: query.from,
+    to: query.to,
+    cursor: query.cursor,
+    pageSize: query.pageSize,
+  });
+  return {
+    incidents: (raw.items ?? []).map(mapIncident),
+    next_cursor: raw.nextCursor ?? null,
+    page_size: raw.pageSize ?? query.pageSize ?? 50,
+  };
+}
+
+/**
+ * GET /api/incidents — open + recent-resolved, split for the legacy { open, resolved } consumers
+ * (the report drill-down). BOUNDED: all open (count-bounded, window-exempt) + one recent page of
+ * resolved (default 30d window). For the full paginated history use getIncidents directly.
  */
 export async function listIncidents(): Promise<IncidentsResponse> {
-  const [openRaw, resolvedRaw] = await Promise.all([
-    request<RawIncidentsPage>("/incidents", { status: "open" }),
-    request<RawIncidentsPage>("/incidents", { status: "resolved" }),
+  const [open, resolved] = await Promise.all([
+    getIncidents({ status: "open", pageSize: 200 }),
+    getIncidents({ status: "resolved", pageSize: 50 }),
   ]);
-  return {
-    open: incidentItems(openRaw).map(mapIncident),
-    resolved: incidentItems(resolvedRaw).map(mapIncident),
-  };
+  return { open: open.incidents, resolved: resolved.incidents };
 }
 
 interface RawTimelineRun {

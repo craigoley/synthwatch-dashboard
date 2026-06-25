@@ -215,6 +215,35 @@ export function incident(over: RawObj = {}): RawObj {
   };
 }
 
+/**
+ * Incidents spread across time so the 7d / 30d / 90d windows bucket deterministically: 8 resolved
+ * within 7d, +12 within 7–30d, +45 within 30–90d (so the resolved window holds 8 / 20 / 65). The
+ * 90d window (65 > one 50-row page) exercises the cursor "Load more". Plus TWO open incidents — one
+ * recent, one opened 45d ago — to prove the open list is UNWINDOWED (the 45d one must still show).
+ * Timestamps are relative to real now (the dashboard derives its range from Date.now()), with wide
+ * margins so clock jitter never flips an incident across a window boundary.
+ */
+export function spreadIncidents(): RawObj[] {
+  const now = Date.now();
+  const at = (ageDays: number) => new Date(now - ageDays * 86_400_000).toISOString();
+  const out: RawObj[] = [];
+  let id = 6000;
+  const addResolved = (ageDays: number) => {
+    const opened = at(ageDays);
+    out.push(incident({
+      id: id++, checkId: 1, status: "resolved", severity: "warning",
+      openedAt: opened, resolvedAt: at(ageDays - 1 / 24), summary: "resolved blip", rca: null,
+    }));
+  };
+  for (let i = 0; i < 8; i++) addResolved(0.5 + i * 0.7); //  ages 0.5‥5.4d  → in 7d
+  for (let i = 0; i < 12; i++) addResolved(8 + i * 1.5); //   ages 8‥24.5d  → in 30d, not 7d
+  for (let i = 0; i < 45; i++) addResolved(32 + i * 1.2); //  ages 32‥84.8d → in 90d, not 30d
+  // Open incidents are unwindowed: a recent one AND one opened 45d ago (older than the 30d default).
+  out.push(incident({ id: 6900, checkId: 1, status: "open", severity: "critical", openedAt: at(0.2), resolvedAt: null, summary: "active now", rca: null }));
+  out.push(incident({ id: 6901, checkId: 2, status: "open", severity: "warning", openedAt: at(45), resolvedAt: null, summary: "long-running", rca: null }));
+  return out;
+}
+
 /** GET /api/incidents/{id} — investigation detail (camelCase per the API contract). */
 export function incidentDetail(over: RawObj = {}): RawObj {
   return {
