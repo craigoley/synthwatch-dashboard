@@ -577,15 +577,26 @@ export async function getIncidents(query: IncidentsQuery = {}): Promise<Incident
   };
 }
 
+// The UNSCOPED { open, resolved } consumers (status page, the availability-chart incident overlay, the
+// monitor report-detail) read HISTORICAL resolved incidents across windows up to 90d — so listIncidents()
+// must NOT inherit the API's default 30d window, which would silently drop 30–90d-old resolved incidents
+// from those surfaces (the chart promises they're overlaid; the 90d report omits them otherwise). Incidents
+// are SPARSE (≤ one per failure episode), so a wide lookback + a large page returns effectively all of them
+// while staying bounded. The incidents PAGE does NOT use this — it uses useIncidentHistory (getIncidents)
+// with its own date-range + Load more, which is the unbounded set the cursor design exists to bound.
+const LEGACY_INCIDENT_LOOKBACK_DAYS = 365;
+
 /**
- * GET /api/incidents — open + recent-resolved, split for the legacy { open, resolved } consumers
- * (the report drill-down). BOUNDED: all open (count-bounded, window-exempt) + one recent page of
- * resolved (default 30d window). For the full paginated history use getIncidents directly.
+ * GET /api/incidents — all open + wide-window resolved, split for the legacy { open, resolved } consumers.
+ * Open is count-bounded + window-exempt; resolved is fetched over a wide (≥ widest consumer window)
+ * lookback at a large page so no consumer silently loses history. For the full paginated/date-ranged
+ * history use getIncidents / useIncidentHistory directly (the incidents page).
  */
 export async function listIncidents(): Promise<IncidentsResponse> {
+  const from = new Date(Date.now() - LEGACY_INCIDENT_LOOKBACK_DAYS * 86_400_000).toISOString();
   const [open, resolved] = await Promise.all([
     getIncidents({ status: "open", pageSize: 200 }),
-    getIncidents({ status: "resolved", pageSize: 50 }),
+    getIncidents({ status: "resolved", from, pageSize: 200 }),
   ]);
   return { open: open.incidents, resolved: resolved.incidents };
 }

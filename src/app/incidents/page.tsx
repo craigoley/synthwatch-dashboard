@@ -81,9 +81,11 @@ function IncidentRow({ incident }: { incident: IncidentWithCheck }) {
 }
 
 export default function IncidentsPage() {
-  // Open: all open incidents, unwindowed (count-bounded). Resolved: cursor-paginated over a
-  // date-range window (default 30d) with Load more — the unbounded-over-time set.
-  const openH = useIncidentHistory({ status: "open" }, NO_RANGE);
+  // Open: all open incidents, unwindowed (count-bounded: ≤1 open per check). Fetched at a large page
+  // size so the list is effectively complete in one page — the open section has no Load-more and must
+  // never silently truncate a still-open incident. Resolved: cursor-paginated over a date-range window
+  // (default 30d) with Load more — the unbounded-over-time set.
+  const openH = useIncidentHistory({ status: "open" }, NO_RANGE, 200);
   const dateRange = useDateRange("30d");
   const resolvedH = useIncidentHistory({ status: "resolved" }, dateRange.range);
 
