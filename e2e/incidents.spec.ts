@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
-import { mockApi } from "./mock";
+import { mockApi, defaultWorld } from "./mock";
+import { incident } from "./fixtures";
 
 test.describe("incidents — RCA render", () => {
   test("a populated rca shows the badge, confidence, and observed-vs-inferred", async ({ page }) => {
@@ -38,6 +39,42 @@ test.describe("incidents — RCA render", () => {
     await expect(rowLink).toHaveAttribute("href", "/incidents/1");
     // the check-name link still navigates to the check (not the incident)
     await expect(page.getByRole("link", { name: "Global API" })).toHaveAttribute("href", "/checks/10");
+  });
+});
+
+// ★ Regression: GET /api/incidents is a CURSOR ENVELOPE ({ items, nextCursor, pageSize }), not a bare
+// array. listIncidents used to `.map` the envelope → "(intermediate value).map is not a function", which
+// surfaced as the page's ERROR state. These lock in reading `items` (open + resolved fetched separately)
+// and graceful empty handling.
+test.describe("incidents — cursor envelope (regression)", () => {
+  test("renders open + resolved from the envelope, not the .map error", async ({ page }) => {
+    const w = defaultWorld();
+    w.incidents = [
+      incident({ id: 1, checkId: 10, checkName: "Global API", status: "open", resolvedAt: null }),
+      incident({
+        id: 5, checkId: 11, checkName: "Resolved API", status: "resolved",
+        severity: "warning", resolvedAt: "2026-06-24T10:00:00Z", rca: null,
+      }),
+    ];
+    await mockApi(page, w);
+    await page.goto("/incidents");
+
+    // the list renders — NOT the thrown-.map error state.
+    await expect(page.getByText(/is not a function/)).toHaveCount(0);
+    await expect(page.getByText(/^ERROR ·/)).toHaveCount(0);
+    await expect(page.getByText("Global API")).toBeVisible(); // open section row
+    await expect(page.getByText("Resolved API")).toBeVisible(); // resolved section row
+  });
+
+  test("empty incidents → empty states, not a crash", async ({ page }) => {
+    const w = defaultWorld();
+    w.incidents = [];
+    await mockApi(page, w);
+    await page.goto("/incidents");
+
+    await expect(page.getByText("All clear — no open incidents.")).toBeVisible();
+    await expect(page.getByText("No resolved incidents yet.")).toBeVisible();
+    await expect(page.getByText(/is not a function/)).toHaveCount(0);
   });
 });
 

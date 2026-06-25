@@ -419,7 +419,18 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
       const d = world.incidentDetails[Number(m[1])];
       return d ? json(route, d) : json(route, { error: "not_found" }, 404);
     }
-    if (path === "/api/incidents") return json(route, world.incidents);
+    // GET /api/incidents is a CURSOR ENVELOPE ({ items, nextCursor, pageSize }), same shape as runs —
+    // NOT a bare array (the #79/#85 pagination arc). The dashboard fetches status=open and status=resolved
+    // separately; filter `world.incidents` by the requested status so the envelope mirrors the real API.
+    if (path === "/api/incidents" && method === "GET") {
+      const status = url.searchParams.get("status");
+      const isOpen = (i: RawObj) => i.resolvedAt == null && i.resolved_at == null;
+      const items =
+        status === "open" ? world.incidents.filter(isOpen)
+        : status === "resolved" ? world.incidents.filter((i) => !isOpen(i))
+        : world.incidents;
+      return json(route, { items, nextCursor: null, pageSize: 50 });
+    }
     if (path === "/api/flows") return json(route, world.flows);
 
     return json(route, []);
