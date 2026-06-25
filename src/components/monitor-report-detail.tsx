@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 
 import { useRuns, useMetrics, useIncidents } from "@/lib/client";
@@ -51,7 +52,11 @@ export function MonitorReportDetail({
   window: ReportWindow;
 }) {
   // Recent runs within the report window — for the "recent errors" + latency trend.
-  const { data: runsPage } = useRuns(checkId, 50, lookbackRange(WINDOW_DAYS[window]));
+  // Memoize on `window`: lookbackRange() reads Date.now() at call time, so calling it
+  // inline would mint a fresh from/to (and thus a fresh SWR key) on every render,
+  // defeating caching/dedup and triggering a refetch loop against the API.
+  const range = useMemo(() => lookbackRange(WINDOW_DAYS[window]), [window]);
+  const { data: runsPage } = useRuns(checkId, 50, range);
   const { data: metrics } = useMetrics(kind === "browser" ? checkId : null);
   const { data: incidents } = useIncidents();
 
