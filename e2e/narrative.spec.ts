@@ -76,12 +76,12 @@ test.describe("reporting layer 3 — narrative card", () => {
     await expect(page.getByTestId("narrative-card")).toHaveCount(0); // card hidden
   });
 
-  test("compact per-monitor narrative on a row's drill-down", async ({ page }) => {
+  test("compact per-monitor narrative shows directly on the monitor's report card", async ({ page }) => {
     await mockApi(page, worldWithNarrative());
     await page.goto("/reports");
 
-    await page.getByTestId("row-1").getByRole("button").first().click();
-    const monitorCard = page.locator('[data-testid="narrative-card"][data-scope="monitor"]');
+    // Redesign: the per-monitor narrative is surfaced ON the card (not hidden behind the drill-down).
+    const monitorCard = page.getByTestId("report-1").locator('[data-testid="narrative-card"][data-scope="monitor"]');
     await expect(monitorCard).toBeVisible();
     await expect(monitorCard).toContainText("API health steady");
     await expect(monitorCard).toContainText("180ms"); // its cited number

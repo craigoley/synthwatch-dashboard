@@ -2,106 +2,98 @@
 
 import { useMemo, useState } from "react";
 
-import { useAvailabilityReport, usePerformanceReport, useChecks, useTags } from "@/lib/client";
+import { useAvailabilityReport, usePerformanceReport, useChecks, useSla, useTags } from "@/lib/client";
 import { EmptyState, Spinner } from "@/components/states";
 import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
-import { TagChips } from "@/components/tag-chips";
-import { StatusDot } from "@/components/status-badge";
-import { MonitorReportDetail } from "@/components/monitor-report-detail";
 import { NarrativeCard } from "@/components/narrative-card";
-import { formatDuration, formatPct } from "@/lib/format";
-import type { CheckKind, ReportWindow, RunStatus, Tag } from "@/lib/types";
+import { MonitorReportCard, type ReportRow } from "@/components/monitor-report-card";
+import type { ReportWindow } from "@/lib/types";
 
 const WINDOWS: ReportWindow[] = ["7d", "30d", "90d"];
 
-interface Row {
-  check_id: number;
-  name: string;
-  kind: CheckKind;
-  current_status: RunStatus | null;
-  tags: Tag[];
-  availability_pct: number | null;
-  downtime_minutes: number;
-  incident_count: number;
-  p50_ms: number | null;
-  p95_ms: number | null;
-  p99_ms: number | null;
-}
-
-type SortCol = "name" | "availability_pct" | "p50_ms" | "p95_ms" | "p99_ms" | "incident_count";
-
-const COLUMNS: { col: SortCol; label: string; numeric: boolean }[] = [
-  { col: "name", label: "Monitor", numeric: false },
-  { col: "availability_pct", label: "Availability", numeric: true },
-  { col: "p50_ms", label: "p50", numeric: true },
-  { col: "p95_ms", label: "p95", numeric: true },
-  { col: "p99_ms", label: "p99", numeric: true },
-  { col: "incident_count", label: "Incidents", numeric: true },
+type SortCol = "availability_pct" | "p95_ms" | "incidents" | "name";
+const SORTS: { col: SortCol; label: string }[] = [
+  { col: "availability_pct", label: "Availability" },
+  { col: "p95_ms", label: "p95" },
+  { col: "incidents", label: "Incidents" },
+  { col: "name", label: "Name" },
 ];
 
-function compare(a: Row, b: Row, col: SortCol, dir: "asc" | "desc"): number {
+function incidentsOf(r: ReportRow): number {
+  return r.incident_window_count ?? r.open_incident_count;
+}
+
+function compare(a: ReportRow, b: ReportRow, col: SortCol, dir: "asc" | "desc"): number {
   const s = dir === "asc" ? 1 : -1;
   if (col === "name") return a.name.localeCompare(b.name) * s;
-  const av = a[col] as number | null;
-  const bv = b[col] as number | null;
+  const av = col === "incidents" ? incidentsOf(a) : a[col];
+  const bv = col === "incidents" ? incidentsOf(b) : b[col];
   if (av == null && bv == null) return 0;
-  if (av == null) return 1; // nulls always sort last
+  if (av == null) return 1; // nulls last, regardless of dir
   if (bv == null) return -1;
   return (av - bv) * s;
 }
 
-function availTone(pct: number | null): string {
-  if (pct == null) return "var(--color-ink-dim)";
-  if (pct >= 99) return "var(--color-pass)";
-  if (pct >= 95) return "var(--color-warn)";
-  return "var(--color-fail)";
-}
-
 export default function ReportsPage() {
-  const [window, setWindow] = useState<ReportWindow>("30d");
+  // Default to 7d: the AI narratives (fleet + per-monitor, Layer 3) are generated for the 7d window
+  // (the runner currently hardcodes 7d), so 7d shows the richest report. Availability/latency/incidents
+  // come from the live checks + SLA endpoints and work for any window.
+  const [window, setWindow] = useState<ReportWindow>("7d");
   const { selected, toggle, clear } = useTagFilter();
   const [sort, setSort] = useState<{ col: SortCol; dir: "asc" | "desc" }>({ col: "availability_pct", dir: "asc" });
   const [expanded, setExpanded] = useState<number | null>(null);
 
-  // Detail-first: ALWAYS ungrouped (per-check breakdown). Tags filter; they don't group.
-  const { data: avail, isLoading } = useAvailabilityReport(window, "none");
+  // ★ The monitor SET comes from the live checks list — the proven, always-populated source (the same one
+  // the status/monitors pages use). The old reports list bound only to /reports/availability, which returns
+  // empty even when monitors exist → the misleading "No monitors to report on". SLA supplies windowed
+  // availability (computed from up/down counts). The rollup reports, when present, ENRICH each row with
+  // windowed latency percentiles + downtime/incident counts; when empty they simply don't override.
+  const { data: checks, isLoading } = useChecks();
+  const { data: sla } = useSla(window);
+  const { data: avail } = useAvailabilityReport(window, "none");
   const { data: perf } = usePerformanceReport(window, "none");
-  const { data: checks } = useChecks();
   const { data: inUseTags } = useTags();
 
-  // Live tag lens: tags come from the check data at render time, never baked into structure.
-  const checkMeta = useMemo(
-    () => new Map((checks ?? []).map((c) => [c.id, { tags: c.tags, status: c.current_status }])),
-    [checks],
-  );
+  const rows = useMemo<ReportRow[]>(() => {
+    if (!checks) return [];
+    const slaByCheck = new Map((sla?.items ?? []).map((r) => [r.check_id, r]));
+    const availByCheck = new Map((avail?.groups[0]?.checks ?? []).map((c) => [c.check_id, c]));
+    const perfByCheck = new Map((perf?.groups[0]?.checks ?? []).map((c) => [c.check_id, c]));
 
-  const rows = useMemo<Row[]>(() => {
-    if (!avail) return [];
-    const perfById = new Map((perf?.groups[0]?.checks ?? []).map((c) => [c.check_id, c]));
-    return (avail.groups[0]?.checks ?? []).map((a) => {
-      const p = perfById.get(a.check_id);
-      const meta = checkMeta.get(a.check_id);
+    return checks.map((c) => {
+      const s = slaByCheck.get(c.id);
+      const a = availByCheck.get(c.id);
+      const p = perfByCheck.get(c.id);
+      const up = s?.up_runs ?? 0;
+      const down = s?.down_runs ?? 0;
+      // Prefer the rollup report's downtime-accurate %; else compute from SLA up/down (matches the
+      // narrative's figure). availability_pct on /sla is often null even with runs, so don't rely on it.
+      const computedPct = up + down > 0 ? Math.round((10000 * up) / (up + down)) / 100 : null;
       return {
-        check_id: a.check_id,
-        name: a.name,
-        kind: a.kind,
-        current_status: meta?.status ?? null,
-        tags: meta?.tags ?? [],
-        availability_pct: a.availability_pct,
-        downtime_minutes: a.downtime_minutes,
-        incident_count: a.incident_count,
-        p50_ms: p?.p50_ms ?? null,
-        p95_ms: p?.p95_ms ?? null,
+        check_id: c.id,
+        name: c.name,
+        kind: c.kind,
+        current_status: c.current_status,
+        tags: c.tags,
+        availability_pct: a?.availability_pct ?? computedPct,
+        up_runs: up,
+        down_runs: down,
+        completed_runs: s?.completed_runs ?? 0,
+        // Windowed latency from the perf rollup when served; else the live 24h metrics (labelled "24h").
+        p50_ms: p?.p50_ms ?? c.p50_ms,
+        p95_ms: p?.p95_ms ?? c.p95_ms,
         p99_ms: p?.p99_ms ?? null,
+        latency_windowed: p != null,
+        open_incident_count: c.open_incident_count,
+        max_open_severity: c.max_open_severity,
+        incident_window_count: a?.incident_count ?? null,
+        spark: c.spark,
       };
     });
-  }, [avail, perf, checkMeta]);
+  }, [checks, sla, avail, perf]);
 
   const filtered = rows.filter((r) => matchesTags(r.tags, selected));
   const sorted = [...filtered].sort((a, b) => compare(a, b, sort.col, sort.dir));
-
-  const clickSort = (col: SortCol) =>
-    setSort((s) => (s.col === col ? { col, dir: s.dir === "asc" ? "desc" : "asc" } : { col, dir: col === "name" ? "asc" : "asc" }));
 
   return (
     <div className="space-y-5">
@@ -127,7 +119,7 @@ export default function ReportsPage() {
         </div>
       </header>
 
-      {/* AI narrative summary (Layer 3) — hides entirely until the endpoint serves one. */}
+      {/* AI narrative summary (Layer 3) — hides entirely until the endpoint serves one (currently 7d). */}
       <NarrativeCard scope="fleet" window={window} />
 
       {/* Tags FILTER the list (multi-tag AND); only real in-use tags are offered. */}
@@ -141,81 +133,57 @@ export default function ReportsPage() {
         />
       )}
 
-      {avail === undefined ? (
-        isLoading ? <div className="py-16"><Spinner label="Building report…" /></div> : null
-      ) : avail === null ? (
-        <div
-          className="rounded-lg px-4 py-3 text-sm"
-          style={{
-            background: "color-mix(in srgb, var(--color-warn) 12%, transparent)",
-            border: "1px solid color-mix(in srgb, var(--color-warn) 40%, transparent)",
-            color: "var(--color-warn)",
-          }}
-          data-testid="reports-pending"
-        >
-          <strong>Reports aren&apos;t available yet.</strong> The reporting service isn&apos;t deployed —
-          this view will populate once it serves data.
-        </div>
+      {isLoading && !checks ? (
+        <div className="py-16"><Spinner label="Building report…" /></div>
       ) : sorted.length === 0 ? (
         <EmptyState
-          title={selected.length > 0 ? "No monitors match this filter." : "No monitors to report on."}
-          hint={selected.length > 0 ? "No monitor carries all the selected tags." : undefined}
+          title={
+            selected.length > 0
+              ? "No monitors match this filter."
+              : (checks?.length ?? 0) === 0
+                ? "No monitors yet."
+                : "No monitors to report on."
+          }
+          hint={selected.length > 0 ? "No monitor carries all the selected tags." : "Create a monitor to start collecting report data."}
           action={selected.length > 0 ? <button onClick={clear} className="sw-btn">Clear filter</button> : undefined}
         />
       ) : (
-        <div className="sw-panel overflow-hidden" data-testid="monitor-list">
-          {/* sortable header */}
-          <div className="hidden grid-cols-[1fr_110px_90px_90px_90px_90px] gap-3 border-b border-[var(--color-border)] px-4 py-2.5 sm:grid">
-            {COLUMNS.map((c) => (
-              <button
-                key={c.col}
-                type="button"
-                onClick={() => clickSort(c.col)}
-                data-testid={`sort-${c.col}`}
-                className={`flex items-center gap-1 text-[10px] uppercase tracking-wider transition hover:text-[var(--color-ink)] ${
-                  sort.col === c.col ? "text-[var(--color-ink)]" : "text-[var(--color-ink-faint)]"
-                } ${c.numeric ? "justify-end" : ""}`}
-              >
-                {c.label}
-                {sort.col === c.col && <span aria-hidden>{sort.dir === "asc" ? "▲" : "▼"}</span>}
-              </button>
-            ))}
-          </div>
-
-          <div className="divide-y divide-[var(--color-border)]">
-            {sorted.map((r) => {
-              const open = expanded === r.check_id;
+        <div className="space-y-4" data-testid="monitor-list">
+          {/* sort control (cards have no header row to click) */}
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--color-ink-faint)]">
+            <span className="uppercase tracking-wider">Sort</span>
+            {SORTS.map((s) => {
+              const active = sort.col === s.col;
               return (
-                <div key={r.check_id} data-testid={`row-${r.check_id}`}>
-                  <button
-                    type="button"
-                    onClick={() => setExpanded(open ? null : r.check_id)}
-                    aria-expanded={open}
-                    className="grid w-full grid-cols-1 items-center gap-2 px-4 py-3 text-left transition hover:bg-[var(--color-panel-2)] sm:grid-cols-[1fr_110px_90px_90px_90px_90px] sm:gap-3"
-                  >
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <span aria-hidden className="text-[10px] text-[var(--color-ink-faint)]">{open ? "▾" : "▸"}</span>
-                      <StatusDot status={r.current_status} />
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium text-[var(--color-ink)]">{r.name}</span>
-                        <TagChips tags={r.tags} className="mt-0.5" />
-                      </span>
-                    </span>
-                    <span className="sw-mono text-sm sm:text-right" style={{ color: availTone(r.availability_pct) }}>
-                      {formatPct(r.availability_pct)}
-                    </span>
-                    <span className="sw-mono text-[13px] text-[var(--color-ink-dim)] sm:text-right">{formatDuration(r.p50_ms)}</span>
-                    <span className="sw-mono text-[13px] text-[var(--color-ink-dim)] sm:text-right">{formatDuration(r.p95_ms)}</span>
-                    <span className="sw-mono text-[13px] text-[var(--color-ink-dim)] sm:text-right">{formatDuration(r.p99_ms)}</span>
-                    <span className="sw-mono text-[13px] sm:text-right" style={{ color: r.incident_count ? "var(--color-fail)" : "var(--color-ink-dim)" }}>
-                      {r.incident_count}
-                    </span>
-                  </button>
-                  {open && <MonitorReportDetail checkId={r.check_id} kind={r.kind} window={window} />}
-                </div>
+                <button
+                  key={s.col}
+                  type="button"
+                  data-testid={`sort-${s.col}`}
+                  onClick={() =>
+                    setSort((cur) => (cur.col === s.col ? { col: s.col, dir: cur.dir === "asc" ? "desc" : "asc" } : { col: s.col, dir: s.col === "name" ? "asc" : "desc" }))
+                  }
+                  className={`rounded-md border px-2 py-0.5 transition ${
+                    active
+                      ? "border-[var(--color-border-strong)] bg-[var(--color-panel-2)] text-[var(--color-ink)]"
+                      : "border-transparent hover:text-[var(--color-ink)]"
+                  }`}
+                >
+                  {s.label}
+                  {active && <span aria-hidden> {sort.dir === "asc" ? "▲" : "▼"}</span>}
+                </button>
               );
             })}
           </div>
+
+          {sorted.map((r) => (
+            <MonitorReportCard
+              key={r.check_id}
+              row={r}
+              window={window}
+              open={expanded === r.check_id}
+              onToggle={() => setExpanded((cur) => (cur === r.check_id ? null : r.check_id))}
+            />
+          ))}
         </div>
       )}
     </div>
