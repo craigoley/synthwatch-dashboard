@@ -234,6 +234,14 @@ interface RawRunsPage {
   pageSize: number;
 }
 
+// GET /api/incidents is a cursor ENVELOPE — same { items, nextCursor, pageSize } shape as runs (the
+// #79/#85 cursor-pagination arc), NOT the bare array it used to be. The array lives in `items`.
+interface RawIncidentsPage {
+  items: RawIncident[];
+  nextCursor: string | null;
+  pageSize: number;
+}
+
 interface RawMetric {
   runId: number;
   capturedAt: string;
@@ -529,13 +537,32 @@ export async function getMetrics(id: number): Promise<MetricPoint[]> {
   return (raw.items ?? []).map(mapMetric);
 }
 
-/** GET /api/incidents — open + resolved incidents, split client-side. */
+// Pull the incident array out of the cursor envelope. Tolerates a bare array (the pre-cursor shape) and
+// degrades any non-array (a shape blip / error object) to [] — so a bad response yields an empty list, not
+// a thrown `raw.map is not a function` that takes down the incidents page.
+function incidentItems(raw: RawIncidentsPage | RawIncident[] | null | undefined): RawIncident[] {
+  if (Array.isArray(raw)) return raw;
+  return Array.isArray(raw?.items) ? raw.items : [];
+}
+
+/**
+ * GET /api/incidents — open + resolved incidents for the dashboard's { open, resolved } split.
+ *
+ * The endpoint is a CURSOR ENVELOPE ({ items, nextCursor, pageSize }) since the #79/#85 pagination arc —
+ * reading `.map` off the top-level response is what broke the page. We fetch the two statuses SEPARATELY
+ * because the server windows them differently: `status=open` is EXEMPT from the default 30d window (a
+ * long-running open incident must never be hidden by a recent window), while `status=resolved` gets the
+ * recent window (the unbounded set the cursor design bounds). One no-param call would window OPEN too and
+ * could hide an active incident behind a false "all clear" — so the split is correctness, not just style.
+ */
 export async function listIncidents(): Promise<IncidentsResponse> {
-  const raw = await request<RawIncident[]>("/incidents");
-  const all = raw.map(mapIncident);
+  const [openRaw, resolvedRaw] = await Promise.all([
+    request<RawIncidentsPage>("/incidents", { status: "open" }),
+    request<RawIncidentsPage>("/incidents", { status: "resolved" }),
+  ]);
   return {
-    open: all.filter((i) => i.resolved_at === null),
-    resolved: all.filter((i) => i.resolved_at !== null),
+    open: incidentItems(openRaw).map(mapIncident),
+    resolved: incidentItems(resolvedRaw).map(mapIncident),
   };
 }
 
