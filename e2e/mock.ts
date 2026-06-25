@@ -96,6 +96,23 @@ export interface World {
    * available" notice. Set to { items: [] } for the "no specs yet" empty state, or with rows.
    */
   specCatalog?: { items: RawObj[]; probedAt?: string | null };
+  /**
+   * Auth (Phase 12 slice 3). Simulates slice 2's gate so the dashboard's token injection + 401/403
+   * interceptor + role UI are exercised end-to-end:
+   *  - `accounts`: email → role for known editor/admins (an email absent here verifies as invalid).
+   *  - `enforceAuth`: when true, mutating non-allowlisted writes require an editor/admin token (gate ON).
+   *    Default false → today's open behavior (every existing test passes unchanged).
+   *  - `revokedEmails`: a valid-looking token whose email is here resolves to NO session → 401 (mid-action
+   *    re-login). Tests mutate the shared world to flip state after sign-in.
+   *  - `validCode`: the OTP that verifies (default "123456").
+   *  - `editors` / `accessRequests`: admin user-management data (stateful across add/remove).
+   */
+  accounts?: Record<string, "admin" | "editor">;
+  enforceAuth?: boolean;
+  revokedEmails?: Set<string>;
+  validCode?: string;
+  editors?: RawObj[];
+  accessRequests?: RawObj[];
 }
 
 export function defaultWorld(): World {
@@ -126,8 +143,30 @@ export function defaultWorld(): World {
 const json = (route: Route, body: unknown, status = 200) =>
   route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 
-/** Install the mock on a page. Pass a tweaked World for per-test variants. */
-export async function mockApi(page: Page, world: World = defaultWorld()): Promise<void> {
+/**
+ * Install the mock on a page. Pass a tweaked World for per-test variants.
+ *
+ * ★ By default it seeds a signed-in EDITOR session (Phase 12 slice 3): the dashboard is now
+ * read-only-by-default, so non-auth tests must be "signed in" to see the write affordances they exercise
+ * (this preserves the pre-auth open-write behavior). Auth-specific tests pass { seedSession: false } to
+ * start signed out and drive login themselves.
+ */
+const SEED_EDITOR = "e2e-editor@test";
+export async function mockApi(
+  page: Page,
+  world: World = defaultWorld(),
+  opts: { seedSession?: boolean } = {},
+): Promise<void> {
+  if (opts.seedSession ?? true) {
+    // The seeded session's email must be a known account so GET /auth/me (called on mount) validates it
+    // (otherwise it resolves to anonymous → read-only). Seed localStorage before the app boots.
+    world.accounts = { ...(world.accounts ?? {}), [SEED_EDITOR]: "editor" };
+    world.revokedEmails ??= new Set();
+    await page.addInitScript((session) => {
+      window.localStorage.setItem("synthwatch.session", session);
+    }, JSON.stringify({ token: `swt_${SEED_EDITOR}`, email: SEED_EDITOR, role: "editor", expiresAt: "2099-01-01T00:00:00Z" }));
+  }
+
   // Stateful test-send requests: requestId → { channelId, poll cursor }. The POST
   // enqueues (202) and the GET status walks the configured statusSequence.
   const testRequests = new Map<number, { channelId: number; polls: number }>();
@@ -141,6 +180,87 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
     let m: RegExpMatchArray | null;
 
     if (method === "OPTIONS") return route.fulfill({ status: 204 });
+
+    // ── Auth (Phase 12 slice 3) ──────────────────────────────────────────────────────────────────
+    // Token scheme: verify mints `swt_<email>`; the email is parsed back out to resolve the live role.
+    const bearerEmail = (): string | null => {
+      const h = req.headers()["authorization"];
+      const tok = h?.startsWith("Bearer ") ? h.slice(7) : null;
+      return tok?.startsWith("swt_") ? tok.slice(4) : null;
+    };
+    // Live role for the request's token, or null = no valid session (unknown/revoked → 401).
+    // A valid token whose email isn't an account resolves to "anonymous" (→ 403 on a write).
+    const roleOf = (): "admin" | "editor" | "anonymous" | null => {
+      const email = bearerEmail();
+      if (!email || world.revokedEmails?.has(email)) return null;
+      return world.accounts?.[email] ?? "anonymous";
+    };
+    const UNAUTH_WRITES = ["/api/auth/request-code", "/api/auth/verify", "/api/auth/request-access"];
+
+    if (path === "/api/auth/request-code" && method === "POST")
+      return json(route, { message: "If your email is registered, a sign-in code has been sent." }, 202);
+    if (path === "/api/auth/request-access" && method === "POST")
+      return json(route, { message: "If your request is valid, an admin will review it." });
+    if (path === "/api/auth/verify" && method === "POST") {
+      const b = JSON.parse(req.postData() || "{}");
+      const role = world.accounts?.[String(b.email)];
+      if ((world.validCode ?? "123456") === String(b.code) && role)
+        return json(route, { token: `swt_${b.email}`, email: b.email, role, expiresAt: "2099-01-01T00:00:00Z" });
+      return json(route, { error: "bad_request", message: "That code is invalid or has expired." }, 400);
+    }
+    if (path === "/api/auth/me" && method === "GET") {
+      const r = roleOf();
+      if (r === null) return json(route, { error: "unauthorized", message: "No valid session." }, 401);
+      return json(route, { email: bearerEmail(), role: r });
+    }
+    if (path === "/api/auth/logout" && method === "POST") {
+      const email = bearerEmail();
+      if (email) (world.revokedEmails ??= new Set()).add(email);
+      return json(route, { message: "Signed out." });
+    }
+
+    // Editor management — admin-only on EVERY verb (mirrors the handler self-guard, independent of the flag).
+    if (path === "/api/editors" || path.startsWith("/api/editors/") || path === "/api/access-requests") {
+      const r = roleOf();
+      if (r === null) return json(route, { error: "unauthorized", message: "Authentication required." }, 401);
+      if (r !== "admin")
+        return json(route, { error: "forbidden", message: "You do not have permission to perform this action." }, 403);
+      if (path === "/api/editors" && method === "GET") return json(route, world.editors ?? []);
+      if (path === "/api/editors" && method === "POST") {
+        const email = String(JSON.parse(req.postData() || "{}").email ?? "").toLowerCase();
+        if ((world.editors ?? []).some((e) => e.email === email))
+          return json(route, { error: "conflict", message: `${email} is already an editor.` }, 409);
+        const row = { email, addedBy: bearerEmail(), addedAt: "2026-06-25T00:00:00Z" };
+        world.editors = [...(world.editors ?? []), row];
+        world.accessRequests = (world.accessRequests ?? []).filter((a) => a.email !== email);
+        return json(route, row, 201);
+      }
+      if (path.startsWith("/api/editors/") && method === "DELETE") {
+        const email = decodeURIComponent(path.slice("/api/editors/".length)).toLowerCase();
+        if (!(world.editors ?? []).some((e) => e.email === email))
+          return json(route, { error: "not_found", message: `${email} is not an editor.` }, 404);
+        world.editors = (world.editors ?? []).filter((e) => e.email !== email);
+        return route.fulfill({ status: 204 });
+      }
+      if (path === "/api/access-requests" && method === "GET") {
+        const have = new Set((world.editors ?? []).map((e) => e.email));
+        return json(route, (world.accessRequests ?? []).filter((a) => !have.has(a.email as string)));
+      }
+    }
+
+    // Gate simulation: when enforcement is ON, a mutating non-allowlisted write needs an editor/admin
+    // session (401 no/invalid, 403 valid-but-anonymous) — exactly slice 2's verb-based gate. Editor/admin
+    // fall through to the real write handler below.
+    if (
+      world.enforceAuth &&
+      ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
+      !UNAUTH_WRITES.includes(path)
+    ) {
+      const r = roleOf();
+      if (r === null) return json(route, { error: "unauthorized", message: "Authentication required." }, 401);
+      if (r === "anonymous")
+        return json(route, { error: "forbidden", message: "You do not have permission to perform this action." }, 403);
+    }
 
     // Writes first (don't get caught by failAllReads).
     if (path === "/api/checks" && method === "POST") {

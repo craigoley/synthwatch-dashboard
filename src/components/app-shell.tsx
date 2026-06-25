@@ -4,14 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useChecks } from "@/lib/client";
+import { useAuth } from "@/components/auth-provider";
 
-const NAV = [
+const NAV: { href: string; label: string; match: (p: string) => boolean; adminOnly?: boolean }[] = [
   { href: "/", label: "Status", match: (p: string) => p === "/" || p.startsWith("/checks") },
   { href: "/incidents", label: "Incidents", match: (p: string) => p.startsWith("/incidents") },
   { href: "/monitors", label: "Monitors", match: (p: string) => p.startsWith("/monitors") },
   { href: "/specs", label: "Catalog", match: (p: string) => p.startsWith("/specs") },
   { href: "/notifications", label: "Notifications", match: (p: string) => p.startsWith("/notifications") },
   { href: "/reports", label: "Reports", match: (p: string) => p.startsWith("/reports") },
+  // Admin-only. Hiding it is UX; /api/editors is admin-gated server-side regardless (the real boundary).
+  { href: "/users", label: "Users", match: (p: string) => p.startsWith("/users"), adminOnly: true },
 ];
 
 function Logo() {
@@ -60,8 +63,41 @@ function FleetPulse() {
   );
 }
 
+/** Sign-in / account control in the header. Reflects the live session (read-only-by-default cue). */
+function AccountControl() {
+  const { isAuthed, email, role, isAdmin, promptLogin, signOut } = useAuth();
+
+  if (!isAuthed) {
+    return (
+      <button type="button" onClick={promptLogin} className="sw-btn sw-btn-sm" data-testid="sign-in">
+        Sign in to edit
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2" data-testid="account">
+      <span className="hidden flex-col items-end leading-tight sm:flex">
+        <span className="sw-mono max-w-[160px] truncate text-[11px] text-[var(--color-ink-dim)]" title={email ?? ""}>
+          {email}
+        </span>
+        <span
+          className="sw-mono text-[9px] uppercase tracking-wider"
+          style={{ color: isAdmin ? "var(--color-brand)" : "var(--color-ink-faint)" }}
+          data-testid="account-role"
+        >
+          {role}
+        </span>
+      </span>
+      <button type="button" onClick={() => void signOut()} className="sw-btn sw-btn-ghost sw-btn-sm" data-testid="sign-out">
+        Sign out
+      </button>
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "/";
+  const { isAdmin } = useAuth();
 
   // The public status page is stakeholder-facing — it brings its own clean chrome
   // and must not show the operator nav / fleet pulse.
@@ -88,7 +124,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
 
           <nav className="order-last w-full flex items-center gap-1 overflow-x-auto sm:order-none sm:ml-2 sm:w-auto">
-            {NAV.map((item) => {
+            {NAV.filter((item) => !item.adminOnly || isAdmin).map((item) => {
               const active = item.match(pathname);
               return (
                 <Link
@@ -110,6 +146,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 LIVE
               </span>
             </span>
+            <AccountControl />
           </div>
         </div>
       </header>

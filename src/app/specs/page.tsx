@@ -26,6 +26,8 @@ import { EmptyState, Spinner } from "@/components/states";
 import { StatusDot } from "@/components/status-badge";
 import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";
+import { useAuth } from "@/components/auth-provider";
+import { SignInToEdit } from "@/components/write-gate";
 import { activationFrom } from "@/lib/specs";
 import { formatDuration, formatRelative } from "@/lib/format";
 import type { SpecCatalogEntry, SpecCoverage } from "@/lib/types";
@@ -119,6 +121,9 @@ function ActionCell({
   entry: SpecCatalogEntry;
   onActivate: (e: SpecCatalogEntry) => void;
 }) {
+  const { canWrite } = useAuth();
+  // Read-only viewers don't see activation (UX only — the API also gates the POST /checks write).
+  if (!canWrite) return <span className="text-[13px] text-[var(--color-ink-faint)]">—</span>;
   if (entry.monitored) return <span className="text-[13px] text-[var(--color-ink-faint)]">—</span>;
   const disabled = !entry.runnable;
   return (
@@ -213,6 +218,8 @@ export default function SpecCatalogPage() {
         with its coverage and whether its spec can run. Read-only — drift and setup live on the{" "}
         <Link href="/monitors" className="text-[var(--color-brand)] hover:underline">Monitors</Link> page.
       </p>
+
+      <SignInToEdit />
 
       {data === undefined ? (
         isLoading ? (
