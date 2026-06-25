@@ -584,3 +584,32 @@ export interface Narrative {
   generatedAt: string | null;
   stale: boolean;
 }
+
+// ─── monitors-as-code drift (GET /api/reconcile/drift, Phase 6b) ──────────────
+/**
+ * What the reconcile found differs between Git (the synthwatch-monitors manifest) and the live monitors.
+ * The reconcile is READ-ONLY (report mode) — it never applies. Two classes (the UI labels them apart):
+ *  - new | changed | missing → resolvable CONFIG drift ("monitor config differs from Git"; apply WOULD fix).
+ *  - orphan → a KNOWN GAP: Git defines a monitor the runner can't run yet (browser spec-exec deferred).
+ *    NOT a failure — render it informationally/neutrally, visually distinct from the config-drift trio.
+ */
+export type DriftType = "new" | "changed" | "missing" | "orphan";
+
+/**
+ * One drift row. `source_key` is the monitor's manifest id. `detail` is the runner-written jsonb passed
+ * through verbatim; its shape varies by type (e.g. a `changed` row carries
+ * `{ fields: { name: { git, live }, … } }`, an `orphan` carries `{ flow_name, reason }`).
+ */
+export interface DriftRow {
+  source_key: string;
+  drift_type: DriftType;
+  detail: Record<string, unknown>;
+  detected_at: string;
+}
+
+/** The latest reconcile snapshot. Empty `items` = live monitors are in sync with Git. */
+export interface ReconcileDrift {
+  items: DriftRow[];
+  /** When the last reconcile ran (latest detected_at), null when there's no drift. */
+  detected_at: string | null;
+}

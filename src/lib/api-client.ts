@@ -34,6 +34,9 @@ import type {
   PerformanceReport,
   Narrative,
   NarrativeFact,
+  DriftType,
+  DriftRow,
+  ReconcileDrift,
   Check,
   CheckAuth,
   CheckDetail,
@@ -619,6 +622,35 @@ function mapFlow(raw: RawFlow): Flow {
 export async function listFlows(): Promise<Flow[]> {
   const raw = await request<RawFlow[]>("/flows");
   return (raw ?? []).map(mapFlow);
+}
+
+// ─── monitors-as-code drift (Phase 6b) ───────────────────────────────────────
+// The API serves the runner-owned reconcile_drift snapshot read-only (mirrors the narrative read path).
+// FLAGGED DEP: a 404 (endpoint not deployed yet) → null, so the surface hides cleanly rather than erroring.
+// An empty items array is DIFFERENT from null: it means the reconcile ran and found nothing → "in sync".
+
+interface RawDriftItem {
+  sourceKey: string;
+  driftType: string;
+  detail?: Record<string, unknown> | null;
+  detectedAt: string;
+}
+
+/** GET /api/reconcile/drift — the latest reconcile snapshot (read-only; reconcile runs in report mode). */
+export async function getReconcileDrift(): Promise<ReconcileDrift | null> {
+  try {
+    const raw = await request<{ items?: RawDriftItem[]; detectedAt?: string | null }>("/reconcile/drift");
+    const items: DriftRow[] = (raw?.items ?? []).map((d) => ({
+      source_key: d.sourceKey,
+      drift_type: d.driftType as DriftType,
+      detail: d.detail ?? {},
+      detected_at: d.detectedAt,
+    }));
+    return { items, detected_at: raw?.detectedAt ?? null };
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null;
+    throw err;
+  }
 }
 
 // ─── locations (multi-location: the run-location ASSIGNMENT, not per-run status) ──

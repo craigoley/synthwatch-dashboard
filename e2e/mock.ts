@@ -86,6 +86,11 @@ export interface World {
   metrics?: RawObj[];
   /** AI narratives (Layer 3). Unset → /reports/narrative 404 → card hides (graceful). */
   narratives?: { fleet?: RawObj; monitor?: Record<string, RawObj> };
+  /**
+   * Monitors-as-code drift (Phase 6b). Unset → /api/reconcile/drift 404 → the surface hides.
+   * Set to { items: [] } for the "in sync" empty state, or with rows to list drift.
+   */
+  reconcileDrift?: { items: RawObj[]; detectedAt?: string | null };
 }
 
 export function defaultWorld(): World {
@@ -228,6 +233,15 @@ export async function mockApi(page: Page, world: World = defaultWorld()): Promis
     if (world.failAllReads) return route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"down"}' });
 
     if (path === "/api/checks" && method === "GET") return json(route, world.checks);
+    // Monitors-as-code drift (Phase 6b). Unset → 404 (endpoint not deployed → surface hides);
+    // { items: [] } → "in sync"; items present → drift listed. detectedAt defaults to a fixed time.
+    if (path === "/api/reconcile/drift" && method === "GET") {
+      if (!world.reconcileDrift) return json(route, { error: "not_found" }, 404);
+      const { items } = world.reconcileDrift;
+      const detectedAt =
+        world.reconcileDrift.detectedAt ?? (items.length ? "2026-06-25T12:00:00Z" : null);
+      return json(route, { items, detectedAt });
+    }
     // Locations: available options + a check's current assignment (undefined → 404).
     if (path === "/api/locations" && method === "GET") {
       return world.locations ? json(route, { locations: world.locations }) : json(route, { error: "not_found" }, 404);
