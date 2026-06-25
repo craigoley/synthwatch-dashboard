@@ -141,7 +141,7 @@ function ForbiddenToast({ message, onDismiss }: { message: string; onDismiss: ()
 
 // ─── the OTP login modal ──────────────────────────────────────────────────────────────────────────
 
-type Step = "email" | "code";
+type Step = "email" | "code" | "requested";
 
 function LoginModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [step, setStep] = useState<Step>("email");
@@ -194,12 +194,18 @@ function LoginModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     }
   }
 
+  // Enumeration-safe: the backend ALWAYS returns the same uniform message regardless of whether the email
+  // is unknown / an editor / an admin. We display it as-is and never branch the UI on the email — so the
+  // request-access flow leaks nothing. (Backend also rate-limits.) On success we move to the dedicated
+  // "requested" confirmation so the user gets clear feedback (the old code set the message but never showed
+  // it on the email step — a silent no-op).
   async function requestAccess() {
     setError(null);
     setBusy(true);
     try {
       const res = await authRequestAccess(email.trim());
       setNotice(res.message);
+      setStep("requested");
     } catch {
       setError("Could not submit the request. Try again.");
     } finally {
@@ -242,11 +248,17 @@ function LoginModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             <button type="submit" disabled={busy || !email.trim()} className="sw-btn sw-btn-primary w-full" data-testid="login-send">
               {busy ? "Sending…" : "Send sign-in code"}
             </button>
-            <button type="button" onClick={requestAccess} disabled={busy || !email.trim()} className="sw-btn sw-btn-ghost w-full">
-              Request edit access
+            <button
+              type="button"
+              onClick={requestAccess}
+              disabled={busy || !email.trim()}
+              className="sw-btn sw-btn-ghost w-full"
+              data-testid="request-access"
+            >
+              Don&apos;t have access? Request it
             </button>
           </form>
-        ) : (
+        ) : step === "code" ? (
           <form onSubmit={verify} className="space-y-3">
             {notice && (
               <div className="rounded-lg px-3 py-2 text-sm text-[var(--color-ink-dim)]" data-testid="login-notice"
@@ -280,7 +292,42 @@ function LoginModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             >
               Use a different email
             </button>
+            {/* The dead-end fix: a denied user waiting for a code that never comes (they aren't an
+                editor/admin) can request access right here. Enumeration-safe — same uniform result. */}
+            <p className="pt-1 text-center text-[12px] text-[var(--color-ink-dim)]">
+              No code arriving? You may not have access yet —{" "}
+              <button
+                type="button"
+                onClick={requestAccess}
+                disabled={busy}
+                className="text-[var(--color-brand)] underline-offset-2 hover:underline disabled:opacity-50"
+                data-testid="request-access-from-code"
+              >
+                request access
+              </button>
+              .
+            </p>
           </form>
+        ) : (
+          // "requested" — the uniform, enumeration-safe confirmation (identical for any email).
+          <div className="space-y-3" data-testid="request-confirmation">
+            <div
+              className="rounded-lg px-3 py-3 text-sm"
+              style={{ background: "color-mix(in srgb, var(--color-brand) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--color-brand) 28%, var(--color-border))" }}
+            >
+              <p className="font-medium text-[var(--color-ink)]">{notice}</p>
+              <p className="mt-1 text-[12px] text-[var(--color-ink-dim)]">
+                An admin will review your request. Once they grant access, sign in with a one-time code.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setStep("email"); setCode(""); setError(null); }}
+              className="sw-btn sw-btn-ghost w-full"
+            >
+              Back to sign in
+            </button>
+          </div>
         )}
       </div>
     </Modal>

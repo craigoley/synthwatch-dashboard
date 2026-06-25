@@ -153,3 +153,48 @@ test.describe("auth — gate end-to-end (enforcement ON)", () => {
     await expect(page.getByTestId("login-modal")).toHaveCount(0); // 403 is NOT a re-login
   });
 });
+
+// The user-facing request-access trigger (the reported gap): a denied/unregistered user has a path to
+// REQUEST access from the login flow — including from the dead-end code step (waiting for a code that never
+// comes). Enumeration-safe: the confirmation is identical regardless of the email.
+test.describe("auth — request access (login flow)", () => {
+  async function openLogin(page: Page, over: Partial<World> = {}) {
+    await mockApi(page, world(over), { seedSession: false });
+    await page.goto("/monitors");
+    await page.getByTestId("sign-in").click();
+    await expect(page.getByTestId("login-modal")).toBeVisible();
+  }
+
+  test("request access from the email step → uniform confirmation", async ({ page }) => {
+    await openLogin(page);
+    await page.getByTestId("login-email").fill("nobody@example.com");
+    await page.getByTestId("request-access").click();
+    const confirm = page.getByTestId("request-confirmation");
+    await expect(confirm).toBeVisible();
+    await expect(confirm).toContainText("an admin will review");
+  });
+
+  test("★ the dead-end code step offers a request-access path", async ({ page }) => {
+    await openLogin(page);
+    await page.getByTestId("login-email").fill("nobody@example.com");
+    await page.getByTestId("login-send").click(); // advance to the code step — the code never arrives
+    await expect(page.getByTestId("login-code")).toBeVisible();
+    await page.getByTestId("request-access-from-code").click(); // the fix: request access from the dead end
+    await expect(page.getByTestId("request-confirmation")).toContainText("an admin will review");
+  });
+
+  test("★ enumeration-safe: identical confirmation for a known vs unknown email", async ({ page }) => {
+    await openLogin(page, { accounts: { "boss@test": "admin" } });
+
+    await page.getByTestId("login-email").fill("boss@test"); // a real admin
+    await page.getByTestId("request-access").click();
+    const known = (await page.getByTestId("request-confirmation").innerText()).trim();
+
+    await page.getByRole("button", { name: "Back to sign in" }).click();
+    await page.getByTestId("login-email").fill("stranger@example.com"); // unknown
+    await page.getByTestId("request-access").click();
+    const unknown = (await page.getByTestId("request-confirmation").innerText()).trim();
+
+    expect(unknown).toBe(known); // no leak — the response can't be used as an existence oracle
+  });
+});
