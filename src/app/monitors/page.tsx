@@ -10,6 +10,7 @@ import { StatusDot } from "@/components/status-badge";
 import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
+import { ReconcileDriftSurface } from "@/components/reconcile-drift";
 import { formatRelative } from "@/lib/format";
 import type { Check, CheckWithStatus } from "@/lib/types";
 
@@ -137,6 +138,9 @@ export default function MonitorsPage() {
           + New monitor
         </button>
       </header>
+
+      {/* Monitors-as-code drift (Phase 6b) — read-only; hides until the reconcile endpoint serves. */}
+      <ReconcileDriftSurface />
 
       {data && data.length > 0 && (
         <TagFilter

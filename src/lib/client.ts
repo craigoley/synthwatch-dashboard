@@ -43,6 +43,7 @@ import {
   getAvailabilityReport,
   getPerformanceReport,
   getNarrative,
+  getReconcileDrift,
   type ChannelInput,
   createCheck as apiCreateCheck,
   updateCheck as apiUpdateCheck,
@@ -74,6 +75,7 @@ const keys = {
   availabilityReport: (w: string, g: string) => ["report-availability", w, g] as const,
   performanceReport: (w: string, g: string) => ["report-performance", w, g] as const,
   narrative: (scope: string, w: string, key: number | null) => ["narrative", scope, w, key] as const,
+  reconcileDrift: ["reconcile-drift"] as const,
 };
 
 // Live dashboards: refresh on an interval, revalidate when the tab refocuses.
@@ -215,6 +217,17 @@ export function useNarrative(scope: "fleet" | "monitor", window: ReportWindow, k
     () => getNarrative(scope, window, scope === "monitor" ? (key ?? undefined) : undefined),
     { revalidateOnFocus: false, shouldRetryOnError: false },
   );
+}
+
+// Monitors-as-code drift (Phase 6b). shouldRetryOnError:false → a 404 (endpoint not deployed) leaves
+// data null and the surface hides; an empty items array (reconcile ran, in sync) still renders the
+// positive "in sync with Git" state. Read-only — there is no write/apply hook (apply is a later runner
+// capability; reconcile runs in report mode).
+export function useReconcileDrift() {
+  return useSWR(keys.reconcileDrift, () => getReconcileDrift(), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
 }
 
 export function useSla(window: SlaWindow = "24h") {
