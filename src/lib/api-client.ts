@@ -190,6 +190,8 @@ interface RawCheck {
   requestBody?: string | null;
   auth?: CheckAuth | null;
   tags?: Tag[] | null;
+  sourceKey?: string | null;
+  specPath?: string | null;
   lastRunAt: string | null;
   createdAt: string;
 }
@@ -345,6 +347,8 @@ function mapCheck(raw: RawCheck): Check {
     request_body: raw.requestBody ?? null,
     auth: raw.auth ?? null,
     tags: raw.tags ?? [],
+    source_key: raw.sourceKey ?? null,
+    spec_path: raw.specPath ?? null,
   };
 }
 

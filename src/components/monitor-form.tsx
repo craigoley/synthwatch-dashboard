@@ -27,9 +27,16 @@ import {
   type StepState,
 } from "@/components/multistep-builder";
 import type { Check, CheckKind, DnsRecordType, HttpMethod, LighthouseFormFactor, Tag } from "@/lib/types";
+import type { ActivationContext } from "@/lib/specs";
 
 interface Props {
   initial?: Check | null;
+  /**
+   * Spec-activation mode (Phase 13): prefill from a manifest spec and LOCK its identity (kind=browser,
+   * spec_path, source_key, synthetic flow_name). Mutually exclusive with `initial` (edit). When set, the
+   * submit carries spec_path + source_key so the runner runs the Git spec (Option C) next tick.
+   */
+  activation?: ActivationContext | null;
   onDone: () => void;
   onCancel: () => void;
 }
@@ -120,6 +127,20 @@ function fromCheck(c: Check | null | undefined): FormState {
     // assignment) load — see the seeding effect in MonitorForm.
     locations: [],
     tags: [],
+  };
+}
+
+/** Seed the form from an activation prefill: browser kind + synthetic flow_name locked, identity
+    (name/target/interval/tags) prefilled and editable. target may be "" — the form then asks for it. */
+function formFromActivation(a: ActivationContext): FormState {
+  return {
+    ...fromCheck(null),
+    name: a.name,
+    kind: "browser",
+    target_url: a.target ?? "",
+    flow_name: a.flowName,
+    interval_seconds: String(a.intervalSeconds),
+    tags: a.tags,
   };
 }
 
@@ -329,8 +350,11 @@ function Field({
   );
 }
 
-export function MonitorForm({ initial, onDone, onCancel }: Props) {
-  const [form, setForm] = useState<FormState>(() => fromCheck(initial));
+export function MonitorForm({ initial, activation, onDone, onCancel }: Props) {
+  const isActivation = Boolean(activation);
+  const [form, setForm] = useState<FormState>(() =>
+    activation ? formFromActivation(activation) : fromCheck(initial),
+  );
   const [http, setHttp] = useState<HttpConfigState>(() => httpConfigFromCheck(initial));
   const [steps, setSteps] = useState<StepState[]>(() => stepsFromCheck(initial));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -504,6 +528,10 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
       ...(form.kind === "http"
         ? buildHttpConfigPayload(http)
         : { assertions: [], request_headers: null, request_body: null, auth: null }),
+      // Activation: the LOCKED spec binding. spec_path makes the runner fetch+run the Git spec
+      // (Option C); source_key links the catalog row (a duplicate → 409). flow_name above is the
+      // synthetic flowNameFor(spec_path) that satisfies browser_needs_flow.
+      ...(activation ? { source_key: activation.sourceKey, spec_path: activation.specPath } : {}),
     };
 
     setSubmitting(true);
@@ -522,12 +550,18 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
       onDone();
     } catch (err) {
       if (err instanceof ApiRequestError) {
-        // The API returns field-keyed validation messages (e.g.
-        // "assertions[0].comparison"); surface them inline on the right row.
-        if (err.details && typeof err.details === "object" && !Array.isArray(err.details)) {
-          setFieldErrors(err.details as Record<string, string>);
+        // Duplicate source_key (the partial unique index) → the API returns 409. A monitor for this
+        // spec already exists; say so plainly rather than echoing the raw conflict message.
+        if (err.status === 409) {
+          setError("A monitor for this spec already exists.");
+        } else {
+          // The API returns field-keyed validation messages (e.g.
+          // "assertions[0].comparison"); surface them inline on the right row.
+          if (err.details && typeof err.details === "object" && !Array.isArray(err.details)) {
+            setFieldErrors(err.details as Record<string, string>);
+          }
+          setError(err.message);
         }
-        setError(err.message);
       } else {
         setError("Failed to save monitor. Please try again.");
       }
@@ -551,6 +585,21 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
         </div>
       )}
 
+      {/* Activation: the spec identity is LOCKED (browser kind + spec_path + source_key + synthetic
+          flow_name). Shown read-only so it's clear what runs; the name above stays editable. */}
+      {isActivation && activation && (
+        <div
+          data-testid="activation-banner"
+          className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3"
+        >
+          <div className="sw-eyebrow mb-1">Activating spec — Browser</div>
+          <div className="sw-mono truncate text-[12px] text-[var(--color-ink)]">{activation.specPath}</div>
+          <div className="sw-mono mt-1 text-[11px] text-[var(--color-ink-faint)]">
+            id {activation.sourceKey} · flow {activation.flowName} (synthetic) · fetched from Git each run
+          </div>
+        </div>
+      )}
+
       <Field label="Name">
         <input
           className="sw-input"
@@ -564,23 +613,26 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
       <div className="flex flex-wrap items-center gap-6">
         {/* Label reads "Type" to the user; the field still binds to `kind` (the DB
             column / API key / runner all stay `kind` — display string only). The
-            block is full-width on mobile so the 7 options wrap inside the modal. */}
-        <div className="w-full sm:w-auto">
-          <span className="sw-label">Type</span>
-          <Segmented
-            value={form.kind}
-            onChange={(v) => set("kind", v)}
-            options={[
-              { value: "http", label: "HTTP" },
-              { value: "browser", label: "Browser" },
-              { value: "ssl", label: "SSL" },
-              { value: "dns", label: "DNS" },
-              { value: "tcp", label: "TCP" },
-              { value: "ping", label: "Ping" },
-              { value: "multistep", label: "Multistep" },
-            ]}
-          />
-        </div>
+            block is full-width on mobile so the 7 options wrap inside the modal.
+            Hidden in activation mode — the spec locks kind to 'browser'. */}
+        {!isActivation && (
+          <div className="w-full sm:w-auto">
+            <span className="sw-label">Type</span>
+            <Segmented
+              value={form.kind}
+              onChange={(v) => set("kind", v)}
+              options={[
+                { value: "http", label: "HTTP" },
+                { value: "browser", label: "Browser" },
+                { value: "ssl", label: "SSL" },
+                { value: "dns", label: "DNS" },
+                { value: "tcp", label: "TCP" },
+                { value: "ping", label: "Ping" },
+                { value: "multistep", label: "Multistep" },
+              ]}
+            />
+          </div>
+        )}
         <div>
           <span className="sw-label">Severity</span>
           <Segmented
@@ -677,7 +729,7 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
         <MultistepBuilder steps={steps} onChange={setSteps} errors={fieldErrors} />
       )}
 
-      {form.kind === "browser" && (
+      {form.kind === "browser" && !isActivation && (
         <Field
           label="Flow"
           hint={
@@ -933,7 +985,7 @@ export function MonitorForm({ initial, onDone, onCancel }: Props) {
           disabled={submitting || (locationsActive && form.locations.length === 0)}
           className="sw-btn sw-btn-primary"
         >
-          {submitting ? "Saving…" : isEdit ? "Save changes" : "Create monitor"}
+          {submitting ? "Saving…" : isActivation ? "Set up monitor" : isEdit ? "Save changes" : "Create monitor"}
         </button>
       </div>
     </form>

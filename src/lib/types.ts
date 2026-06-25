@@ -143,6 +143,10 @@ export interface Check {
   slo: Slo | null;
   /** key:value tags (Phase 9a); empty until the tags API serves them. */
   tags: Tag[];
+  /** Monitors-as-code (Phase 13): the manifest id this check was activated from; null for hand-made. */
+  source_key: string | null;
+  /** The manifest spec path; non-null → the runner fetches+runs the Git spec (Option C). */
+  spec_path: string | null;
 }
 
 /**
