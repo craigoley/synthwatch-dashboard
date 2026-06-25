@@ -1,26 +1,22 @@
 import type { Tag } from "@/lib/types";
 
-// Stable per-key color so the same key reads the same everywhere (env always one
-// hue, service another, …). Suggested keys get fixed tones; others hash into the rest.
+// A tag chip's hue comes from its KEY. The four SUGGESTED keys carry a fixed, intentional hue so they
+// read consistently everywhere; EVERY other (arbitrary, user-defined) key is NEUTRAL.
+//
+// ★ Arbitrary tags must NOT reuse the status-law colors (pass-green / warn-amber / fail-red / running-blue).
+// The old fallback HASHED each key into a palette that included those status colors, so a plain label like
+// "wegmans" hashed to red and read as an error/alert — a false signal, not a real state. Keeping arbitrary
+// tags neutral preserves the status colors' meaning (globals.css: "Status color law is absolute").
 const KEY_TONE: Record<string, string> = {
   env: "var(--color-running)",
   service: "var(--color-brand)",
   team: "var(--color-warn)",
   criticality: "var(--color-fail)",
 };
-const PALETTE = [
-  "var(--color-brand)",
-  "var(--color-running)",
-  "var(--color-warn)",
-  "var(--color-pass)",
-  "var(--color-fail)",
-];
+const NEUTRAL_TONE = "var(--color-ink-dim)";
 
 function toneFor(key: string): string {
-  if (KEY_TONE[key]) return KEY_TONE[key];
-  let h = 0;
-  for (let i = 0; i < key.length; i += 1) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  return PALETTE[h % PALETTE.length] ?? "var(--color-brand)";
+  return KEY_TONE[key] ?? NEUTRAL_TONE;
 }
 
 /** Small, subtle key:value tag chips. Renders nothing when there are no tags. */
