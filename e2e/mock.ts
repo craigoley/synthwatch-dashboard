@@ -80,8 +80,12 @@ export interface World {
   checkTags?: Record<number, RawObj[]>;
   /** Distinct in-use tags (GET /tags, for the 9b filter bar). */
   tags?: RawObj[];
-  /** Reports served? false → /reports/* 404 (pre-API "reports pending"). Default true. */
+  /** Reports served? false → /reports/* 404 (endpoint not deployed). Default true. */
   reportsServed?: boolean;
+  /** Reproduce the prod bug: /reports/availability + /reports/performance return 200 with EMPTY groups
+   *  (the rollup-backed reports can be empty even when monitors exist). The per-monitor list must still
+   *  render from /checks + /sla. Default false. */
+  reportsEmpty?: boolean;
   /** Per-check run metrics (CWV) for the report drill-down web-vitals (raw camelCase). */
   metrics?: RawObj[];
   /** AI narratives (Layer 3). Unset → /reports/narrative 404 → card hides (graceful). */
@@ -418,6 +422,8 @@ export async function mockApi(
     // Reports (Layer 2) — deterministic from the query so window/groupBy switches are observable.
     if ((path === "/api/reports/availability" || path === "/api/reports/performance") && method === "GET") {
       if (world.reportsServed === false) return json(route, { error: "not_found" }, 404);
+      // ★ The prod bug: rollup-backed reports return 200 with empty groups even when monitors exist.
+      if (world.reportsEmpty) return json(route, { window: url.searchParams.get("window") ?? "30d", groupBy: url.searchParams.get("groupBy") ?? "none", groups: [] });
       const win = url.searchParams.get("window") ?? "30d";
       const gb = url.searchParams.get("groupBy") ?? "none";
       const days = win === "7d" ? 7 : win === "90d" ? 90 : 30;

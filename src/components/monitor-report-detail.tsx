@@ -46,10 +46,13 @@ export function MonitorReportDetail({
   checkId,
   kind,
   window,
+  hideNarrative = false,
 }: {
   checkId: number;
   kind: CheckKind;
   window: ReportWindow;
+  /** The reports card already shows the per-monitor narrative — suppress the duplicate here. */
+  hideNarrative?: boolean;
 }) {
   // Recent runs within the report window — for the "recent errors" + latency trend.
   // Memoize on `window`: lookbackRange() reads Date.now() at call time, so calling it
@@ -67,8 +70,9 @@ export function MonitorReportDetail({
 
   return (
     <div className="space-y-4 border-t border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-4" data-testid={`detail-${checkId}`}>
-      {/* Compact per-monitor AI narrative — hides until the endpoint serves one. */}
-      <NarrativeCard scope="monitor" checkKey={checkId} window={window} compact />
+      {/* Compact per-monitor AI narrative — hides until the endpoint serves one. Suppressed when the
+          parent reports card already renders it (hideNarrative). */}
+      {!hideNarrative && <NarrativeCard scope="monitor" checkKey={checkId} window={window} compact />}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AvailabilityChart checkId={checkId} />
