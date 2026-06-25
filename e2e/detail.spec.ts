@@ -149,9 +149,12 @@ test.describe("check detail", () => {
     await mockApi(page);
     await page.goto("/checks/10");
 
-    await expect(page.getByRole("heading", { name: "By location" })).toBeVisible();
-    await expect(page.getByText("eastus2")).toBeVisible();
-    await expect(page.getByText("westus2")).toBeVisible();
+    // Scope location names to the per-location panel — the run-history below now
+    // auto-expands the newest run (the westus2 failure), whose error also names the region.
+    const byLocation = page.locator(".sw-panel", { hasText: "By location" });
+    await expect(byLocation.getByRole("heading", { name: "By location" })).toBeVisible();
+    await expect(byLocation.getByText("eastus2")).toBeVisible();
+    await expect(byLocation.getByText("westus2")).toBeVisible();
     // partial failure → "regional", visually distinct from a global outage
     await expect(page.getByText(/Regional — 1\/2 locations failing/)).toBeVisible();
   });

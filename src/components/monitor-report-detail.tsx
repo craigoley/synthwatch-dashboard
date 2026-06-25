@@ -6,8 +6,10 @@ import { useRuns, useMetrics, useIncidents } from "@/lib/client";
 import { AvailabilityChart, LatencyChart } from "@/components/charts";
 import { NarrativeCard } from "@/components/narrative-card";
 import { StatusBadge, TONE_VAR } from "@/components/status-badge";
-import { formatDuration, formatLocalDateTime } from "@/lib/format";
+import { formatDuration, formatLocalDateTime, lookbackRange } from "@/lib/format";
 import type { CheckKind, MetricPoint, ReportWindow } from "@/lib/types";
+
+const WINDOW_DAYS: Record<ReportWindow, number> = { "7d": 7, "30d": 30, "90d": 90 };
 
 const isFail = (s: string) => s === "fail" || s === "error";
 
@@ -48,7 +50,8 @@ export function MonitorReportDetail({
   kind: CheckKind;
   window: ReportWindow;
 }) {
-  const { data: runsPage } = useRuns(checkId, 50, 0);
+  // Recent runs within the report window — for the "recent errors" + latency trend.
+  const { data: runsPage } = useRuns(checkId, 50, lookbackRange(WINDOW_DAYS[window]));
   const { data: metrics } = useMetrics(kind === "browser" ? checkId : null);
   const { data: incidents } = useIncidents();
 

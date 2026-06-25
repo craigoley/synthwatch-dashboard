@@ -337,13 +337,24 @@ export interface IncidentDetail {
   recurrence: IncidentRecurrence[];
 }
 
-/** Paginated run history. */
+/**
+ * One cursor-paginated page of run history. Mirrors the API's CursorPage envelope:
+ * `next_cursor` is an opaque token to pass back as the next request's cursor, and is
+ * null once the date-range window is exhausted. No total — counting an append-only
+ * table is the unbounded scan the cursor design avoids.
+ */
 export interface RunsPage {
   runs: Run[];
-  total: number;
-  limit: number;
-  offset: number;
+  next_cursor: string | null;
+  page_size: number;
 }
+
+/**
+ * A relative look-back window for cursor lists (runs now, incidents next). `custom`
+ * carries explicit from/to; the presets resolve to a from = now − N days. Keep this
+ * shape shared so every cursor+date-range surface uses one control.
+ */
+export type RunRangePreset = "7d" | "30d" | "90d";
 
 export interface IncidentsResponse {
   open: IncidentWithCheck[];

@@ -223,9 +223,8 @@ interface RawCheckDetail extends RawCheck {
 
 interface RawRunsPage {
   items: RawRun[];
-  page: number;
+  nextCursor: string | null;
   pageSize: number;
-  total: number;
 }
 
 interface RawMetric {
@@ -461,8 +460,13 @@ function mapFleet(raw: RawSlaFleet | null | undefined): SlaFleet | null {
 }
 
 export interface RunsQuery {
-  limit?: number;
-  offset?: number;
+  /** ISO-8601 window start; the API defaults to the last 7d when omitted (bounded). */
+  from?: string;
+  /** ISO-8601 window end; the API defaults to now when omitted. */
+  to?: string;
+  /** Opaque next-cursor from the prior page (omit for the first page). */
+  cursor?: string;
+  pageSize?: number;
 }
 
 export interface DeleteCheckResult {
@@ -484,21 +488,23 @@ export async function getCheck(id: number): Promise<CheckDetail> {
   return { check: mapCheck(raw), recent_runs: (raw.recentRuns ?? []).map(mapRun) };
 }
 
-/** GET /api/checks/:id/runs — paginated run history. */
+/**
+ * GET /api/checks/:id/runs — one cursor-paginated page of run history over a date-range
+ * window. Keyset cursor on started_at (stable for the append-only runs table); omit `from`
+ * and the API bounds the query to a recent default window so it never loads all-time. Pass
+ * the returned `next_cursor` back as `cursor` for the following page.
+ */
 export async function getRuns(id: number, query: RunsQuery = {}): Promise<RunsPage> {
-  // The endpoint is PAGE-based (page/pageSize); it ignores limit/offset entirely.
-  // Translate the caller's offset/limit into the page/pageSize it actually honors
-  // so paging works (the dashboard-facing RunsQuery/RunsPage stay offset/limit).
-  const reqPageSize = query.limit ?? 50;
-  const reqOffset = query.offset ?? 0;
-  const page = Math.floor(reqOffset / reqPageSize) + 1;
-  const raw = await request<RawRunsPage>(`/checks/${id}/runs`, { page, pageSize: reqPageSize });
-  const pageSize = raw.pageSize || raw.items.length;
+  const raw = await request<RawRunsPage>(`/checks/${id}/runs`, {
+    from: query.from,
+    to: query.to,
+    cursor: query.cursor,
+    pageSize: query.pageSize,
+  });
   return {
-    runs: raw.items.map(mapRun),
-    total: raw.total,
-    limit: pageSize,
-    offset: pageSize ? (raw.page - 1) * pageSize : 0,
+    runs: (raw.items ?? []).map(mapRun),
+    next_cursor: raw.nextCursor ?? null,
+    page_size: raw.pageSize ?? query.pageSize ?? 50,
   };
 }
 

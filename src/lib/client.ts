@@ -12,6 +12,7 @@
  */
 
 import useSWR, { type SWRConfiguration, mutate as globalMutate } from "swr";
+import useSWRInfinite from "swr/infinite";
 
 import {
   listChecks,
@@ -49,13 +50,17 @@ import {
   deleteCheck as apiDeleteCheck,
 } from "@/lib/api-client";
 import type { CreateCheckInput, UpdateCheckInput } from "@/lib/schemas";
-import type { ReportWindow, Routing, SlaWindow, Tag } from "@/lib/types";
+import type { ReportWindow, Routing, RunsPage, SlaWindow, Tag } from "@/lib/types";
+
+/** Default page size for cursor-paginated run history (matches the API default/max bounds). */
+export const RUN_PAGE_SIZE = 50;
 
 // Logical SWR cache keys (NOT URLs). Centralized so reads and revalidation agree.
 const keys = {
   checks: ["checks"] as const,
   check: (id: number) => ["check", id] as const,
-  runs: (id: number, limit: number, offset: number) => ["runs", id, limit, offset] as const,
+  runs: (id: number, pageSize: number, from: string | null, to: string | null) =>
+    ["runs", id, pageSize, from, to] as const,
   steps: (runId: number) => ["steps", runId] as const,
   metrics: (id: number) => ["metrics", id] as const,
   incidents: ["incidents"] as const,
@@ -93,12 +98,83 @@ export function useCheck(id: number | null) {
   return useSWR(id ? keys.check(id) : null, () => getCheck(id as number), live);
 }
 
-export function useRuns(id: number | null, limit = 50, offset = 0) {
+/**
+ * A single recent page of runs (no load-more) — for summaries like the report
+ * drill-down's "recent errors". `range` bounds the window; omit it and the API
+ * defaults to its recent window so the query stays bounded.
+ */
+export function useRuns(
+  id: number | null,
+  pageSize = RUN_PAGE_SIZE,
+  range?: { from?: string; to?: string },
+) {
   return useSWR(
-    id ? keys.runs(id, limit, offset) : null,
-    () => getRuns(id as number, { limit, offset }),
+    id ? keys.runs(id, pageSize, range?.from ?? null, range?.to ?? null) : null,
+    () => getRuns(id as number, { pageSize, from: range?.from, to: range?.to }),
     live,
   );
+}
+
+// The infinite key: null first page disables the hook; we thread the prior page's
+// next_cursor so each page continues the keyset. Range (from/to) is part of the key,
+// so changing the date-range starts a fresh walk.
+type RunHistoryKey = readonly [
+  "run-history",
+  number,
+  string | null, // from
+  string | null, // to
+  number, // pageSize
+  string | null, // cursor (null = first page)
+];
+
+/**
+ * Cursor-paginated run history with load-more. Accumulates pages client-side; `loadMore`
+ * advances one page, `hasMore` is false once the API returns a null next-cursor (window
+ * exhausted). `range` is the date-range window; changing it resets the walk (it's keyed in).
+ */
+export function useRunHistory(
+  id: number | null,
+  range: { from?: string; to?: string },
+  pageSize = RUN_PAGE_SIZE,
+) {
+  const getKey = (index: number, prev: RunsPage | null): RunHistoryKey | null => {
+    if (!id) return null;
+    if (prev && prev.next_cursor === null) return null; // reached the end — stop requesting
+    const cursor = index === 0 ? null : (prev?.next_cursor ?? null);
+    return ["run-history", id, range.from ?? null, range.to ?? null, pageSize, cursor];
+  };
+
+  const swr = useSWRInfinite<RunsPage>(
+    getKey,
+    (key) => {
+      const [, cid, from, to, ps, cursor] = key as RunHistoryKey;
+      return getRuns(cid, {
+        pageSize: ps,
+        from: from ?? undefined,
+        to: to ?? undefined,
+        cursor: cursor ?? undefined,
+      });
+    },
+    { refreshInterval: 15_000, revalidateOnFocus: true, revalidateFirstPage: false, keepPreviousData: true },
+  );
+
+  const pages = swr.data ?? [];
+  const runs = pages.flatMap((p) => p.runs);
+  const lastPage = pages.length > 0 ? pages[pages.length - 1] : null;
+  // hasMore: the last loaded page still carries a cursor. Before anything loads we
+  // optimistically allow a first fetch (the hook itself gates on getKey).
+  const hasMore = lastPage ? lastPage.next_cursor !== null : false;
+
+  return {
+    runs,
+    error: swr.error as Error | undefined,
+    isLoading: swr.isLoading,
+    // Validating a page beyond the first → a load-more is in flight.
+    isLoadingMore: swr.isValidating && pages.length > 0,
+    hasMore,
+    loadMore: () => swr.setSize(swr.size + 1),
+    reset: () => swr.setSize(1),
+  };
 }
 
 export function useRunSteps(runId: number | null) {
