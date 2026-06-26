@@ -38,6 +38,7 @@ import {
   getDeliveryReadiness,
   sendChannelTest,
   getChannelTestStatus,
+  runCheckNow,
   getCheckTags,
   setCheckTags as apiSetCheckTags,
   getTags,
@@ -307,6 +308,19 @@ export function useDeliveryReadiness() {
 // status (GET .../test/status). No cache — these are imperative one-offs, but
 // re-exported so the page imports from the React data layer like everything else.
 export { sendChannelTest, getChannelTestStatus };
+
+// On-demand "Run now": POST → 202 { requestId }; the run then appears in the history.
+export { runCheckNow };
+
+/** Revalidate a check's run-history (all date-range pages) — call after triggering an on-demand run
+ *  so the new run shows up live. Matches the useRunHistory cache key ["run-history", checkId, …]. */
+export async function revalidateRunHistory(checkId: number) {
+  await globalMutate(
+    (k) => Array.isArray(k) && k[0] === "run-history" && k[1] === checkId,
+    undefined,
+    { revalidate: true },
+  );
+}
 
 // Tags (Phase 9a). shouldRetryOnError:false so a pre-API 404 leaves data undefined
 // (the editor hides) rather than retry-looping.
