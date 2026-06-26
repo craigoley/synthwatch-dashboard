@@ -126,6 +126,21 @@ test.describe("check detail", () => {
     expect((await page.request.get("/trace-proxy/200")).status()).not.toBe(404);
   });
 
+  // ★ The vendored viewer forces html,body{min-width:550px;min-height:450px;overflow:auto}, so an embed
+  // shorter than 450px makes IT render a scrollbar (which can cascade a second one). On a short viewport
+  // h-[70vh] would be 420px (< 450) — the min-h floor must keep the embed above Playwright's minimum so it
+  // fills the panel cleanly instead of double-scrolling.
+  test("the trace embed stays above Playwright's 450px min-height on a short viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 1100, height: 600 }); // 70vh = 420px < the viewer's 450px floor
+    await mockApi(page);
+    await page.goto("/checks/2");
+    await page.getByTestId("view-trace-200").click();
+
+    const box = await page.getByTestId("trace-viewer-200").boundingBox();
+    expect(box, "trace iframe is laid out").toBeTruthy();
+    expect(box!.height).toBeGreaterThanOrEqual(450); // floored above the viewer's min-height, not 420
+  });
+
   test("a passing run shows no trace affordance (no trace captured)", async ({ page }) => {
     await mockApi(page);
     await page.goto("/checks/1"); // http, passing run (no trace_url)
