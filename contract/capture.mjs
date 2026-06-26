@@ -47,4 +47,31 @@ for (const [name, path] of Object.entries(SEAMS)) {
     console.error(`FAILED   ${name.padEnd(26)} ${path}: ${e.message}`);
   }
 }
+
+// ─── gated seam: ai-insights (editor/admin only) ────────────────────────────────────────────────────
+// Unlike the open GETs above, POST /runs/{id}/ai-insights requires an authed call. The bearer comes from
+// SYNTHWATCH_API_TOKEN (a real admin token) — NEVER hardcoded/committed. Without it the seam is SKIPPED and
+// the committed fixture stands. Use a run that HAS a trace + insights (SYNTHWATCH_AI_RUN_ID, default 844515);
+// the body saves as ai_insights_ok.json (or ai_insights_not_configured.json if the API reports configured:false).
+const AI_TOKEN = process.env.SYNTHWATCH_API_TOKEN;
+const AI_RUN_ID = process.env.SYNTHWATCH_AI_RUN_ID ?? "844515";
+if (AI_TOKEN) {
+  try {
+    const res = await fetch(`${BASE}/runs/${AI_RUN_ID}/ai-insights`, {
+      method: "POST",
+      headers: { accept: "application/json", authorization: `Bearer ${AI_TOKEN}` },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const name = data && data.configured === false ? "ai_insights_not_configured" : "ai_insights_ok";
+    writeFileSync(join(dir, `${name}.json`), JSON.stringify(data, null, 2) + "\n");
+    console.log(`captured ${name.padEnd(26)} POST /runs/${AI_RUN_ID}/ai-insights`);
+  } catch (e) {
+    failed += 1;
+    console.error(`FAILED   ai-insights POST /runs/${AI_RUN_ID}: ${e.message}`);
+  }
+} else {
+  console.log("skipped  ai-insights            (set SYNTHWATCH_API_TOKEN [+ SYNTHWATCH_AI_RUN_ID] to capture the gated POST)");
+}
+
 process.exit(failed ? 1 : 0);

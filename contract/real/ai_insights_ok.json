@@ -1,0 +1,45 @@
+{
+  "configured": true,
+  "summary": "Slow SPA boot driven by render-blocking JS chunks, an image-heavy page, and one site-origin console error on the search header.",
+  "performance": [
+    {
+      "title": "Main-thread JS chunks slow to first byte",
+      "detail": "Several _next/static/chunks/*.js requests show ~700ms server wait before any bytes, render-blocking the SPA boot.",
+      "severity": "medium",
+      "confidence": "high",
+      "evidence": "05qfr1~43mehr.js 1026ms (wait 613ms)"
+    }
+  ],
+  "network": [
+    {
+      "title": "images.wegmans.com dominates page weight",
+      "detail": "70 requests / 6.6 MB from the image host; a single hero image is 2.2 MB. Serve responsive/next-gen formats.",
+      "severity": "medium",
+      "confidence": "medium",
+      "evidence": "hero image 2.2 MB of 6.6 MB total"
+    }
+  ],
+  "errors": [
+    {
+      "title": "Invalid discovery pages storage data",
+      "detail": "The search header logs a console error on load — relevant to a search monitor; likely corrupt localStorage state in SiteHeaderSearch.",
+      "severity": "high",
+      "confidence": "high",
+      "evidence": "console error from _next/static/chunks"
+    }
+  ],
+  "suggestions": [
+    {
+      "title": "Two CSS chunks preloaded but unused",
+      "detail": "Wasted preloads observed within the first few seconds.",
+      "severity": "low",
+      "confidence": "low",
+      "evidence": null
+    }
+  ],
+  "caveats": [
+    "Web Vitals are best-effort for this SPA's soft navigations — lean on network/console/payload signals.",
+    "Not a real Lighthouse audit — suggestions are based on the trace's network/console data."
+  ],
+  "note": null
+}
