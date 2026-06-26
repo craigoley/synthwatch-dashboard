@@ -690,3 +690,44 @@ export interface SpecCatalog {
   /** When the last reconcile populated the catalog (latest probe time), null when empty. */
   probed_at: string | null;
 }
+
+// ─── Trace AI insights (slice 3 — consumes POST /api/runs/{id}/ai-insights) ──────────────────────────
+// On-demand AOAI analysis of a run's Playwright trace. The endpoint is gated (editor/admin) and
+// inert-until-configured (the AOAI deploy prereq), so the client normalizes its non-fatal states.
+
+export type AiInsightSeverity = "critical" | "high" | "medium" | "low" | "info";
+export type AiInsightConfidence = "high" | "medium" | "low";
+/** Whether a finding is the site's own code, an embedded third party, or undetermined (honesty over guessing). */
+export type AiInsightScope = "site" | "third_party" | "unknown";
+
+export interface AiInsight {
+  severity: AiInsightSeverity;
+  confidence: AiInsightConfidence;
+  title: string;
+  detail: string;
+  /** The specific trace signal the finding is based on (a request, a console line, a payload size). */
+  evidence: string | null;
+  scope: AiInsightScope | null;
+}
+
+export interface AiInsights {
+  summary: string;
+  performance: AiInsight[];
+  network: AiInsight[];
+  errors: AiInsight[];
+  suggestions: AiInsight[];
+  /** Honesty notes that MUST be surfaced (SPA Web Vitals unreliable, not a Lighthouse audit, …). */
+  caveats: string[];
+}
+
+/**
+ * Normalized result of POST /runs/{id}/ai-insights — the UI's three non-happy states made explicit:
+ *  - not_configured: 200, AI not set up yet (the live state until the AOAI deploy prereq). NOT an error.
+ *  - unavailable: AOAI/extraction returned no insights (non-fatal null) — "try again".
+ *  - ok: insights to render.
+ * (401/403 are handled by the global auth interceptor before this resolves.)
+ */
+export type AiInsightsResult =
+  | { status: "ok"; insights: AiInsights }
+  | { status: "not_configured"; message: string }
+  | { status: "unavailable"; message: string };

@@ -11,6 +11,7 @@ import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { runStatusMeta } from "@/lib/status";
 import { formatDuration, formatLocalDateTime } from "@/lib/format";
 import { TraceViewer } from "@/components/trace-viewer";
+import { AiInsightsPanel } from "@/components/ai-insights";
 import type { Run } from "@/lib/types";
 
 /**
@@ -64,6 +65,8 @@ function RunArtifacts({ run }: { run: Run }) {
             Per-action screenshots, console, network waterfall &amp; DOM time-travel — from the trace
             captured on failure.
           </p>
+          {/* On-demand AOAI analysis of this trace (slice 3) — gated + inert-until-configured. */}
+          <AiInsightsPanel runId={run.id} />
         </div>
       )}
     </div>
