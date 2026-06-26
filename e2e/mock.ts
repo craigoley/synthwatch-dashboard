@@ -82,10 +82,12 @@ export interface World {
   tags?: RawObj[];
   /** Reports served? false → /reports/* 404 (endpoint not deployed). Default true. */
   reportsServed?: boolean;
-  /** POST /api/runs/{id}/ai-insights body. Unset → not-configured (the live default until the AOAI deploy
-   *  prereq). Set { configured:true, insights:{…} } for the happy path; { configured:true, insights:null }
-   *  for the AOAI-null "unavailable" path. */
+  /** POST /api/runs/{id}/ai-insights 200 body — the REAL flat AiInsightsDto shape:
+   *  { configured, summary, performance[], network[], errors[], suggestions[], caveats[], note }.
+   *  Unset → not-configured default. Set configured:true + categories for the happy path. */
   aiInsights?: RawObj;
+  /** Force the ai-insights POST to a non-200 (e.g. 401/403) to exercise the auth interceptor. */
+  aiInsightsStatus?: number;
   /** Reproduce the prod bug: /reports/availability + /reports/performance return 200 with EMPTY groups
    *  (the rollup-backed reports can be empty even when monitors exist). The per-monitor list must still
    *  render from /checks + /sla. Default false. */
@@ -352,10 +354,17 @@ export async function mockApi(
       return json(route, world.routing);
     }
     // Async test-send: POST enqueues (202 { requestId }); undefined → 404 (not deployed).
-    // Trace AI insights (slice 3). Default (world.aiInsights unset) = the LIVE state: AOAI not configured
-    // yet — a graceful 200, NOT an error. Tests set world.aiInsights to drive the configured/null paths.
+    // Trace AI insights. aiInsightsStatus forces a 401/403 (the gate); else a 200 flat AiInsightsDto.
+    // Default (unset) = configured:false (note-bearing), the inert-until-AOAI-prereq state.
     if ((m = path.match(/^\/api\/runs\/(\d+)\/ai-insights$/)) && method === "POST") {
-      return json(route, world.aiInsights ?? { configured: false, message: "AI insights aren’t configured yet." });
+      if (world.aiInsightsStatus) {
+        const err = world.aiInsightsStatus === 403 ? "forbidden" : "unauthorized";
+        return json(route, { error: err, message: `${err} (test)` }, world.aiInsightsStatus);
+      }
+      return json(
+        route,
+        world.aiInsights ?? { configured: false, note: "AI insights are not configured for this environment yet." },
+      );
     }
 
     if ((m = path.match(/^\/api\/channels\/(\d+)\/test$/)) && method === "POST") {
