@@ -1308,35 +1308,44 @@ export async function getPerformanceReport(
   try {
     const raw = await request<Record<string, unknown>>("/reports/performance", { window, groupBy });
     const groups = ((raw?.groups as Record<string, unknown>[]) ?? []).map((g) => {
+      // ★ The API NESTS latency under `latency` and web-vitals (p75) under `webVitals` — they are NOT flat
+      // on the group, and per-check uses `checkName` + a nested `latency`. Reading flat (g.p50Ms / wv.lcpMs
+      // / c.p50Ms / c.name) silently nulled every percentile + vital + blanked names → the reports page's
+      // "windowed" latency never populated (it always fell back to the 24h metrics). Anchored by a contract
+      // test now (the missing test let this ship). INP is intentionally absent (never captured).
+      const lat = (g.latency ?? {}) as Record<string, unknown>;
       const wv = g.webVitals as Record<string, unknown> | null | undefined;
+      const checks = ((g.checks as Record<string, unknown>[]) ?? []).map((c) => {
+        const cl = (c.latency ?? {}) as Record<string, unknown>;
+        return {
+          check_id: c.checkId as number,
+          name: String(c.checkName ?? ""),
+          kind: c.kind as CheckKind,
+          avg_ms: (cl.avgMs as number) ?? null,
+          p50_ms: (cl.p50Ms as number) ?? null,
+          p95_ms: (cl.p95Ms as number) ?? null,
+          p99_ms: (cl.p99Ms as number) ?? null,
+        };
+      });
       return {
         group: String(g.group ?? "ungrouped"),
-        avg_ms: (g.avgMs as number) ?? null,
-        p50_ms: (g.p50Ms as number) ?? null,
-        p95_ms: (g.p95Ms as number) ?? null,
-        p99_ms: (g.p99Ms as number) ?? null,
+        avg_ms: (lat.avgMs as number) ?? null,
+        p50_ms: (lat.p50Ms as number) ?? null,
+        p95_ms: (lat.p95Ms as number) ?? null,
+        p99_ms: (lat.p99Ms as number) ?? null,
         series: mapSeries(g.series as RawSeriesPoint[]),
         // null when the group has no browser checks → the UI renders NO vitals.
-        // ★ INP is intentionally absent (never captured) — not mapped at all.
         web_vitals: wv
           ? {
-              lcp_ms: (wv.lcpMs as number) ?? null,
-              fcp_ms: (wv.fcpMs as number) ?? null,
-              ttfb_ms: (wv.ttfbMs as number) ?? null,
-              cls: (wv.cls as number) ?? null,
+              lcp_ms: (wv.lcpP75Ms as number) ?? null,
+              fcp_ms: (wv.fcpP75Ms as number) ?? null,
+              ttfb_ms: (wv.ttfbP75Ms as number) ?? null,
+              cls: (wv.clsP75 as number) ?? null,
             }
           : null,
         browser_check_count: (g.browserCheckCount as number) ?? 0,
-        check_count: (g.checkCount as number) ?? 0,
-        checks: ((g.checks as Record<string, unknown>[]) ?? []).map((c) => ({
-          check_id: c.checkId as number,
-          name: String(c.name ?? ""),
-          kind: c.kind as CheckKind,
-          avg_ms: (c.avgMs as number) ?? null,
-          p50_ms: (c.p50Ms as number) ?? null,
-          p95_ms: (c.p95Ms as number) ?? null,
-          p99_ms: (c.p99Ms as number) ?? null,
-        })),
+        check_count: (g.checkCount as number) ?? checks.length,
+        checks,
       };
     });
     return { window, group_by: String(raw?.groupBy ?? groupBy), groups };
