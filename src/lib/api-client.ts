@@ -44,6 +44,11 @@ import type {
   AiInsightSeverity,
   AiInsights,
   AiInsightsResult,
+  BaselineDiff,
+  BaselineDiffCause,
+  BaselineDiffInsight,
+  BaselineDiffResult,
+  DiffConsoleLine,
   Check,
   CheckAuth,
   CheckDetail,
@@ -700,6 +705,131 @@ export async function getAiInsights(runId: number): Promise<AiInsightsResult> {
     return { status: "unavailable", message: raw.note ?? "The AI service ran but couldn’t generate insights for this run." };
   }
   return { status: "ok", insights };
+}
+
+// ─── Location comparison: POST /api/runs/{id}/baseline-diff ──────────────────────────────────────────
+// The DIFF needs no AOAI, so it's present for every non-transport state; the INSIGHT only when configured.
+// Mirrors getAiInsights' transport-vs-API-side state machine + the camelCase contract (flat top-level).
+
+interface RawDiffConsoleLine {
+  level?: string;
+  origin?: string;
+  text?: string;
+}
+interface RawBaselineDiffDto {
+  configured?: boolean;
+  note?: string | null;
+  retryable?: boolean;
+  failing?: { runId?: number; location?: string | null; status?: string };
+  baseline?: { source?: string; capturedAt?: string | null; location?: string | null };
+  diff?: {
+    console?: { onlyInA?: RawDiffConsoleLine[]; onlyInB?: RawDiffConsoleLine[]; shared?: number };
+    network?: {
+      totalRequestsA?: number;
+      totalRequestsB?: number;
+      failedHostsOnlyInA?: string[];
+      thirdPartyOnlyInA?: { host?: string; count?: number; kb?: number }[];
+    };
+  };
+  insight?: {
+    summary?: string;
+    likelyCause?: string;
+    confidence?: string;
+    isFlaky?: boolean;
+    findings?: RawAiInsightDto[];
+    caveats?: string[];
+  } | null;
+}
+
+const DIFF_CAUSES: readonly string[] = [
+  "regional-waf-cdn", "network-allowlist", "geo-dns", "region-timeout", "third-party-blocked",
+  "flaky-transient", "undetermined",
+];
+
+const mapDiffLine = (r: RawDiffConsoleLine): DiffConsoleLine => ({
+  level: String(r.level ?? ""),
+  origin: String(r.origin ?? "unknown"),
+  text: String(r.text ?? ""),
+});
+
+function mapBaselineDiff(r: RawBaselineDiffDto): BaselineDiff {
+  const c = r.diff?.console ?? {};
+  const n = r.diff?.network ?? {};
+  return {
+    failing: {
+      runId: Number(r.failing?.runId ?? 0),
+      location: r.failing?.location ?? null,
+      status: String(r.failing?.status ?? ""),
+    },
+    baseline: { source: String(r.baseline?.source ?? "success-baseline"), capturedAt: r.baseline?.capturedAt ?? null },
+    console: {
+      onlyInThisRun: (c.onlyInA ?? []).map(mapDiffLine),
+      onlyInBaseline: (c.onlyInB ?? []).map(mapDiffLine),
+      shared: Number(c.shared ?? 0),
+    },
+    network: {
+      totalRequestsThisRun: Number(n.totalRequestsA ?? 0),
+      totalRequestsBaseline: Number(n.totalRequestsB ?? 0),
+      failedHostsOnlyInThisRun: (n.failedHostsOnlyInA ?? []).map(String),
+      thirdPartyOnlyInThisRun: (n.thirdPartyOnlyInA ?? []).map((t) => ({
+        host: String(t.host ?? ""),
+        count: Number(t.count ?? 0),
+        kb: Number(t.kb ?? 0),
+      })),
+    },
+  };
+}
+
+function mapBaselineDiffInsight(i: NonNullable<RawBaselineDiffDto["insight"]>): BaselineDiffInsight {
+  return {
+    summary: String(i.summary ?? ""),
+    likelyCause: (DIFF_CAUSES.includes(i.likelyCause ?? "") ? i.likelyCause : "undetermined") as BaselineDiffCause,
+    confidence: (AI_CONFIDENCES.includes(i.confidence ?? "") ? i.confidence : "low") as AiInsightConfidence,
+    isFlaky: i.isFlaky === true,
+    findings: (i.findings ?? []).map(mapAiInsight),
+    caveats: (i.caveats ?? []).map(String),
+  };
+}
+
+/**
+ * POST /api/runs/:id/baseline-diff — diff the failing run vs the monitor's last-known-good baseline + the
+ * AI comparison. Same transport-vs-API-side discipline as getAiInsights. The diff is returned for every
+ * non-transport state; the insight only when configured + produced.
+ */
+export async function getBaselineDiff(runId: number): Promise<BaselineDiffResult> {
+  let raw: RawBaselineDiffDto | null;
+  try {
+    raw = await request<RawBaselineDiffDto | null>(
+      `/runs/${runId}/baseline-diff`,
+      undefined,
+      { method: "POST" },
+      { timeoutMs: AI_INSIGHTS_TIMEOUT_MS },
+    );
+  } catch (err) {
+    if (err instanceof ApiRequestError && (err.status === 401 || err.status === 403)) throw err;
+    const reason = logAiTransportFailure(runId, err);
+    return {
+      status: "transport_error",
+      message:
+        reason === "timeout"
+          ? "The comparison didn’t finish in time — this is usually transient. Try again."
+          : "Couldn’t run the comparison — this is usually transient. Try again.",
+    };
+  }
+
+  // A 404 (no trace / no baseline) surfaces as an ApiRequestError → handled above as transport_error with a
+  // breadcrumb; a 200 body always carries the diff.
+  if (!raw || !raw.diff) {
+    return { status: "transport_error", message: "Couldn’t run the comparison for this run." };
+  }
+  const diff = mapBaselineDiff(raw);
+  if (raw.configured === false) {
+    return { status: "not_configured", diff, message: raw.note ?? "AI insights aren’t configured for this environment yet." };
+  }
+  if (!raw.insight) {
+    return { status: "unavailable", diff, message: raw.note ?? "The comparison ran but produced no analysis.", retryable: raw.retryable === true };
+  }
+  return { status: "ok", diff, insight: mapBaselineDiffInsight(raw.insight) };
 }
 
 /** GET /api/checks/:id/metrics — run_metrics time series. */

@@ -1,0 +1,31 @@
+{
+  "configured": false,
+  "note": "AI insights are not configured for this environment yet.",
+  "retryable": false,
+  "failing": { "runId": 844834, "location": "eastus2", "status": "fail" },
+  "baseline": { "source": "success-baseline", "capturedAt": "2026-06-26T18:45:52.5+00:00", "location": null },
+  "diff": {
+    "labelA": "this run (eastus2, fail)",
+    "labelB": "the monitor's last-known-good baseline",
+    "console": {
+      "onlyInA": [{ "level": "error", "origin": "site", "text": "Fetch API cannot load https://api-east.wegmans.com/stores" }],
+      "onlyInB": [],
+      "shared": 12
+    },
+    "network": {
+      "totalRequestsA": 512,
+      "totalRequestsB": 502,
+      "wireKbA": 16864,
+      "wireKbB": 16908,
+      "thirdPartyCountA": 273,
+      "thirdPartyCountB": 266,
+      "failedCountA": 1,
+      "failedCountB": 0,
+      "failedHostsOnlyInA": ["api-east.wegmans.com"],
+      "failedHostsOnlyInB": [],
+      "thirdPartyOnlyInA": [],
+      "thirdPartyOnlyInB": []
+    }
+  },
+  "insight": null
+}
