@@ -147,6 +147,9 @@ export interface Check {
   source_key: string | null;
   /** The manifest spec path; non-null → the runner fetches+runs the Git spec (Option C). */
   spec_path: string | null;
+  /** Last-known-good success-trace baseline timestamp (migration 0039); null = none yet. When set
+   *  (browser checks), the monitor page shows "View last success trace". */
+  success_trace_at: string | null;
 }
 
 /**
