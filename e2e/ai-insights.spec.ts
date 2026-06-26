@@ -80,7 +80,7 @@ test.describe("trace AI insights — auth + error mapping", () => {
     await expect(page.getByTestId("ai-not-configured")).toContainText("not configured");
   });
 
-  test("configured but no insights (AOAI unavailable) → soft try-again, not a crash", async ({ page }) => {
+  test("API responded but produced no insights (configured:true, empty) → API-side 'unavailable'", async ({ page }) => {
     const w = defaultWorld();
     w.aiInsights = {
       configured: true,
@@ -94,7 +94,42 @@ test.describe("trace AI insights — auth + error mapping", () => {
     await page.getByTestId("get-ai-insights-200").click();
     await expect(page.getByTestId("ai-unavailable")).toBeVisible();
     await expect(page.getByTestId("ai-retry-200")).toBeVisible();
+    // ★ This is the API-side failure — it must NOT render as a transport error.
+    await expect(page.getByTestId("ai-transport-error")).toHaveCount(0);
     await expect(page.getByTestId("ai-not-configured")).toHaveCount(0);
+  });
+
+  test("★ a TRANSPORT failure (fetch rejects, never reaches the API) → distinct transport_error copy", async ({ page }) => {
+    const w = defaultWorld();
+    w.aiInsightsAbort = true; // the request never gets a usable response (network/edge)
+    // ★ Capture the diagnostic breadcrumb — the trail that was missing when the transient was mislabeled.
+    const warnings: string[] = [];
+    page.on("console", (msg) => {
+      if (msg.type() === "warning") warnings.push(msg.text());
+    });
+    await mockApi(page, w);
+    await page.goto("/checks/2");
+
+    await page.getByTestId("get-ai-insights-200").click();
+    const transport = page.getByTestId("ai-transport-error");
+    await expect(transport).toBeVisible();
+    // the breadcrumb logged the SHAPE (no PII): which run, reason, did we get a response
+    await expect.poll(() => warnings.find((w) => w.includes("[ai-insights] transport failure"))).toBeTruthy();
+    await expect(transport).toContainText("reach the AI service"); // "couldn't reach", not "ran but no insights"
+    await expect(page.getByTestId(`ai-transport-retry-200`)).toBeVisible();
+    // ★ THE conflation that cost hours: a transport failure must NOT show the API-side "unavailable" card.
+    await expect(page.getByTestId("ai-unavailable")).toHaveCount(0);
+  });
+
+  test("a non-2xx edge response (no error shape) → transport_error, not API-side unavailable", async ({ page }) => {
+    const w = defaultWorld();
+    w.aiInsightsStatus = 502; // a gateway/edge error — the request didn't complete a usable API response
+    await mockApi(page, w);
+    await page.goto("/checks/2");
+
+    await page.getByTestId("get-ai-insights-200").click();
+    await expect(page.getByTestId("ai-transport-error")).toBeVisible();
+    await expect(page.getByTestId("ai-unavailable")).toHaveCount(0);
   });
 
   test("gated: a signed-out viewer sees a sign-in nudge, not the analyze action", async ({ page }) => {

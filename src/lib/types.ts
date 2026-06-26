@@ -721,13 +721,18 @@ export interface AiInsights {
 }
 
 /**
- * Normalized result of POST /runs/{id}/ai-insights — the UI's three non-happy states made explicit:
- *  - not_configured: 200, AI not set up yet (the live state until the AOAI deploy prereq). NOT an error.
- *  - unavailable: AOAI/extraction returned no insights (non-fatal null) — "try again".
+ * Normalized result of POST /runs/{id}/ai-insights — the UI's non-happy states made explicit:
  *  - ok: insights to render.
+ *  - not_configured: 200, AI not set up yet (the live state until the AOAI deploy prereq). NOT an error.
+ *  - unavailable: the API RESPONDED (200, configured:true) but produced no insights — an AOAI/backend-side
+ *      failure ("ran but couldn't generate insights for this run").
+ *  - transport_error: we never got a USABLE response — the fetch rejected (network/edge/DNS/TLS), timed out,
+ *      or returned a non-2xx without our error shape. The request likely never reached the API. Kept DISTINCT
+ *      from `unavailable` so a transient transport blip is legible (conflating the two cost hours). Retryable.
  * (401/403 are handled by the global auth interceptor before this resolves.)
  */
 export type AiInsightsResult =
   | { status: "ok"; insights: AiInsights }
   | { status: "not_configured"; message: string }
-  | { status: "unavailable"; message: string };
+  | { status: "unavailable"; message: string }
+  | { status: "transport_error"; message: string };
