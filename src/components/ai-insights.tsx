@@ -104,12 +104,13 @@ export function AiInsightsPanel({ runId }: { runId: number }) {
     try {
       setView(await getAiInsights(runId));
     } catch (e) {
-      // 401/403 are already handled by the global request() interceptor (re-login modal / permission
-      // toast) — don't render a broken card; just reset. Anything else → a soft, retryable message.
+      // getAiInsights only THROWS for 401/403 (genuine API auth responses) — already handled by the global
+      // request() interceptor (re-login modal / permission toast), so just reset. Transport failures are
+      // RETURNED as transport_error (not thrown); this else is a defensive fallback, labelled honestly.
       if (e instanceof ApiRequestError && (e.status === 401 || e.status === 403)) {
         setView("idle");
       } else {
-        setView({ status: "unavailable", message: "Couldn’t generate insights. Try again." });
+        setView({ status: "transport_error", message: "Couldn’t reach the AI service — this is usually transient. Try again." });
       }
     }
   }
@@ -191,6 +192,30 @@ export function AiInsightsPanel({ runId }: { runId: number }) {
             onClick={analyze}
             className="underline hover:text-[var(--color-ink)]"
             data-testid={`ai-retry-${runId}`}
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {/* TRANSPORT failure — we never reached the AI service (network/edge/timeout). DISTINCT from the
+          API-side "unavailable" above, so a transient blip is legible and obviously retryable. */}
+      {typeof view === "object" && view.status === "transport_error" && (
+        <div
+          className="rounded-lg border px-3 py-3 text-[12px]"
+          style={{
+            background: "color-mix(in srgb, var(--color-warn) 10%, transparent)",
+            borderColor: "color-mix(in srgb, var(--color-warn) 35%, transparent)",
+            color: "var(--color-ink-dim)",
+          }}
+          data-testid="ai-transport-error"
+        >
+          {view.message}{" "}
+          <button
+            type="button"
+            onClick={analyze}
+            className="underline hover:text-[var(--color-ink)]"
+            data-testid={`ai-transport-retry-${runId}`}
           >
             Try again
           </button>

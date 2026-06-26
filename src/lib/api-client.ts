@@ -134,54 +134,66 @@ async function request<T>(
   path: string,
   params?: Record<string, QueryValue>,
   init?: RequestInit,
+  opts?: { timeoutMs?: number },
 ): Promise<T> {
   // Attach the bearer session (Phase 12 slice 3). Sent on EVERY request — harmless on GETs (the API's
   // gate only checks writes), simpler than per-call opt-in. The token is a credential: header only,
   // never a URL/query param, never logged.
   const token = getToken();
-  const res = await fetch(buildUrl(path, params), {
-    ...init,
-    headers: {
-      accept: "application/json",
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
-  });
+  // Opt-in timeout (AbortController) — only when a caller passes timeoutMs, so every existing call is
+  // unchanged. On expiry the fetch rejects with an AbortError (name "AbortError"), which callers can
+  // distinguish from a structured API failure. There was no prior fetch-timeout convention in this client.
+  const controller = opts?.timeoutMs != null ? new AbortController() : undefined;
+  const timer =
+    controller && opts?.timeoutMs != null ? setTimeout(() => controller.abort(), opts.timeoutMs) : undefined;
+  try {
+    const res = await fetch(buildUrl(path, params), {
+      ...init,
+      signal: controller?.signal ?? init?.signal,
+      headers: {
+        accept: "application/json",
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...init?.headers,
+      },
+    });
 
-  if (!res.ok) {
-    let body: { error?: string; message?: string; details?: unknown } = {};
-    try {
-      body = await res.json();
-    } catch {
-      /* non-JSON error body */
-    }
-
-    // 401/403 interceptor (slice 2's gate shapes). EXEMPT /auth/* — a 401 from /auth/me is the normal
-    // "not signed in" probe and /verify's 400s are the login modal's to show; intercepting them would
-    // loop the modal. Everywhere else:
-    //   401 (expired/invalid session) → drop the session + signal a re-login prompt.
-    //   403 (valid session, wrong role) → signal a permission message; do NOT clear (they ARE logged in).
-    if (!path.startsWith("/auth/")) {
-      if (res.status === 401) {
-        clearSession();
-        emitAuthEvent({ type: "unauthorized" });
-      } else if (res.status === 403) {
-        emitAuthEvent({
-          type: "forbidden",
-          message: body.message ?? "You do not have permission to perform this action.",
-        });
+    if (!res.ok) {
+      let body: { error?: string; message?: string; details?: unknown } = {};
+      try {
+        body = await res.json();
+      } catch {
+        /* non-JSON error body */
       }
+
+      // 401/403 interceptor (slice 2's gate shapes). EXEMPT /auth/* — a 401 from /auth/me is the normal
+      // "not signed in" probe and /verify's 400s are the login modal's to show; intercepting them would
+      // loop the modal. Everywhere else:
+      //   401 (expired/invalid session) → drop the session + signal a re-login prompt.
+      //   403 (valid session, wrong role) → signal a permission message; do NOT clear (they ARE logged in).
+      if (!path.startsWith("/auth/")) {
+        if (res.status === 401) {
+          clearSession();
+          emitAuthEvent({ type: "unauthorized" });
+        } else if (res.status === 403) {
+          emitAuthEvent({
+            type: "forbidden",
+            message: body.message ?? "You do not have permission to perform this action.",
+          });
+        }
+      }
+
+      throw new ApiRequestError(
+        body.message ?? body.error ?? `Request failed (${res.status})`,
+        res.status,
+        body.details,
+      );
     }
 
-    throw new ApiRequestError(
-      body.message ?? body.error ?? `Request failed (${res.status})`,
-      res.status,
-      body.details,
-    );
+    const text = await res.text();
+    return (text ? JSON.parse(text) : null) as T;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
-
-  const text = await res.text();
-  return (text ? JSON.parse(text) : null) as T;
 }
 
 /** Shallow snake_case → camelCase for outgoing write bodies. */
@@ -618,19 +630,65 @@ function mapAiInsights(r: RawAiInsightsDto): AiInsights {
   };
 }
 
+// AOAI calls are slow (blob download + parse + model); bound the request so a hung one becomes a clean
+// transport_error ("timed out, try again") instead of an indefinite spinner.
+const AI_INSIGHTS_TIMEOUT_MS = 60_000;
+
 /**
- * POST /api/runs/:id/ai-insights — on-demand AOAI trace analysis. The POST goes through request(), so the
- * bearer token is injected exactly like every other authed call, and a 401/403 throws here → the global
- * interceptor drives re-login / the permission toast (this never maps an auth error to "not configured").
- * We only classify the 200 body (the FLAT AiInsightsDto):
- *   configured === false                              → not_configured (the ONLY trigger for that copy)
- *   configured === true  but no summary/insights      → unavailable (retry)
- *   configured === true  with content                 → ok
+ * Diagnostic breadcrumb for an ai-insights TRANSPORT failure (no usable response). Logs only the SHAPE —
+ * did we get a response at all, the HTTP status, why we classify it as transport — no PII. This is the trail
+ * that was missing when a transient edge blip was mislabeled "unavailable" and cost hours to diagnose.
+ * NOTE: there is no client-side telemetry sink (Sentry/analytics) in this app, so this is console-only —
+ * adding one would let a recurrence be diagnosed without a repro. (See the PR notes.)
+ */
+function logAiTransportFailure(runId: number, err: unknown): "timeout" | "http_error" | "network" {
+  const timedOut = err instanceof Error && err.name === "AbortError";
+  const gotResponse = err instanceof ApiRequestError; // ApiRequestError ⇒ the API responded (non-2xx)
+  const reason = timedOut ? "timeout" : gotResponse ? "http_error" : "network";
+  const status = err instanceof ApiRequestError ? err.status : "none";
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[ai-insights] transport failure run=${runId} reason=${reason} gotResponse=${gotResponse} httpStatus=${status}`,
+  );
+  return reason;
+}
+
+/**
+ * POST /api/runs/:id/ai-insights — on-demand AOAI trace analysis. Goes through request() (bearer token
+ * injected; 401/403 drive the global re-login / permission UX). Distinguishes the two failure families that
+ * were previously conflated into one "unavailable" message:
+ *   • TRANSPORT (fetch rejected / timed out / non-2xx without our error shape) → transport_error: we never
+ *     got a usable response; the request likely never reached the API. Retry may help (often transient).
+ *   • API-SIDE: a structured 200 body we classify by `configured` / content:
+ *       configured === false                         → not_configured (the ONLY trigger for that copy)
+ *       configured === true  but no summary/insights → unavailable (the API RAN but produced nothing)
+ *       configured === true  with content            → ok
  */
 export async function getAiInsights(runId: number): Promise<AiInsightsResult> {
-  const raw = await request<RawAiInsightsDto | null>(`/runs/${runId}/ai-insights`, undefined, {
-    method: "POST",
-  });
+  let raw: RawAiInsightsDto | null;
+  try {
+    raw = await request<RawAiInsightsDto | null>(
+      `/runs/${runId}/ai-insights`,
+      undefined,
+      { method: "POST" },
+      { timeoutMs: AI_INSIGHTS_TIMEOUT_MS },
+    );
+  } catch (err) {
+    // 401/403 are genuine API responses the global interceptor already handled — rethrow so the caller
+    // drives re-login / the permission toast (NOT a transport error).
+    if (err instanceof ApiRequestError && (err.status === 401 || err.status === 403)) throw err;
+    // Anything else = no usable response (network/edge/DNS/TLS reject, timeout, or a non-2xx without our
+    // JSON error shape). Distinct from an API-side "ran but no insights". Leave a breadcrumb + say so.
+    const reason = logAiTransportFailure(runId, err);
+    return {
+      status: "transport_error",
+      message:
+        reason === "timeout"
+          ? "The AI service didn’t respond in time — this is usually transient. Try again."
+          : "Couldn’t reach the AI service — this is usually transient. Try again.",
+    };
+  }
+
   if (!raw || raw.configured === false) {
     return { status: "not_configured", message: raw?.note ?? "AI insights aren’t configured for this environment yet." };
   }
@@ -639,7 +697,7 @@ export async function getAiInsights(runId: number): Promise<AiInsightsResult> {
     insights.summary.trim() !== "" ||
     insights.performance.length + insights.network.length + insights.errors.length + insights.suggestions.length > 0;
   if (!hasContent) {
-    return { status: "unavailable", message: raw.note ?? "Couldn’t generate insights for this trace." };
+    return { status: "unavailable", message: raw.note ?? "The AI service ran but couldn’t generate insights for this run." };
   }
   return { status: "ok", insights };
 }

@@ -88,6 +88,8 @@ export interface World {
   aiInsights?: RawObj;
   /** Force the ai-insights POST to a non-200 (e.g. 401/403) to exercise the auth interceptor. */
   aiInsightsStatus?: number;
+  /** Abort the ai-insights POST (a network/edge TRANSPORT failure → the fetch rejects → transport_error). */
+  aiInsightsAbort?: boolean;
   /** Reproduce the prod bug: /reports/availability + /reports/performance return 200 with EMPTY groups
    *  (the rollup-backed reports can be empty even when monitors exist). The per-monitor list must still
    *  render from /checks + /sla. Default false. */
@@ -357,6 +359,9 @@ export async function mockApi(
     // Trace AI insights. aiInsightsStatus forces a 401/403 (the gate); else a 200 flat AiInsightsDto.
     // Default (unset) = configured:false (note-bearing), the inert-until-AOAI-prereq state.
     if ((m = path.match(/^\/api\/runs\/(\d+)\/ai-insights$/)) && method === "POST") {
+      // aiInsightsAbort = a TRANSPORT failure: the fetch never gets a usable response (edge/network) —
+      // route.abort() rejects the fetch, mirroring the transient that was mislabeled "unavailable".
+      if (world.aiInsightsAbort) return route.abort("failed");
       if (world.aiInsightsStatus) {
         const err = world.aiInsightsStatus === 403 ? "forbidden" : "unauthorized";
         return json(route, { error: err, message: `${err} (test)` }, world.aiInsightsStatus);
