@@ -41,7 +41,6 @@ import type {
   SpecCatalogEntry,
   AiInsight,
   AiInsightConfidence,
-  AiInsightScope,
   AiInsightSeverity,
   AiInsights,
   AiInsightsResult,
@@ -568,51 +567,47 @@ export async function getSteps(runId: number): Promise<RunStep[]> {
 }
 
 // ─── Trace AI insights (POST /api/runs/:id/ai-insights — slice 2 endpoint, gated editor/admin) ────────
-// Contract this UI consumes (the endpoint returns 200 for all non-fatal states; the gate handles 401/403):
-//   { configured: false, message? }                       → not configured yet (AOAI deploy prereq)
-//   { configured: true,  insights: null,  message? }      → AOAI/extraction failed (non-fatal) → retry
-//   { configured: true,  insights: { summary, performance[], network[], errors[], suggestions[], caveats[] } }
-interface RawAiInsight {
+// ★ The REAL API (AiInsightsDto, slice 2) returns a FLAT 200 body — categories at the TOP level, NOT
+// wrapped in an `insights` object, and the non-fatal note is `note` (not `message`):
+//   { configured: false, ..., note }                                    → not configured (AOAI prereq pending)
+//   { configured: true,  summary: null, ..., note }                     → AOAI/parse failed (non-fatal) → retry
+//   { configured: true,  summary, performance[], network[], errors[], suggestions[], caveats[], note }
+// (#100 assumed a nested { insights: {...} } shape — it never matched the live API, so success bodies were
+//  misread. 401/403 never reach here: request() throws + drives the global re-login / permission UX.)
+interface RawAiInsightDto {
   severity?: string;
   confidence?: string;
   title?: string;
   detail?: string;
   evidence?: string | null;
-  scope?: string | null;
 }
-interface RawAiInsights {
-  summary?: string;
-  performance?: RawAiInsight[];
-  network?: RawAiInsight[];
-  errors?: RawAiInsight[];
-  suggestions?: RawAiInsight[];
-  caveats?: string[];
-}
-interface RawAiInsightsResponse {
+interface RawAiInsightsDto {
   configured?: boolean;
-  message?: string;
-  insights?: RawAiInsights | null;
+  summary?: string | null;
+  performance?: RawAiInsightDto[];
+  network?: RawAiInsightDto[];
+  errors?: RawAiInsightDto[];
+  suggestions?: RawAiInsightDto[];
+  caveats?: string[];
+  note?: string | null;
 }
 
 const AI_SEVERITIES: readonly string[] = ["critical", "high", "medium", "low", "info"];
 const AI_CONFIDENCES: readonly string[] = ["high", "medium", "low"];
 
-function mapAiInsight(r: RawAiInsight): AiInsight {
+function mapAiInsight(r: RawAiInsightDto): AiInsight {
   return {
     severity: (AI_SEVERITIES.includes(r.severity ?? "") ? r.severity : "info") as AiInsightSeverity,
     confidence: (AI_CONFIDENCES.includes(r.confidence ?? "") ? r.confidence : "low") as AiInsightConfidence,
     title: String(r.title ?? ""),
     detail: String(r.detail ?? ""),
     evidence: r.evidence ?? null,
-    scope:
-      r.scope === "site" || r.scope === "third_party" || r.scope === "unknown"
-        ? (r.scope as AiInsightScope)
-        : null,
+    scope: null, // the API doesn't (yet) tag site/third-party scope; kept optional on the domain type
   };
 }
 
-function mapAiInsights(r: RawAiInsights): AiInsights {
-  const arr = (a?: RawAiInsight[]) => (a ?? []).map(mapAiInsight);
+function mapAiInsights(r: RawAiInsightsDto): AiInsights {
+  const arr = (a?: RawAiInsightDto[]) => (a ?? []).map(mapAiInsight);
   return {
     summary: String(r.summary ?? ""),
     performance: arr(r.performance),
@@ -624,22 +619,29 @@ function mapAiInsights(r: RawAiInsights): AiInsights {
 }
 
 /**
- * POST /api/runs/:id/ai-insights — on-demand AOAI trace analysis. Normalizes the endpoint's three
- * non-fatal states (see the contract above). 401/403 are NOT swallowed here — they propagate so the
- * global request() interceptor drives re-login / the permission toast; the caller resets its own UI.
+ * POST /api/runs/:id/ai-insights — on-demand AOAI trace analysis. The POST goes through request(), so the
+ * bearer token is injected exactly like every other authed call, and a 401/403 throws here → the global
+ * interceptor drives re-login / the permission toast (this never maps an auth error to "not configured").
+ * We only classify the 200 body (the FLAT AiInsightsDto):
+ *   configured === false                              → not_configured (the ONLY trigger for that copy)
+ *   configured === true  but no summary/insights      → unavailable (retry)
+ *   configured === true  with content                 → ok
  */
 export async function getAiInsights(runId: number): Promise<AiInsightsResult> {
-  const raw = await request<RawAiInsightsResponse | null>(`/runs/${runId}/ai-insights`, undefined, {
+  const raw = await request<RawAiInsightsDto | null>(`/runs/${runId}/ai-insights`, undefined, {
     method: "POST",
   });
   if (!raw || raw.configured === false) {
-    return { status: "not_configured", message: raw?.message ?? "AI insights aren’t configured yet." };
+    return { status: "not_configured", message: raw?.note ?? "AI insights aren’t configured for this environment yet." };
   }
-  const ins = raw.insights ?? null;
-  if (!ins || typeof ins.summary !== "string" || ins.summary.trim() === "") {
-    return { status: "unavailable", message: raw.message ?? "Couldn’t generate insights for this trace." };
+  const insights = mapAiInsights(raw);
+  const hasContent =
+    insights.summary.trim() !== "" ||
+    insights.performance.length + insights.network.length + insights.errors.length + insights.suggestions.length > 0;
+  if (!hasContent) {
+    return { status: "unavailable", message: raw.note ?? "Couldn’t generate insights for this trace." };
   }
-  return { status: "ok", insights: mapAiInsights(ins) };
+  return { status: "ok", insights };
 }
 
 /** GET /api/checks/:id/metrics — run_metrics time series. */
