@@ -111,5 +111,8 @@ test.describe("phase 13 — spec activation (set up monitor)", () => {
     await expect(dialog(page).getByText("A monitor for this spec already exists.")).toBeVisible();
     // The modal stays open (the activation didn't complete).
     await expect(dialog(page)).toBeVisible();
+    // ★ A FAILED setup leaves NO phantom row: the create threw → no cache invalidation → the row reflects
+    // truth (still unmonitored), never an optimistic "active" lie that didn't persist.
+    await expect(page.getByTestId("spec-row-wegmans-search-product")).not.toHaveAttribute("data-coverage", "active");
   });
 });
