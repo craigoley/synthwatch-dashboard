@@ -21,7 +21,7 @@
 import { useState } from "react";
 import Link from "next/link";
 
-import { useSpecCatalog, revalidateSpecCatalog } from "@/lib/client";
+import { useSpecCatalog } from "@/lib/client";
 import { EmptyState, Spinner } from "@/components/states";
 import { StatusDot } from "@/components/status-badge";
 import { Modal } from "@/components/modal";
@@ -194,12 +194,10 @@ export default function SpecCatalogPage() {
 
   const when = data?.probed_at ? formatRelative(data.probed_at) : null;
 
-  // After a successful activation the new check exists → re-read the catalog so the row flips
-  // Unmonitored→Active (and gains health on its first run), then close the modal.
-  async function onActivated() {
-    await revalidateSpecCatalog();
-    setActivating(null);
-  }
+  // Activation creates a check via createCheck() → revalidateChecks(), which now also invalidates the
+  // spec-catalog cache (catalog coverage is check-derived). So the row flips Unmonitored→Active LIVE the
+  // moment the create succeeds — the page just closes the modal; the refresh is owned by the mutation.
+  const onActivated = () => setActivating(null);
 
   return (
     <div className="space-y-6">

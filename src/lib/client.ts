@@ -426,13 +426,14 @@ export async function revalidateChecks(id?: number) {
   await Promise.all([
     globalMutate(keys.checks),
     globalMutate(keys.flows),
+    // The spec catalog's coverage is check-derived (GET /api/specs LEFT JOINs checks by source_key), so a
+    // check create/edit/pause/delete flips a catalog row Unmonitored↔Active/Paused. Invalidate it HERE —
+    // in the mutation owner — so the catalog updates live like the checks/flows lists, regardless of which
+    // page triggered the write (catalog activation OR a spec-bound New-monitor). Previously this lived only
+    // in the catalog page's onActivated callback, so other paths left the catalog stale until a refresh.
+    globalMutate(keys.specCatalog),
     id != null ? globalMutate(keys.check(id)) : Promise.resolve(),
   ]);
-}
-
-/** Re-read the spec catalog (after an activation creates a check → the row flips Unmonitored→Active). */
-export async function revalidateSpecCatalog() {
-  await globalMutate(keys.specCatalog);
 }
 
 export async function createCheck(input: CreateCheckInput) {
