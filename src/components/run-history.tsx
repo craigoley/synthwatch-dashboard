@@ -77,7 +77,13 @@ function RunArtifacts({ run }: { run: Run }) {
                 src={`/trace-viewer/index.html?trace=${encodeURIComponent(
                   (typeof window !== "undefined" ? window.location.origin : "") + traceProxy,
                 )}`}
-                className="h-[70vh] w-full bg-white"
+                // The vendored viewer's OWN CSS sets `html,body{min-width:550px;min-height:450px;overflow:auto}`,
+                // so when the iframe is smaller than that floor IT (not us) renders scrollbars. h-[70vh] alone
+                // dips below 450px on common laptop heights (70% of ~640px ≈ 448px), tripping their vertical
+                // scrollbar — and the ~15px it steals can cascade the width below 550px → a second one. The
+                // min-h floor (their 450px + headroom) keeps the embed above the floor so it fills cleanly.
+                // (Below ~550px viewport WIDTH their horizontal scrollbar is intrinsic — not fixable here.)
+                className="block h-[70vh] min-h-[480px] w-full bg-white"
                 data-testid={`trace-viewer-${run.id}`}
               />
             </div>
