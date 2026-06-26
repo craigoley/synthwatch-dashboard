@@ -1150,6 +1150,18 @@ export async function sendChannelTest(
 }
 
 /**
+ * POST /api/checks/{id}/run — trigger an on-demand run now (don't wait for the timer). Editor-gated by
+ * the API. 202 { requestId }; idempotent server-side (a second request while one is pending coalesces).
+ * The run then appears in the check's run history.
+ */
+export async function runCheckNow(id: number): Promise<{ requestId: number }> {
+  return request<{ requestId: number }>(`/checks/${id}/run`, undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+  });
+}
+
+/**
  * GET /api/channels/{id}/test/status?requestId= — poll one queued test send.
  * Throws ApiRequestError (incl. 404 for an unknown requestId) so the caller can
  * stop polling and surface the reason.

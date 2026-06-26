@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
-import { useCheck, useMetrics, updateCheck, revalidateChecks } from "@/lib/client";
+import { useCheck, useMetrics, updateCheck, revalidateChecks, runCheckNow, revalidateRunHistory } from "@/lib/client";
+import { useAuth } from "@/components/auth-provider";
 import { AvailabilityChart, LatencyChart, MetricsCharts } from "@/components/charts";
 import { CheckSlaPanel, SloPanel } from "@/components/sla";
 import { RunHistory } from "@/components/run-history";
@@ -244,6 +245,8 @@ export default function CheckDetailPage() {
   const { data: metrics } = useMetrics(valid ? id : null);
   const [editing, setEditing] = useState(false);
   const [pausing, setPausing] = useState(false);
+  const [running, setRunning] = useState(false);
+  const { canWrite } = useAuth(); // editor/admin — gates the "Run now" affordance (it spends compute)
 
   if (!valid) return <ErrorState message="Invalid check id." />;
   if (isLoading && !data) return <div className="py-16"><Spinner label="Loading monitor…" /></div>;
@@ -260,6 +263,26 @@ export default function CheckDetailPage() {
       await revalidateChecks(check.id);
     } finally {
       setPausing(false);
+    }
+  }
+
+  async function refreshRuns() {
+    await Promise.all([revalidateChecks(check.id), revalidateRunHistory(check.id)]);
+  }
+
+  // Trigger an on-demand run (the API enqueues it + kicks the runner; cron is the fallback). The button
+  // reflects the TRIGGER only (~instant); the run itself runs ~15s and surfaces in the run history. Nudge
+  // a few refreshes so it appears as 'running' then updates to its verdict without a manual reload.
+  async function handleRunNow() {
+    setRunning(true);
+    try {
+      await runCheckNow(check.id);
+      await refreshRuns();
+      [2500, 6000, 12000].forEach((d) => setTimeout(() => void refreshRuns(), d));
+    } catch {
+      // 401/403 are handled globally by the api-client interceptor; transient errors recover on the next tick.
+    } finally {
+      setRunning(false);
     }
   }
 
@@ -310,6 +333,17 @@ export default function CheckDetailPage() {
           <TagChips tags={check.tags} className="mt-2" />
         </div>
         <div className="flex items-center gap-2">
+          {canWrite && check.enabled && (
+            <button
+              onClick={handleRunNow}
+              disabled={running}
+              className="sw-btn"
+              title="Run this monitor now — don't wait for the timer"
+              data-testid="run-now"
+            >
+              {running ? "Running…" : "Run now"}
+            </button>
+          )}
           <button onClick={togglePause} disabled={pausing} className="sw-btn">
             {pausing ? "…" : check.enabled ? "Pause" : "Resume"}
           </button>
