@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 import { mockApi, defaultWorld } from "./mock";
-import { slaResponse, slaRow } from "./fixtures";
+import { slaResponse, slaRow, defaultChecks } from "./fixtures";
 
 // Reports: per-monitor report CARDS sourced from the live checks list + SLA (+ optional rollup-report
 // enrichment), so a monitor that has data always renders. ★ The old list bound only to /reports/availability
@@ -119,5 +119,28 @@ test.describe("reports — per-monitor cards + tag filter", () => {
     await expect(page.getByTestId("detail-1")).toBeVisible();
     await expect(page.getByTestId("vitals-1")).toHaveCount(0);
     await expect(page.getByTestId("errors-1")).toBeVisible();
+  });
+
+  // ★ Regression: sorting by Incidents must actually REORDER the cards. It was a guaranteed no-op because
+  // the api-client read the wrong report field (`incidentCount` vs the API's `incidentsOpened`) → every
+  // monitor's incident count was 0 → all ties → order never changed. (The old mock served `incidentCount`,
+  // matching the buggy read, so the test suite never caught it — the same stale-mock divergence.)
+  test("★ sorting by Incidents reorders the cards (was a no-op: wrong incident field)", async ({ page }) => {
+    const w = defaultWorld();
+    // 3 monitors whose availability order ≠ incidents order, so an Incidents sort is observably different:
+    //   availPct(id)=100-((id*7)%28)*0.9 → id3=81.1, id1=93.7, id4=100  (avail asc → 3,1,4)
+    //   incidentsOpened=id%5            → id4=4, id3=3, id1=1            (inc desc → 4,3,1)
+    w.checks = defaultChecks().filter((c) => [1, 3, 4].includes(Number(c.id)));
+    await mockApi(page, w);
+    await page.goto("/reports");
+
+    const order = () =>
+      page.locator('[data-testid="monitor-list"] > section').evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
+
+    // default sort = availability asc
+    await expect.poll(order).toEqual(["report-3", "report-1", "report-4"]);
+    // sort by Incidents (first click → desc): highest incidentsOpened first — a DIFFERENT order
+    await page.getByTestId("sort-incidents").click();
+    await expect.poll(order).toEqual(["report-4", "report-3", "report-1"]);
   });
 });

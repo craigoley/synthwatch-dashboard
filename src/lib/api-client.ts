@@ -1078,16 +1078,18 @@ export async function getAvailabilityReport(
       group: String(g.group ?? "ungrouped"),
       availability_pct: (g.availabilityPct as number) ?? null,
       downtime_minutes: (g.downtimeMinutes as number) ?? 0,
-      incident_count: (g.incidentCount as number) ?? 0,
+      // ★ The API field is `incidentsOpened` (not `incidentCount`). Reading the wrong name made this
+      // always 0 → the reports "Incidents" sort had a constant key for every monitor → it never reordered.
+      incident_count: (g.incidentsOpened as number) ?? 0,
       check_count: (g.checkCount as number) ?? 0,
       series: mapSeries(g.series as RawSeriesPoint[]),
       checks: ((g.checks as Record<string, unknown>[]) ?? []).map((c) => ({
         check_id: c.checkId as number,
-        name: String(c.name ?? ""),
+        name: String(c.checkName ?? ""), // API serves `checkName`, not `name`
         kind: c.kind as CheckKind,
         availability_pct: (c.availabilityPct as number) ?? null,
         downtime_minutes: (c.downtimeMinutes as number) ?? 0,
-        incident_count: (c.incidentCount as number) ?? 0,
+        incident_count: (c.incidentsOpened as number) ?? 0,
       })),
     }));
     return { window, group_by: String(raw?.groupBy ?? groupBy), groups };
