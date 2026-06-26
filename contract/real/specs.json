@@ -1,0 +1,78 @@
+{
+  "items": [
+    {
+      "sourceKey": "synthwatch-self-homepage",
+      "name": "SynthWatch dashboard homepage",
+      "specPath": "monitors/synthwatch/dashboard-homepage.spec.ts",
+      "kind": "browser",
+      "target": "https://synthwatch-dashboard.vercel.app",
+      "suggestedIntervalSeconds": 600,
+      "tags": [
+        "synthwatch",
+        "self",
+        "smoke"
+      ],
+      "description": "Example/self-monitoring flow: the SynthWatch dashboard loads and renders the monitor grid. Template for new flows.",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": false,
+      "checkId": null,
+      "checkName": null,
+      "enabled": null,
+      "health": null
+    },
+    {
+      "sourceKey": "wegmans-recipe-nav",
+      "name": "Wegmans: recipe navigation",
+      "specPath": "monitors/wegmans/recipe-nav.spec.ts",
+      "kind": "browser",
+      "target": "https://www.wegmans.com",
+      "suggestedIntervalSeconds": 1800,
+      "tags": [
+        "wegmans",
+        "recipes",
+        "navigation",
+        "journey"
+      ],
+      "description": "Navigate Meals & Recipes \u2192 Courses \u2192 Dinner \u2192 the cauliflower-crust pesto pizza recipe, assert the recipe loads.",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": false,
+      "checkId": null,
+      "checkName": null,
+      "enabled": null,
+      "health": null
+    },
+    {
+      "sourceKey": "wegmans-search-product",
+      "name": "Wegmans: search \u2192 product page",
+      "specPath": "monitors/wegmans/search-product.spec.ts",
+      "kind": "browser",
+      "target": "https://www.wegmans.com",
+      "suggestedIntervalSeconds": 1800,
+      "tags": [
+        "wegmans",
+        "ecommerce",
+        "search",
+        "journey"
+      ],
+      "description": "Search wegmans.com for ginger sparkling water, open the Wegmans-brand product, assert the product page loads.",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": true,
+      "checkId": 74,
+      "checkName": "Wegmans: search \u2192 product page",
+      "enabled": true,
+      "health": {
+        "currentStatus": "error",
+        "p95Ms": 1172.35,
+        "openIncidentCount": 1,
+        "lastRunAt": "2026-06-26T01:40:19.545673+00:00"
+      }
+    }
+  ],
+  "probedAt": "2026-06-26T01:00:18.265247+00:00"
+}

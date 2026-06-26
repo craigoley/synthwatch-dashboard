@@ -1,0 +1,84 @@
+{
+  "window": "7d",
+  "fleet": {
+    "completedRuns": 3352,
+    "upRuns": 2435,
+    "downRuns": 917,
+    "availabilityPct": null,
+    "insufficientData": true
+  },
+  "items": [
+    {
+      "checkId": 2,
+      "checkName": "Wegmans homepage",
+      "kind": "browser",
+      "windowFrom": "2026-06-19T01:58:02.201797+00:00",
+      "windowTo": "2026-06-26T01:58:02.201797+00:00",
+      "completedRuns": 324,
+      "upRuns": 287,
+      "downRuns": 37,
+      "availabilityPct": null,
+      "insufficientData": true
+    },
+    {
+      "checkId": 4,
+      "checkName": "SynthWatch API health",
+      "kind": "http",
+      "windowFrom": "2026-06-19T01:58:02.201797+00:00",
+      "windowTo": "2026-06-26T01:58:02.201797+00:00",
+      "completedRuns": 1074,
+      "upRuns": 1067,
+      "downRuns": 7,
+      "availabilityPct": null,
+      "insufficientData": true
+    },
+    {
+      "checkId": 10,
+      "checkName": "Wegmans.com cert",
+      "kind": "ssl",
+      "windowFrom": "2026-06-19T01:58:02.201797+00:00",
+      "windowTo": "2026-06-26T01:58:02.201797+00:00",
+      "completedRuns": 144,
+      "upRuns": 144,
+      "downRuns": 0,
+      "availabilityPct": null,
+      "insufficientData": true
+    },
+    {
+      "checkId": 33,
+      "checkName": "API CORS preflight",
+      "kind": "http",
+      "windowFrom": "2026-06-19T01:58:02.201797+00:00",
+      "windowTo": "2026-06-26T01:58:02.201797+00:00",
+      "completedRuns": 937,
+      "upRuns": 937,
+      "downRuns": 0,
+      "availabilityPct": null,
+      "insufficientData": true
+    },
+    {
+      "checkId": 59,
+      "checkName": "rca-demo",
+      "kind": "http",
+      "windowFrom": "2026-06-19T01:58:02.201797+00:00",
+      "windowTo": "2026-06-26T01:58:02.201797+00:00",
+      "completedRuns": 861,
+      "upRuns": 0,
+      "downRuns": 861,
+      "availabilityPct": null,
+      "insufficientData": true
+    },
+    {
+      "checkId": 74,
+      "checkName": "Wegmans: search \u2192 product page",
+      "kind": "browser",
+      "windowFrom": "2026-06-19T01:58:02.201797+00:00",
+      "windowTo": "2026-06-26T01:58:02.201797+00:00",
+      "completedRuns": 12,
+      "upRuns": 0,
+      "downRuns": 12,
+      "availabilityPct": null,
+      "insufficientData": true
+    }
+  ]
+}

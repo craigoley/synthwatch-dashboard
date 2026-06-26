@@ -13,7 +13,9 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
-    "e2e:report": "playwright show-report"
+    "e2e:report": "playwright show-report",
+    "contract": "playwright test -c playwright.contract.config.ts",
+    "capture:contracts": "node contract/capture.mjs"
   },
   "dependencies": {
     "next": "16.2.9",

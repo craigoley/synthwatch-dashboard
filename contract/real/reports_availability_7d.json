@@ -1,0 +1,109 @@
+{
+  "window": "7d",
+  "groupBy": null,
+  "groups": [
+    {
+      "group": null,
+      "availabilityPct": 72.8699,
+      "upCount": 2369,
+      "downCount": 882,
+      "totalCount": 3251,
+      "downtimeMinutes": 5054.3,
+      "incidentsOpened": 15,
+      "checks": [
+        {
+          "checkId": 33,
+          "checkName": "API CORS preflight",
+          "availabilityPct": 100,
+          "upCount": 909,
+          "downCount": 0,
+          "downtimeMinutes": 0,
+          "incidentsOpened": 0
+        },
+        {
+          "checkId": 4,
+          "checkName": "SynthWatch API health",
+          "availabilityPct": 99.3314,
+          "upCount": 1040,
+          "downCount": 7,
+          "downtimeMinutes": 29.79,
+          "incidentsOpened": 2
+        },
+        {
+          "checkId": 2,
+          "checkName": "Wegmans homepage",
+          "availabilityPct": 88.3281,
+          "upCount": 280,
+          "downCount": 37,
+          "downtimeMinutes": 930.33,
+          "incidentsOpened": 2
+        },
+        {
+          "checkId": 10,
+          "checkName": "Wegmans.com cert",
+          "availabilityPct": 100,
+          "upCount": 140,
+          "downCount": 0,
+          "downtimeMinutes": 0,
+          "incidentsOpened": 0
+        },
+        {
+          "checkId": 74,
+          "checkName": "Wegmans: search \u2192 product page",
+          "availabilityPct": 0,
+          "upCount": 0,
+          "downCount": 5,
+          "downtimeMinutes": 0,
+          "incidentsOpened": 0
+        },
+        {
+          "checkId": 59,
+          "checkName": "rca-demo",
+          "availabilityPct": 0,
+          "upCount": 0,
+          "downCount": 833,
+          "downtimeMinutes": 4094.18,
+          "incidentsOpened": 11
+        }
+      ],
+      "series": [
+        {
+          "day": "2026-06-20",
+          "availabilityPct": 0,
+          "upCount": 0,
+          "downCount": 5
+        },
+        {
+          "day": "2026-06-21",
+          "availabilityPct": 56.7568,
+          "upCount": 42,
+          "downCount": 32
+        },
+        {
+          "day": "2026-06-22",
+          "availabilityPct": 98.9691,
+          "upCount": 288,
+          "downCount": 3
+        },
+        {
+          "day": "2026-06-23",
+          "availabilityPct": 71.145,
+          "upCount": 466,
+          "downCount": 189
+        },
+        {
+          "day": "2026-06-24",
+          "availabilityPct": 70.6093,
+          "upCount": 788,
+          "downCount": 328
+        },
+        {
+          "day": "2026-06-25",
+          "availabilityPct": 70.7207,
+          "upCount": 785,
+          "downCount": 325
+        }
+      ]
+    }
+  ]
+}

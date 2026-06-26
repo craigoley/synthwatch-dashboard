@@ -73,4 +73,13 @@ export default tseslint.config(
       "react-hooks/set-state-in-effect": "off",
     },
   },
+
+  {
+    // The contract checks + capture script read/write FIXED local fixture paths (contract/real/*.json),
+    // never user input — the non-literal-fs-filename security rule is a pure false positive here.
+    files: ["contract/**"],
+    rules: {
+      "security/detect-non-literal-fs-filename": "off",
+    },
+  },
 );
