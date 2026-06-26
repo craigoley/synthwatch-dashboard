@@ -14,7 +14,7 @@ import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { runStatusMeta } from "@/lib/status";
-import { formatCertExpiry, formatDuration, formatRelative } from "@/lib/format";
+import { formatCertExpiry, formatDuration, formatRelative, secondsToMinutesLabel } from "@/lib/format";
 import type { ChainStep, Check, Run } from "@/lib/types";
 
 function ConfigChip({ label, value }: { label: string; value: string }) {
@@ -289,7 +289,7 @@ export default function CheckDetailPage() {
       </header>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <ConfigChip label="Interval" value={`${check.interval_seconds}s`} />
+        <ConfigChip label="Interval" value={`${secondsToMinutesLabel(check.interval_seconds)} min`} />
         <ConfigChip label="Timeout" value={`${check.timeout_ms}ms`} />
         <ConfigChip label="Fail thresh" value={String(check.failure_threshold)} />
         <ConfigChip label="Severity" value={check.severity} />
