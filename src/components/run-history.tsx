@@ -12,6 +12,7 @@ import { runStatusMeta } from "@/lib/status";
 import { formatDuration, formatLocalDateTime } from "@/lib/format";
 import { TraceViewer } from "@/components/trace-viewer";
 import { AiInsightsPanel } from "@/components/ai-insights";
+import { BaselineDiffPanel } from "@/components/baseline-diff";
 import type { Run } from "@/lib/types";
 
 /**
@@ -67,6 +68,8 @@ function RunArtifacts({ run }: { run: Run }) {
           </p>
           {/* On-demand AOAI analysis of this trace (slice 3) — gated + inert-until-configured. */}
           <AiInsightsPanel runId={run.id} />
+          {/* Location comparison: why this FAILING run differs from the last-known-good baseline. */}
+          {(run.status === "fail" || run.status === "error") && <BaselineDiffPanel runId={run.id} />}
         </div>
       )}
     </div>

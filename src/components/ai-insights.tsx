@@ -31,7 +31,7 @@ const severityTone = (s: AiInsightSeverity) => TONE_VAR[SEV_TOKEN[s]];
 
 type View = "idle" | "loading" | AiInsightsResult;
 
-function InsightCard({ insight }: { insight: AiInsight }) {
+export function InsightCard({ insight }: { insight: AiInsight }) {
   const tone = severityTone(insight.severity);
   return (
     <div className="rounded-md border-l-2 bg-[var(--color-panel-2)] px-3 py-2" style={{ borderLeftColor: tone }}>

@@ -736,3 +736,62 @@ export type AiInsightsResult =
   | { status: "not_configured"; message: string }
   | { status: "unavailable"; message: string }
   | { status: "transport_error"; message: string };
+
+// ─── Location comparison: baseline-diff (consumes POST /api/runs/{id}/baseline-diff) ─────────────────
+// "Why does this run fail when the last-known-good baseline passed?" — the canonicalized DELTA between
+// the failing run's trace signals and the monitor's success-trace baseline, + an AI comparison.
+// ★ HONEST framing: it compares the failing run vs the BASELINE, NOT directly vs the passing location
+// (passing runs have no trace). Mirrors the ai-insights non-fatal states + adds the regional-cause taxonomy.
+
+export type BaselineDiffCause =
+  | "regional-waf-cdn"
+  | "network-allowlist"
+  | "geo-dns"
+  | "region-timeout"
+  | "third-party-blocked"
+  | "flaky-transient"
+  | "undetermined";
+
+/** A console line in the delta: error/warning, the site's own vs an embedded third party, and the text. */
+export interface DiffConsoleLine {
+  level: string;
+  origin: string; // "site" | "third-party"
+  text: string;
+}
+
+/** The structured delta the UI shows (what differs between the failing run and the baseline). */
+export interface BaselineDiff {
+  failing: { runId: number; location: string | null; status: string };
+  baseline: { source: string; capturedAt: string | null };
+  console: { onlyInThisRun: DiffConsoleLine[]; onlyInBaseline: DiffConsoleLine[]; shared: number };
+  network: {
+    totalRequestsThisRun: number;
+    totalRequestsBaseline: number;
+    failedHostsOnlyInThisRun: string[];
+    thirdPartyOnlyInThisRun: { host: string; count: number; kb: number }[];
+  };
+}
+
+/** The AI comparison over the delta — a categorized regional cause + the honest flakiness call. */
+export interface BaselineDiffInsight {
+  summary: string;
+  likelyCause: BaselineDiffCause;
+  confidence: AiInsightConfidence;
+  isFlaky: boolean;
+  findings: AiInsight[];
+  caveats: string[];
+}
+
+/**
+ * Normalized result of POST /runs/{id}/baseline-diff. The DIFF is present for every non-transport state
+ * (it needs no AOAI), so the UI always shows what differs; the INSIGHT only when configured + produced.
+ *  - ok: diff + a parsed insight.
+ *  - not_configured: diff present, AOAI not set up yet (NOT an error).
+ *  - unavailable: configured, but the model produced nothing (retryable iff transient).
+ *  - transport_error: never got a usable response (no diff).
+ */
+export type BaselineDiffResult =
+  | { status: "ok"; diff: BaselineDiff; insight: BaselineDiffInsight }
+  | { status: "not_configured"; diff: BaselineDiff; message: string }
+  | { status: "unavailable"; diff: BaselineDiff; message: string; retryable: boolean }
+  | { status: "transport_error"; message: string };
