@@ -82,6 +82,9 @@ export interface World {
   tags?: RawObj[];
   /** Reports served? false → /reports/* 404 (endpoint not deployed). Default true. */
   reportsServed?: boolean;
+  /** Successive GET /checks/{id} bodies for live-run polling tests: each poll advances; the last repeats.
+   *  e.g. [runningDetail, passDetail] → the page shows 'running', then 'pass', via polling (no reload). */
+  detailSequence?: Record<number, RawObj[]>;
   /** POST /api/runs/{id}/ai-insights 200 body — the REAL flat AiInsightsDto shape:
    *  { configured, summary, performance[], network[], errors[], suggestions[], caveats[], note }.
    *  Unset → not-configured default. Set configured:true + categories for the happy path. */
@@ -183,6 +186,9 @@ export async function mockApi(
   // enqueues (202) and the GET status walks the configured statusSequence.
   const testRequests = new Map<number, { channelId: number; polls: number }>();
   let nextRequestId = 1000;
+  // Per-check cursor into world.detailSequence — advances each GET /checks/{id} so a live-run test can
+  // serve running → terminal across polls.
+  const detailSeqIdx = new Map<number, number>();
 
   await page.route(`${API_ORIGIN}/**`, async (route) => {
     const req = route.request();
@@ -516,8 +522,21 @@ export async function mockApi(
         ? json(route, world.notificationsHealth)
         : json(route, { error: "not_found" }, 404); // readiness endpoint not deployed (flagged dep)
     }
+    // On-demand run trigger (the "Run now" affordance) — the API enqueues + returns { requestId }.
+    if ((m = path.match(/^\/api\/checks\/(\d+)\/run$/)) && method === "POST") {
+      return json(route, { requestId: (nextRequestId += 1) }, 202);
+    }
     if ((m = path.match(/^\/api\/checks\/(\d+)$/))) {
-      const d = world.details[Number(m[1])];
+      const cid = Number(m[1]);
+      // Live-run sequence: successive polls advance through detailSequence (last entry repeats), so a test
+      // can drive running → pass without a reload. Falls back to the static detail.
+      const seq = world.detailSequence?.[cid];
+      if (seq && seq.length > 0) {
+        const i = Math.min(detailSeqIdx.get(cid) ?? 0, seq.length - 1);
+        detailSeqIdx.set(cid, i + 1);
+        return json(route, seq[i]);
+      }
+      const d = world.details[cid];
       return d ? json(route, d) : json(route, { error: "not_found" }, 404);
     }
     if ((m = path.match(/^\/api\/checks\/(\d+)\/runs$/))) {
