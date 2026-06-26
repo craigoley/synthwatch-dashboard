@@ -10,6 +10,7 @@ import { DateRangeControl, useDateRange } from "@/components/date-range-control"
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { runStatusMeta } from "@/lib/status";
 import { formatDuration, formatLocalDateTime } from "@/lib/format";
+import { TraceViewer } from "@/components/trace-viewer";
 import type { Run } from "@/lib/types";
 
 /**
@@ -21,7 +22,6 @@ import type { Run } from "@/lib/types";
  */
 function RunArtifacts({ run }: { run: Run }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const [traceOpen, setTraceOpen] = useState(false);
   const screenshot = run.screenshot_url ? apiUrl(run.screenshot_url) : null;
   // ★ Serve the trace SAME-ORIGIN via the dashboard's own proxy (app/trace-proxy/[id]).
   // The viewer fetch()es the trace, and fetching the cross-origin (API-origin) trace is
@@ -53,41 +53,13 @@ function RunArtifacts({ run }: { run: Run }) {
       {traceProxy && (
         <div>
           <div className="mb-1 sw-eyebrow">Playwright trace — forensics</div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setTraceOpen((o) => !o)}
-              aria-expanded={traceOpen}
-              className="sw-btn sw-btn-sm sw-btn-primary"
-              data-testid={`view-trace-${run.id}`}
-            >
-              {traceOpen ? "▾ Hide trace" : "▸ View trace"}
-            </button>
-            <a href={traceProxy} download className="sw-btn sw-btn-sm">
-              ↓ Download (.zip)
-            </a>
-          </div>
-          {traceOpen && (
-            // Self-hosted viewer (public/trace-viewer) fed the SAME-ORIGIN proxy URL —
-            // the viewer's fetch() stays on the dashboard origin (no CORS). Absolute URL
-            // required: the viewer resolves ?trace= relative to /trace-viewer/, not the page.
-            <div className="mt-2 overflow-hidden rounded-lg border border-[var(--color-border)]">
-              <iframe
-                title={`Playwright trace for run ${run.id}`}
-                src={`/trace-viewer/index.html?trace=${encodeURIComponent(
-                  (typeof window !== "undefined" ? window.location.origin : "") + traceProxy,
-                )}`}
-                // The vendored viewer's OWN CSS sets `html,body{min-width:550px;min-height:450px;overflow:auto}`,
-                // so when the iframe is smaller than that floor IT (not us) renders scrollbars. h-[70vh] alone
-                // dips below 450px on common laptop heights (70% of ~640px ≈ 448px), tripping their vertical
-                // scrollbar — and the ~15px it steals can cascade the width below 550px → a second one. The
-                // min-h floor (their 450px + headroom) keeps the embed above the floor so it fills cleanly.
-                // (Below ~550px viewport WIDTH their horizontal scrollbar is intrinsic — not fixable here.)
-                className="block h-[70vh] min-h-[480px] w-full bg-white"
-                data-testid={`trace-viewer-${run.id}`}
-              />
-            </div>
-          )}
+          <TraceViewer
+            proxyPath={traceProxy}
+            openLabel="▸ View trace"
+            iframeTitle={`Playwright trace for run ${run.id}`}
+            viewTestId={`view-trace-${run.id}`}
+            iframeTestId={`trace-viewer-${run.id}`}
+          />
           <p className="mt-1.5 text-[11px] text-[var(--color-ink-faint)]">
             Per-action screenshots, console, network waterfall &amp; DOM time-travel — from the trace
             captured on failure.

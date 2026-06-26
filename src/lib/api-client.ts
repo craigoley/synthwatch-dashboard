@@ -220,6 +220,7 @@ interface RawCheck {
   tags?: Tag[] | null;
   sourceKey?: string | null;
   specPath?: string | null;
+  successTraceAt?: string | null;
   lastRunAt: string | null;
   createdAt: string;
 }
@@ -385,6 +386,7 @@ function mapCheck(raw: RawCheck): Check {
     tags: raw.tags ?? [],
     source_key: raw.sourceKey ?? null,
     spec_path: raw.specPath ?? null,
+    success_trace_at: raw.successTraceAt ?? null,
   };
 }
 

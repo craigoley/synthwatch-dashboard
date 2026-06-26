@@ -8,6 +8,7 @@ import { useCheck, useMetrics, updateCheck, revalidateChecks } from "@/lib/clien
 import { AvailabilityChart, LatencyChart, MetricsCharts } from "@/components/charts";
 import { CheckSlaPanel, SloPanel } from "@/components/sla";
 import { RunHistory } from "@/components/run-history";
+import { TraceViewer } from "@/components/trace-viewer";
 import { StatusBadge, TONE_VAR } from "@/components/status-badge";
 import { TagChips } from "@/components/tag-chips";
 import { Modal } from "@/components/modal";
@@ -204,6 +205,36 @@ function PerLocationPanel({ runs }: { runs: Run[] }) {
   );
 }
 
+/**
+ * Browser checks only: the monitor's last-known-good (most-recent-success) Playwright trace — the
+ * COMPLETE run, a baseline to diff failures against. Shown only when a baseline exists
+ * (success_trace_at set). Reuses the shared TraceViewer embed, pointed at the per-check success
+ * trace proxy (→ API GET /checks/{id}/success-trace, overwritten on each success).
+ */
+function SuccessTracePanel({ check }: { check: Check }) {
+  if (check.kind !== "browser" || !check.success_trace_at) return null;
+  return (
+    <div className="sw-panel p-4">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-[var(--color-ink)]">Last known good</h3>
+        <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+          success baseline · {formatRelative(check.success_trace_at)}
+        </span>
+      </div>
+      <TraceViewer
+        proxyPath={`/trace-proxy/check/${check.id}`}
+        openLabel="▸ View last success trace"
+        iframeTitle={`Last successful trace for ${check.name}`}
+        viewTestId={`view-success-trace-${check.id}`}
+        iframeTestId={`success-trace-viewer-${check.id}`}
+      />
+      <p className="mt-1.5 text-[11px] text-[var(--color-ink-faint)]">
+        The most recent SUCCESSFUL run&apos;s full trace — a baseline to diff against failures.
+      </p>
+    </div>
+  );
+}
+
 export default function CheckDetailPage() {
   const routeParams = useParams<{ id: string }>();
   const id = Number(routeParams?.id);
@@ -370,6 +401,10 @@ export default function CheckDetailPage() {
           </div>
         )}
       </section>
+
+      {/* Browser checks: the last-known-good success trace (baseline to diff against failures).
+          Hidden until the monitor has had a success (success_trace_at set). */}
+      <SuccessTracePanel check={check} />
 
       {/* Cursor-paginated run history: date-range control (default last 7d) + Load more.
           The default window keeps the first fetch BOUNDED — never an all-time scan. */}
