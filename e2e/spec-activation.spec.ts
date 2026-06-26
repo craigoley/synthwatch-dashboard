@@ -72,6 +72,8 @@ test.describe("phase 13 — spec activation (set up monitor)", () => {
     expect(body.sourceKey).toBe("wegmans-search-product");
     expect(body.flowName).toBe("search-product"); // flowNameFor(spec_path), satisfies browser_needs_flow
     expect(body.kind).toBe("browser");
+    // ★ Interval round-trips through the minutes UI: suggested 600s → shown as 10 min → sent back as 600s.
+    expect(body.intervalSeconds).toBe(600);
 
     // The catalog re-reads → the row flips Unmonitored → Active.
     await expect

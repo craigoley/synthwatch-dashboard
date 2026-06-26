@@ -59,6 +59,31 @@ test.describe("monitor form", () => {
     await expect(page.getByText("Target host")).toHaveCount(0);
   });
 
+  // ★ Interval is shown/entered in MINUTES (usability) but the API contract is SECONDS — the form
+  // converts minutes → seconds (×60) on submit. The wire payload field is unchanged (intervalSeconds).
+  test("interval entered in minutes is sent to the API as seconds (×60)", async ({ page }) => {
+    await mockApi(page);
+    await openNewMonitor(page);
+    await page.locator("input").first().fill("Interval check");
+    await page.locator('input[inputmode="url"]').fill("https://example.com/health");
+    await page.getByPlaceholder("5").fill("10"); // 10 minutes (non-default, proves the conversion)
+
+    const post = page.waitForRequest((r) => r.url().endsWith("/api/checks") && r.method() === "POST");
+    await page.getByRole("button", { name: "Create monitor" }).click();
+    const body = (await post).postDataJSON();
+    expect(body.intervalSeconds).toBe(600); // 10 min → 600s, NOT 10
+  });
+
+  test("editing an existing monitor shows its stored interval in MINUTES", async ({ page }) => {
+    const world = defaultWorld();
+    world.checks = world.checks.map((c, i) => (i === 0 ? { ...c, intervalSeconds: 1800 } : c)); // 30 min
+    await mockApi(page, world);
+    await page.goto("/monitors");
+    await page.getByRole("button", { name: "Edit" }).first().click();
+    await page.getByRole("heading", { name: /Edit ·/ }).waitFor();
+    await expect(page.getByPlaceholder("5")).toHaveValue("30"); // 1800s rendered as 30 min, not "1800"
+  });
+
   // ★ Security property: auth is a secret REFERENCE (env-var names only). There
   // must be NO field that accepts a raw credential, anywhere, ever.
   test("no raw-credential field exists in any auth section", async ({ page }) => {

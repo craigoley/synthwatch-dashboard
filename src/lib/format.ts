@@ -97,6 +97,24 @@ export function formatPct(pct: number | null | undefined, digits = 2): string {
   return `${pct.toFixed(digits)}%`;
 }
 
+/**
+ * Check interval is STORED + TRANSPORTED in SECONDS (DB `interval_seconds`, API `intervalSeconds`),
+ * but the UI speaks MINUTES (users think in minutes, not "300 seconds"). These convert at that boundary.
+ */
+/** Minutes → whole seconds for the API payload (5 → 300). Rounds so fractional minutes stay exact-ish. */
+export function minutesToSeconds(minutes: number): number {
+  return Math.round(minutes * 60);
+}
+/**
+ * Seconds → a tidy minutes string for inputs/display: 300 → "5", 90 → "1.5". Never lies about a legacy
+ * non-whole-minute value (shows the true fraction) while keeping whole minutes clean.
+ */
+export function secondsToMinutesLabel(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined || Number.isNaN(seconds)) return "";
+  const m = seconds / 60;
+  return Number.isInteger(m) ? String(m) : String(Number(m.toFixed(2)));
+}
+
 /** Compact integer with thousands separators. */
 export function formatCount(n: number | null | undefined): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "—";

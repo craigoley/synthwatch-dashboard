@@ -30,6 +30,7 @@ import {
 import { FlowCombobox, type FlowComboOption } from "@/components/flow-combobox";
 import type { Check, CheckKind, DnsRecordType, HttpMethod, LighthouseFormFactor, Tag } from "@/lib/types";
 import { flowNameFor, type ActivationContext } from "@/lib/specs";
+import { minutesToSeconds, secondsToMinutesLabel } from "@/lib/format";
 
 interface Props {
   initial?: Check | null;
@@ -56,7 +57,8 @@ interface FormState {
   method: HttpMethod;
   expected_status: string;
   body_must_contain: string;
-  interval_seconds: string;
+  // UI speaks MINUTES; converted to the API's interval_seconds on submit (see format.ts).
+  interval_minutes: string;
   timeout_ms: string;
   failure_threshold: string;
   severity: SeverityOpt;
@@ -113,7 +115,7 @@ function fromCheck(c: Check | null | undefined): FormState {
     method: asMethod(c?.method),
     expected_status: String(c?.expected_status ?? 200),
     body_must_contain: c?.body_must_contain ?? "",
-    interval_seconds: String(c?.interval_seconds ?? 300),
+    interval_minutes: secondsToMinutesLabel(c?.interval_seconds ?? 300), // stored seconds → minutes
     timeout_ms: String(c?.timeout_ms ?? 30000),
     failure_threshold: String(c?.failure_threshold ?? 3),
     severity: asSeverity(c?.severity),
@@ -146,7 +148,7 @@ function formFromActivation(a: ActivationContext): FormState {
     kind: "browser",
     target_url: a.target ?? "",
     flow_name: a.flowName,
-    interval_seconds: String(a.intervalSeconds),
+    interval_minutes: secondsToMinutesLabel(a.intervalSeconds), // spec's suggested seconds → minutes
     tags: a.tags,
   };
 }
@@ -531,7 +533,8 @@ export function MonitorForm({ initial, activation, onDone, onCancel }: Props) {
       method: form.method,
       expected_status: numOrNull(form.expected_status) ?? 200,
       body_must_contain: form.kind === "http" ? form.body_must_contain.trim() || null : null,
-      interval_seconds: numOrNull(form.interval_seconds) ?? 300,
+      // minutes → seconds at the API boundary (5 min → 300s). Default 5 min when blank.
+      interval_seconds: minutesToSeconds(numOrNull(form.interval_minutes) ?? 5),
       timeout_ms: numOrNull(form.timeout_ms) ?? 30000,
       failure_threshold: numOrNull(form.failure_threshold) ?? 3,
       severity: form.severity,
@@ -927,12 +930,16 @@ export function MonitorForm({ initial, activation, onDone, onCancel }: Props) {
       )}
 
       <div className="grid grid-cols-3 gap-4">
-        <Field label="Interval (s)">
+        <Field label="Interval (minutes)">
           <input
             className="sw-input sw-mono"
-            value={form.interval_seconds}
-            onChange={(e) => set("interval_seconds", e.target.value)}
+            type="number"
+            min={1}
+            step={1}
+            value={form.interval_minutes}
+            onChange={(e) => set("interval_minutes", e.target.value)}
             inputMode="numeric"
+            placeholder="5"
           />
         </Field>
         <Field label="Timeout (ms)">
