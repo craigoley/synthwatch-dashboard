@@ -436,16 +436,18 @@ export async function mockApi(
       const availPct = (id: number) => Math.round((100 - ((id * 7) % 28) * 0.9) * 10) / 10;
       const p95Of = (id: number) => 150 + ((id * 37) % 400);
       if (path === "/api/reports/availability") {
+        // ★ Field names mirror the REAL API: `checkName` + `incidentsOpened` (NOT `name`/`incidentCount`).
+        // incidentsOpened varies by id (id % 5) so an Incidents sort observably reorders.
         const rows = checks.map((c) => {
           const id = Number(c.id);
           const pct = availPct(id);
           return {
-            checkId: id, name: c.name, kind: c.kind, availabilityPct: pct,
-            downtimeMinutes: Math.round(((100 - pct) / 100) * days * 1440), incidentCount: id % 3,
+            checkId: id, checkName: c.name, kind: c.kind, availabilityPct: pct,
+            downtimeMinutes: Math.round(((100 - pct) / 100) * days * 1440), incidentsOpened: id % 5,
           };
         });
         const allGroup = {
-          group: "all", availabilityPct: 98, downtimeMinutes: 200, incidentCount: rows.reduce((s, r) => s + r.incidentCount, 0),
+          group: "all", availabilityPct: 98, downtimeMinutes: 200, incidentsOpened: rows.reduce((s, r) => s + r.incidentsOpened, 0),
           checkCount: rows.length, series: series(98), checks: rows,
         };
         const groups = gb === "none" ? [allGroup] : gb === "team"
