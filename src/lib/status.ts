@@ -43,9 +43,12 @@ export function stepStatusToken(status: RunStepStatus | string): StatusMeta["tok
     case "pass":
       return "pass";
     case "fail":
+    case "error":
       return "fail";
+    case "running":
+      return "running";
     default:
-      return "idle";
+      return "idle"; // skip / pending
   }
 }
 
