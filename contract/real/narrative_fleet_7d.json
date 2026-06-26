@@ -1,0 +1,197 @@
+{
+  "scope": "fleet",
+  "key": "",
+  "window": "7d",
+  "headline": "Fleet 7d: availability 72.87%, 15 incident(s).",
+  "body": "Availability 72.87% over 7d. 15 incident(s) opened (unclassified, real-outage); 5054 min downtime. p95 11008ms. Incidents up 15 w/w (0 -> 15). Repeat offender: 6 incidents with the same failure signature. Lowest-availability monitors: Wegmans: search \u2192 product page 0.00%, rca-demo 0.00%, Wegmans homepage 88.33%.",
+  "highlights": [
+    "Incidents up 15 w/w (0 -> 15).",
+    "Repeat offender: 6 incidents with the same failure signature.",
+    "Lowest-availability monitors: Wegmans: search \u2192 product page 0.00%, rca-demo 0.00%, Wegmans homepage 88.33%."
+  ],
+  "generatedAt": "2026-06-26T00:30:29.624421+00:00",
+  "stale": false,
+  "model": "fallback-template",
+  "factPack": {
+    "deltas": {
+      "p95Pct": null,
+      "incidents": 15,
+      "downtimeMin": 5054,
+      "availabilityPts": null
+    },
+    "window": "7d",
+    "current": {
+      "to": "2026-06-26T00:00:00.000Z",
+      "up": 2369,
+      "p50": 1172,
+      "p95": 11008,
+      "p99": 13957,
+      "down": 882,
+      "from": "2026-06-19T00:00:00.000Z",
+      "lcpP75": 1658,
+      "latencyN": 2369,
+      "incidents": 15,
+      "downtimeMin": 5054,
+      "availabilityPct": 72.87
+    },
+    "previous": {
+      "to": "2026-06-19T00:00:00.000Z",
+      "up": 0,
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "down": 0,
+      "from": "2026-06-12T00:00:00.000Z",
+      "lcpP75": null,
+      "latencyN": 0,
+      "incidents": 0,
+      "downtimeMin": 0,
+      "availabilityPct": null
+    },
+    "scopeKey": "",
+    "anomalies": [
+      "Incidents up 15 w/w (0 -> 15).",
+      "Repeat offender: 6 incidents with the same failure signature.",
+      "Lowest-availability monitors: Wegmans: search \u2192 product page 0.00%, rca-demo 0.00%, Wegmans homepage 88.33%."
+    ],
+    "scopeName": "Fleet",
+    "scopeType": "fleet",
+    "incidentList": [
+      {
+        "check": "Wegmans homepage",
+        "summary": null,
+        "openedAt": "2026-06-20T22:26:05.017Z",
+        "severity": "critical",
+        "resolvedAt": "2026-06-21T12:13:12.841Z",
+        "durationMin": 827,
+        "classification": null
+      },
+      {
+        "check": "Wegmans homepage",
+        "summary": null,
+        "openedAt": "2026-06-21T13:51:04.229Z",
+        "severity": "critical",
+        "resolvedAt": "2026-06-21T15:34:16.205Z",
+        "durationMin": 103,
+        "classification": null
+      },
+      {
+        "check": "SynthWatch API health",
+        "summary": null,
+        "openedAt": "2026-06-22T12:15:29.383Z",
+        "severity": "critical",
+        "resolvedAt": "2026-06-22T12:35:24.161Z",
+        "durationMin": 20,
+        "classification": null
+      },
+      {
+        "check": "rca-demo",
+        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
+        "openedAt": "2026-06-23T01:25:18.810Z",
+        "severity": "critical",
+        "resolvedAt": "2026-06-23T19:46:11.837Z",
+        "durationMin": 1101,
+        "classification": "real-outage"
+      },
+      {
+        "check": "SynthWatch API health",
+        "summary": null,
+        "openedAt": "2026-06-23T19:55:25.188Z",
+        "severity": "critical",
+        "resolvedAt": "2026-06-23T20:05:18.270Z",
+        "durationMin": 10,
+        "classification": null
+      },
+      {
+        "check": "rca-demo",
+        "summary": null,
+        "openedAt": "2026-06-23T20:05:20.442Z",
+        "severity": "critical",
+        "resolvedAt": "2026-06-23T21:08:33.763Z",
+        "durationMin": 63,
+        "classification": null
+      },
+      {
+        "check": "rca-demo",
+        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
+        "openedAt": "2026-06-23T21:10:20.717Z",
+        "severity": "critical",
+        "resolvedAt": "2026-06-24T00:07:41.951Z",
+        "durationMin": 177,
+        "classification": "real-outage"
+      },
+      {
+        "check": "rca-demo",
+        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
+        "openedAt": "2026-06-24T00:10:18.675Z",
+        "severity": "critical",
+        "resolvedAt": "2026-06-24T12:47:04.984Z",
+        "durationMin": 757,
+        "classification": "real-outage"
+      },
+      {
+        "check": "rca-demo",
+        "summary": null,
+        "openedAt": "2026-06-24T12:50:34.933Z",
+        "severity": "critical",
+        "resolvedAt": "2026-06-24T13:36:02.258Z",
+        "durationMin": 45,
+        "classification": null
+      },
+      {
+        "check": "rca-demo",
+        "summary": null,
+        "openedAt": "2026-06-24T13:40:18.123Z",
+        "severity": "critical",
+        "resolvedAt": "2026-06-24T14:24:27.620Z",
+        "durationMin": 44,
+        "classification": null
+      },
+      {
+        "check": "rca-demo",
+        "summary": null,
+        "openedAt": "2026-06-24T14:25:33.325Z",
+        "severity": "critical",
+        "resolvedAt": "2026-06-24T14:58:55.588Z",
+        "durationMin": 33,
+        "classification": null
+      },
+      {
+        "check": "rca-demo",
+        "summary": null,
+        "openedAt": "2026-06-24T15:00:19.615Z",
+        "severity": "critical",
+        "resolvedAt": "2026-06-24T16:13:42.669Z",
+        "durationMin": 73,
+        "classification": null
+      },
+      {
+        "check": "rca-demo",
+        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
+        "openedAt": "2026-06-24T16:15:18.447Z",
+        "severity": "critical",
+        "resolvedAt": "2026-06-25T01:47:34.191Z",
+        "durationMin": 572,
+        "classification": "real-outage"
+      },
+      {
+        "check": "rca-demo",
+        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
+        "openedAt": "2026-06-25T01:50:20.078Z",
+        "severity": "critical",
+        "resolvedAt": "2026-06-25T02:10:58.096Z",
+        "durationMin": 21,
+        "classification": "real-outage"
+      },
+      {
+        "check": "rca-demo",
+        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
+        "openedAt": "2026-06-25T02:20:20.004Z",
+        "severity": "critical",
+        "resolvedAt": null,
+        "durationMin": 1330,
+        "classification": "real-outage"
+      }
+    ]
+  }
+}

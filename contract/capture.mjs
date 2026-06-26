@@ -29,6 +29,12 @@ const SEAMS = {
   reports_performance_7d: "/reports/performance?window=7d&groupBy=none",
   specs: "/specs",
   reconcile_drift: "/reconcile/drift",
+  // Rich/nested seams anchored later (priority by prior-bug + complexity). Use IDs with full data so the
+  // fixture exercises the whole shape: narrative factPack (#82), the runs cursor envelope, an SSL check
+  // detail (cert + recentRuns with certDaysRemaining). Adjust the IDs to live data when re-capturing.
+  narrative_fleet_7d: "/reports/narrative?scope=fleet&window=7d",
+  runs_check4: "/checks/4/runs?pageSize=10",
+  check_detail_10: "/checks/10",
 };
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "real");

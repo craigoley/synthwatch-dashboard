@@ -479,19 +479,24 @@ export async function mockApi(
           : [{ ...allGroup, group: `${gb}-x` }];
         return json(route, { window: win, groupBy: gb, groups });
       }
-      // performance: per-check rows; web-vitals at group level present iff any browser check.
+      // performance: ★ mirror the REAL API shape — latency NESTED under `latency`, per-check `checkName`,
+      // web-vitals under `webVitals` with p75 field names (lcpP75Ms/…). (The flat shape this mock used to
+      // serve matched the OLD buggy mapper; the contract test now pins the nested truth.)
       const browserCount = checks.filter((c) => c.kind === "browser").length;
       const rows = checks.map((c) => {
         const id = Number(c.id);
         const p95 = p95Of(id);
         return {
-          checkId: id, name: c.name, kind: c.kind,
-          avgMs: Math.round(p95 * 0.5), p50Ms: Math.round(p95 * 0.6), p95Ms: p95, p99Ms: Math.round(p95 * 1.5),
+          checkId: id, checkName: c.name, kind: c.kind,
+          latency: { sampleCount: 100, avgMs: Math.round(p95 * 0.5), p50Ms: Math.round(p95 * 0.6), p95Ms: p95, p99Ms: Math.round(p95 * 1.5) },
+          webVitals: null,
         };
       });
       const allGroup = {
-        group: "all", avgMs: 200, p50Ms: 180, p95Ms: 400, p99Ms: 600, series: series(400),
-        webVitals: browserCount ? { lcpMs: 1800, fcpMs: 900, ttfbMs: 200, cls: 0.05 } : null,
+        group: "all",
+        latency: { sampleCount: 1000, avgMs: 200, p50Ms: 180, p95Ms: 400, p99Ms: 600 },
+        series: series(400),
+        webVitals: browserCount ? { sampleCount: 200, lcpP75Ms: 1800, fcpP75Ms: 900, ttfbP75Ms: 200, clsP75: 0.05 } : null,
         browserCheckCount: browserCount, checkCount: rows.length, checks: rows,
       };
       const groups = gb === "none" ? [allGroup] : gb === "team"
