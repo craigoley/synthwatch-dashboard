@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 import { mockApi, defaultWorld } from "./mock";
-import { slaResponse, slaRow } from "./fixtures";
+import { slaResponse, slaRow, run, detail } from "./fixtures";
 
 test.describe("check detail", () => {
   test("SLA: the 90d window toggle is present and renders its value", async ({ page }) => {
@@ -189,6 +189,41 @@ test.describe("check detail", () => {
     await mockApi(page);
     await page.goto("/checks/1"); // only "default"
     await expect(page.getByRole("heading", { name: "By location" })).toHaveCount(0);
+  });
+
+  // ★ Per-location → run link: each "By location" row links to THAT location's latest run, which expands in
+  // the history list below. The failing location → its failing run (what you want to troubleshoot).
+  test("per-location row links to that location's latest run (regional fail → its failing run)", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/checks/10"); // eastus2 pass (run 1001), westus2 fail (run 1002)
+
+    const byLocation = page.locator(".sw-panel", { hasText: "By location" });
+    await expect(byLocation.getByTestId("location-run-westus2")).toHaveAttribute("href", "#run-1002"); // FAIL run
+    await expect(byLocation.getByTestId("location-run-eastus2")).toHaveAttribute("href", "#run-1001"); // PASS run
+
+    // clicking the failing location expands ITS run in the history below (not the default newest)
+    await byLocation.getByTestId("location-run-westus2").click();
+    await expect(page.getByText("Funnel · run #1002")).toBeVisible();
+  });
+
+  test("★ a failing browser location → its failing run with the trace + Get AI insights reachable", async ({ page }) => {
+    const w = defaultWorld();
+    // a browser check across two locations; the failing (westus2) run HAS a trace → trace + AI insights.
+    w.details[2] = detail(
+      { id: 2, name: "Homepage flow", kind: "browser", flowName: "homepage-load", currentStatus: "fail" },
+      [
+        run({ id: 9001, checkId: 2, status: "pass", location: "eastus2" }),
+        run({ id: 9002, checkId: 2, status: "fail", location: "westus2", errorMessage: "nav failed in westus2", traceUrl: "/api/runs/9002/trace" }),
+      ],
+    );
+    await mockApi(page, w);
+    await page.goto("/checks/2");
+
+    await page.getByTestId("location-run-westus2").click();
+    await expect(page.getByText("Funnel · run #9002")).toBeVisible();
+    // the failing run's forensics are reachable from the location row: the trace embed + Get AI insights
+    await expect(page.getByTestId("view-trace-9002")).toBeVisible();
+    await expect(page.getByTestId("get-ai-insights-9002")).toBeVisible();
   });
 
   test("SLO: shows the error-budget + burn state when an SLO is set", async ({ page }) => {

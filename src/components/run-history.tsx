@@ -87,8 +87,9 @@ function RunRow({
     <>
       <button
         onClick={onToggle}
+        id={`run-${run.id}`}
         data-testid="run-row"
-        className="grid w-full grid-cols-[16px_1fr_auto_auto] items-center gap-3 px-4 py-2.5 text-left transition hover:bg-[var(--color-panel-2)]"
+        className="grid w-full scroll-mt-20 grid-cols-[16px_1fr_auto_auto] items-center gap-3 px-4 py-2.5 text-left transition hover:bg-[var(--color-panel-2)]"
       >
         <StatusDot status={run.status} />
         <div className="min-w-0">
@@ -159,6 +160,27 @@ export function RunHistory({ checkId }: { checkId: number }) {
   useEffect(() => {
     if (firstId !== null) setExpanded((cur) => (cur === null ? firstId : cur));
   }, [firstId]);
+
+  // Deep-link target: a `#run-<id>` hash (e.g. the per-location panel's "View run" → that location's latest
+  // run) expands that run and scrolls to it — surfacing its trace + "Get AI insights". Re-applies once runs
+  // load (the row must exist in the loaded window) and on hashchange (clicking another location). If the
+  // target isn't in the loaded window (older than the range), it's a no-op — the row link still scrolls.
+  useEffect(() => {
+    function focusHashRun() {
+      if (typeof window === "undefined") return;
+      const m = window.location.hash.match(/^#run-(\d+)$/);
+      if (!m) return;
+      const id = Number(m[1]);
+      if (!runs.some((r) => r.id === id)) return;
+      setExpanded(id);
+      requestAnimationFrame(() =>
+        document.getElementById(`run-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      );
+    }
+    focusHashRun();
+    window.addEventListener("hashchange", focusHashRun);
+    return () => window.removeEventListener("hashchange", focusHashRun);
+  }, [runs.length]); // eslint-disable-line react-hooks/exhaustive-deps -- re-arm when the loaded set grows
 
   function onRangeChange() {
     setExpanded(null);
