@@ -193,13 +193,23 @@ function PerLocationPanel({ runs }: { runs: Run[] }) {
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {entries.map(([loc, r]) => (
-          <div
+          // ★ Each row links to that location's LATEST run in the history list below (#run-<id>), which
+          // expands to its trace + "Get AI insights". The failing location → its failing run (the thing you
+          // want to troubleshoot). The run id is already on the per-location run object — no API change.
+          <a
             key={loc}
-            className="flex items-center justify-between gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2"
+            href={`#run-${r.id}`}
+            data-testid={`location-run-${loc}`}
+            title={`View ${loc}'s latest run`}
+            aria-label={`View ${loc}'s latest run (${r.status})`}
+            className="group flex items-center justify-between gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 transition hover:border-[var(--color-border-strong)] hover:bg-[var(--color-panel-2)]"
           >
             <span className="sw-mono truncate text-[12px] text-[var(--color-ink-dim)]">{loc}</span>
-            <StatusBadge status={r.status} />
-          </div>
+            <span className="flex shrink-0 items-center gap-1.5">
+              <StatusBadge status={r.status} />
+              <span aria-hidden className="text-[var(--color-ink-faint)] transition group-hover:text-[var(--color-ink)]">→</span>
+            </span>
+          </a>
         ))}
       </div>
     </div>
