@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
@@ -251,12 +251,39 @@ export default function CheckDetailPage() {
   const id = Number(routeParams?.id);
   const valid = Number.isInteger(id) && id > 0;
 
-  const { data, error, isLoading } = useCheck(valid ? id : null);
-  const { data: metrics } = useMetrics(valid ? id : null);
   const [editing, setEditing] = useState(false);
   const [pausing, setPausing] = useState(false);
   const [running, setRunning] = useState(false);
+  // ★ "expecting a run": true from clicking Run now until the run actually appears as 'running' — bridges
+  // the trigger→start gap so the scoped fast poll is already active when the run begins.
+  const [expectRun, setExpectRun] = useState(false);
   const { canWrite } = useAuth(); // editor/admin — gates the "Run now" affordance (it spends compute)
+
+  const { data, error, isLoading } = useCheck(valid ? id : null, { expectRun });
+  const { data: metrics } = useMetrics(valid ? id : null);
+
+  // The latest run's status drives the live indicator + when to stop the fast poll.
+  const latestRunStatus = data?.recent_runs?.[0]?.status ?? null;
+
+  // Once the run is visibly 'running', drop the bridge flag — useCheck's data-driven fast poll takes over
+  // (and falls back to idle when the run finishes), so we never fast-poll past the run.
+  useEffect(() => {
+    if (latestRunStatus === "running") setExpectRun(false);
+  }, [latestRunStatus]);
+
+  // Safety: never fast-poll forever if a triggered run never appears (e.g. the trigger failed) — clear the
+  // bridge after a bounded window.
+  useEffect(() => {
+    if (!expectRun) return;
+    const t = setTimeout(() => setExpectRun(false), 90_000);
+    return () => clearTimeout(t);
+  }, [expectRun]);
+
+  // Mirror the header's live status in the run-history list below: when the latest run's status flips
+  // (idle→running→terminal), revalidate the history so the new/updated row shows without a manual reload.
+  useEffect(() => {
+    if (valid && latestRunStatus !== null) void revalidateRunHistory(id);
+  }, [latestRunStatus, valid, id]);
 
   if (!valid) return <ErrorState message="Invalid check id." />;
   if (isLoading && !data) return <div className="py-16"><Spinner label="Loading monitor…" /></div>;
@@ -280,17 +307,18 @@ export default function CheckDetailPage() {
     await Promise.all([revalidateChecks(check.id), revalidateRunHistory(check.id)]);
   }
 
-  // Trigger an on-demand run (the API enqueues it + kicks the runner; cron is the fallback). The button
-  // reflects the TRIGGER only (~instant); the run itself runs ~15s and surfaces in the run history. Nudge
-  // a few refreshes so it appears as 'running' then updates to its verdict without a manual reload.
+  // Trigger an on-demand run (the API enqueues it + kicks the runner; cron is the fallback). setExpectRun
+  // turns on the SCOPED fast poll (useCheck), so the run is caught live as it goes running→done — no manual
+  // refresh, no fragile fixed-timer nudges. The fast poll self-stops once the run settles.
   async function handleRunNow() {
     setRunning(true);
+    setExpectRun(true);
     try {
       await runCheckNow(check.id);
-      await refreshRuns();
-      [2500, 6000, 12000].forEach((d) => setTimeout(() => void refreshRuns(), d));
+      await refreshRuns(); // immediate nudge; the scoped poll handles the run's lifecycle from here
     } catch {
-      // 401/403 are handled globally by the api-client interceptor; transient errors recover on the next tick.
+      // 401/403 are handled globally by the api-client interceptor; the trigger didn't take → stop expecting.
+      setExpectRun(false);
     } finally {
       setRunning(false);
     }
@@ -346,12 +374,13 @@ export default function CheckDetailPage() {
           {canWrite && check.enabled && (
             <button
               onClick={handleRunNow}
-              disabled={running}
+              disabled={running || expectRun || latestRunStatus === "running"}
               className="sw-btn"
               title="Run this monitor now — don't wait for the timer"
               data-testid="run-now"
             >
-              {running ? "Running…" : "Run now"}
+              {/* Pending (triggered, not yet started) → Running (live) → Run now (settled). */}
+              {latestRunStatus === "running" ? "Running…" : running || expectRun ? "Starting…" : "Run now"}
             </button>
           )}
           <button onClick={togglePause} disabled={pausing} className="sw-btn">

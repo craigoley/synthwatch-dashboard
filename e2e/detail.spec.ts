@@ -262,4 +262,48 @@ test.describe("check detail", () => {
     await expect(page.getByText(/No runs recorded yet/i)).toBeVisible();
     expect(errors).toEqual([]);
   });
+
+  // ★ Live run status: an in-flight run transitions running→done on the page via SCOPED fast polling — no
+  // manual refresh. The mock serves a running detail first, then the terminal one on the next poll.
+  test("live: an in-flight run shows 'Running' then its terminal status via polling (no reload)", async ({ page }) => {
+    const w = defaultWorld();
+    w.detailSequence = {
+      1: [
+        detail({ id: 1, name: "API health", kind: "http", currentStatus: "running" },
+          [run({ id: 5000, checkId: 1, status: "running", finishedAt: null, durationMs: null, httpStatus: null })]),
+        detail({ id: 1, name: "API health", kind: "http", currentStatus: "pass" },
+          [run({ id: 5000, checkId: 1, status: "pass" })]),
+      ],
+    };
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+
+    // the live indicator shows Running (the runner's in-flight state)…
+    await expect(page.getByText("Running", { exact: true })).toBeVisible();
+    // …then flips to the terminal verdict via the fast poll — WITHOUT a manual reload.
+    await expect(page.getByText("Pass", { exact: true })).toBeVisible();
+  });
+
+  test("★ Run now → the run goes Starting → Running → done live (no manual refresh)", async ({ page }) => {
+    const w = defaultWorld();
+    w.detailSequence = {
+      1: [
+        detail({ id: 1, name: "API health", kind: "http", currentStatus: "pass" }, [run({ id: 4000, status: "pass" })]), // settled
+        detail({ id: 1, name: "API health", kind: "http", currentStatus: "running" },
+          [run({ id: 4001, checkId: 1, status: "running", finishedAt: null, durationMs: null, httpStatus: null })]),
+        detail({ id: 1, name: "API health", kind: "http", currentStatus: "pass" }, [run({ id: 4001, status: "pass" })]),
+      ],
+    };
+    await mockApi(page, w); // seeded editor → Run now is visible
+    await page.goto("/checks/1");
+
+    const runNow = page.getByTestId("run-now");
+    await expect(runNow).toHaveText("Run now"); // settled
+    await runNow.click(); // triggers + activates the scoped fast poll (expectRun)
+
+    // the run is caught live: the header shows Running, then settles back to Pass — no reload
+    await expect(page.getByText("Running", { exact: true })).toBeVisible();
+    await expect(page.getByText("Pass", { exact: true })).toBeVisible();
+    await expect(runNow).toHaveText("Run now"); // poll settled → button re-enabled
+  });
 });

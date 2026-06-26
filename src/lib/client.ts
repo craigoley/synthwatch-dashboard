@@ -114,8 +114,19 @@ export function useChecks() {
   return useSWR(keys.checks, () => listChecks(), live);
 }
 
-export function useCheck(id: number | null) {
-  return useSWR(id ? keys.check(id) : null, () => getCheck(id as number), live);
+/** Poll cadence while a run is in-flight (or just triggered) — fast enough to SEE pending→running→done. */
+const RUN_ACTIVE_POLL_MS = 2500;
+
+export function useCheck(id: number | null, opts: { expectRun?: boolean } = {}) {
+  return useSWR(id ? keys.check(id) : null, () => getCheck(id as number), {
+    ...live,
+    // ★ Scoped live-refresh: poll FAST while the latest run is 'running', or right after a manual trigger
+    // (expectRun) so the imminent run is caught as it goes running→done — then fall back to the normal idle
+    // cadence once it settles. Never a perpetual fast loop: the fast tick only persists while there's an
+    // in-flight/expected run. (refreshInterval as a function is re-evaluated each tick against the latest data.)
+    refreshInterval: (latest) =>
+      opts.expectRun || latest?.recent_runs?.[0]?.status === "running" ? RUN_ACTIVE_POLL_MS : 15_000,
+  });
 }
 
 /**
