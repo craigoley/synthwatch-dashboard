@@ -1,0 +1,125 @@
+{
+  "window": "7d",
+  "groupBy": null,
+  "groups": [
+    {
+      "group": null,
+      "latency": {
+        "sampleCount": 2435,
+        "avgMs": 2241,
+        "p50Ms": 1126,
+        "p95Ms": 11001,
+        "p99Ms": 13885
+      },
+      "webVitals": {
+        "sampleCount": 287,
+        "lcpP75Ms": 1660,
+        "fcpP75Ms": 1338,
+        "ttfbP75Ms": 378,
+        "clsP75": 0.5432
+      },
+      "checks": [
+        {
+          "checkId": 33,
+          "checkName": "API CORS preflight",
+          "latency": {
+            "sampleCount": 937,
+            "avgMs": 745.5,
+            "p50Ms": 193,
+            "p95Ms": 1964,
+            "p99Ms": 2386
+          },
+          "webVitals": null
+        },
+        {
+          "checkId": 4,
+          "checkName": "SynthWatch API health",
+          "latency": {
+            "sampleCount": 1067,
+            "avgMs": 1630,
+            "p50Ms": 1473,
+            "p95Ms": 3127,
+            "p99Ms": 3855
+          },
+          "webVitals": null
+        },
+        {
+          "checkId": 2,
+          "checkName": "Wegmans homepage",
+          "latency": {
+            "sampleCount": 287,
+            "avgMs": 10481.6,
+            "p50Ms": 10605,
+            "p95Ms": 14751,
+            "p99Ms": 16940
+          },
+          "webVitals": {
+            "sampleCount": 287,
+            "lcpP75Ms": 1660,
+            "fcpP75Ms": 1338,
+            "ttfbP75Ms": 378,
+            "clsP75": 0.5432
+          }
+        },
+        {
+          "checkId": 10,
+          "checkName": "Wegmans.com cert",
+          "latency": {
+            "sampleCount": 144,
+            "avgMs": 76.6,
+            "p50Ms": 64,
+            "p95Ms": 166,
+            "p99Ms": 175
+          },
+          "webVitals": null
+        },
+        {
+          "checkId": 74,
+          "checkName": "Wegmans: search \u2192 product page",
+          "latency": {
+            "sampleCount": 0,
+            "avgMs": null,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null
+          },
+          "webVitals": null
+        },
+        {
+          "checkId": 59,
+          "checkName": "rca-demo",
+          "latency": {
+            "sampleCount": 0,
+            "avgMs": null,
+            "p50Ms": null,
+            "p95Ms": null,
+            "p99Ms": null
+          },
+          "webVitals": null
+        }
+      ],
+      "series": [
+        {
+          "day": "2026-06-21",
+          "avgMs": 4590.9
+        },
+        {
+          "day": "2026-06-22",
+          "avgMs": 2321.3
+        },
+        {
+          "day": "2026-06-23",
+          "avgMs": 2028.6
+        },
+        {
+          "day": "2026-06-24",
+          "avgMs": 2207.7
+        },
+        {
+          "day": "2026-06-25",
+          "avgMs": 2304.7
+        }
+      ]
+    }
+  ]
+}

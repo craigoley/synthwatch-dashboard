@@ -1,0 +1,321 @@
+{
+  "items": [
+    {
+      "id": 33,
+      "checkId": 59,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-25T01:50:20.078332+00:00",
+      "resolvedAt": "2026-06-25T02:10:58.096995+00:00",
+      "openedRunId": 842881,
+      "resolvedRunId": null,
+      "consecutiveFailures": 2,
+      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
+      "checkName": "rca-demo",
+      "checkKind": "http",
+      "rca": {
+        "classification": "real-outage",
+        "confidence": "high",
+        "observed": [
+          "HTTP status: 500",
+          "Error message: expected status eq 200, got 500",
+          "duration: 95ms",
+          "Recent run history: fail, fail",
+          "Multi-location: failing from 1 of 1 location(s)"
+        ],
+        "inferred": [
+          "The endpoint is returning 500 responses, which indicates a server-side error",
+          "Consecutive failures suggest this is not a single transient blip",
+          "Because the check is a simple HTTP check (no selectors), the problem is likely with the target service rather than the monitor",
+          "Investigate server logs, health checks, and recent deploys for the target endpoint"
+        ],
+        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
+        "signature": "59|expected status eq 200, got 500|",
+        "model": "gpt-5-mini",
+        "cached": true,
+        "generated_at": "2026-06-25T01:50:26.607Z"
+      }
+    },
+    {
+      "id": 32,
+      "checkId": 59,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-24T16:15:18.447229+00:00",
+      "resolvedAt": "2026-06-25T01:47:34.191971+00:00",
+      "openedRunId": 842433,
+      "resolvedRunId": null,
+      "consecutiveFailures": 2,
+      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
+      "checkName": "rca-demo",
+      "checkKind": "http",
+      "rca": {
+        "classification": "real-outage",
+        "confidence": "high",
+        "observed": [
+          "HTTP status: 500",
+          "Error message: expected status eq 200, got 500",
+          "duration: 95ms",
+          "Recent run history: fail, fail",
+          "Multi-location: failing from 1 of 1 location(s)"
+        ],
+        "inferred": [
+          "The endpoint is returning 500 responses, which indicates a server-side error",
+          "Consecutive failures suggest this is not a single transient blip",
+          "Because the check is a simple HTTP check (no selectors), the problem is likely with the target service rather than the monitor",
+          "Investigate server logs, health checks, and recent deploys for the target endpoint"
+        ],
+        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
+        "signature": "59|expected status eq 200, got 500|",
+        "model": "gpt-5-mini",
+        "cached": true,
+        "generated_at": "2026-06-24T16:15:22.485Z"
+      }
+    },
+    {
+      "id": 31,
+      "checkId": 59,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-24T15:00:19.615821+00:00",
+      "resolvedAt": "2026-06-24T16:13:42.669019+00:00",
+      "openedRunId": 842370,
+      "resolvedRunId": null,
+      "consecutiveFailures": 2,
+      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
+      "checkName": "rca-demo",
+      "checkKind": "http",
+      "rca": null
+    },
+    {
+      "id": 30,
+      "checkId": 59,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-24T14:25:33.325541+00:00",
+      "resolvedAt": "2026-06-24T14:58:55.588446+00:00",
+      "openedRunId": 842343,
+      "resolvedRunId": null,
+      "consecutiveFailures": 2,
+      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
+      "checkName": "rca-demo",
+      "checkKind": "http",
+      "rca": null
+    },
+    {
+      "id": 29,
+      "checkId": 59,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-24T13:40:18.123931+00:00",
+      "resolvedAt": "2026-06-24T14:24:27.620222+00:00",
+      "openedRunId": 842304,
+      "resolvedRunId": null,
+      "consecutiveFailures": 2,
+      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
+      "checkName": "rca-demo",
+      "checkKind": "http",
+      "rca": null
+    },
+    {
+      "id": 28,
+      "checkId": 59,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-24T12:50:34.933849+00:00",
+      "resolvedAt": "2026-06-24T13:36:02.258031+00:00",
+      "openedRunId": 842269,
+      "resolvedRunId": null,
+      "consecutiveFailures": 2,
+      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
+      "checkName": "rca-demo",
+      "checkKind": "http",
+      "rca": null
+    },
+    {
+      "id": 26,
+      "checkId": 59,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-24T00:10:18.675995+00:00",
+      "resolvedAt": "2026-06-24T12:47:04.984844+00:00",
+      "openedRunId": 841690,
+      "resolvedRunId": null,
+      "consecutiveFailures": 2,
+      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
+      "checkName": "rca-demo",
+      "checkKind": "http",
+      "rca": {
+        "classification": "real-outage",
+        "confidence": "high",
+        "observed": [
+          "HTTP status: 500",
+          "Error message: expected status eq 200, got 500",
+          "duration: 95ms",
+          "Recent run history: fail, fail",
+          "Multi-location: failing from 1 of 1 location(s)"
+        ],
+        "inferred": [
+          "The endpoint is returning 500 responses, which indicates a server-side error",
+          "Consecutive failures suggest this is not a single transient blip",
+          "Because the check is a simple HTTP check (no selectors), the problem is likely with the target service rather than the monitor",
+          "Investigate server logs, health checks, and recent deploys for the target endpoint"
+        ],
+        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
+        "signature": "59|expected status eq 200, got 500|",
+        "model": "gpt-5-mini",
+        "cached": true,
+        "generated_at": "2026-06-24T00:10:28.766Z"
+      }
+    },
+    {
+      "id": 25,
+      "checkId": 59,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-23T21:10:20.717921+00:00",
+      "resolvedAt": "2026-06-24T00:07:41.951212+00:00",
+      "openedRunId": 841549,
+      "resolvedRunId": null,
+      "consecutiveFailures": 2,
+      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
+      "checkName": "rca-demo",
+      "checkKind": "http",
+      "rca": {
+        "classification": "real-outage",
+        "confidence": "high",
+        "observed": [
+          "HTTP status: 500",
+          "Error message: expected status eq 200, got 500",
+          "duration: 95ms",
+          "Recent run history: fail, fail",
+          "Multi-location: failing from 1 of 1 location(s)"
+        ],
+        "inferred": [
+          "The endpoint is returning 500 responses, which indicates a server-side error",
+          "Consecutive failures suggest this is not a single transient blip",
+          "Because the check is a simple HTTP check (no selectors), the problem is likely with the target service rather than the monitor",
+          "Investigate server logs, health checks, and recent deploys for the target endpoint"
+        ],
+        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
+        "signature": "59|expected status eq 200, got 500|",
+        "model": "gpt-5-mini",
+        "cached": true,
+        "generated_at": "2026-06-23T21:10:20.790Z"
+      }
+    },
+    {
+      "id": 24,
+      "checkId": 59,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-23T20:05:20.442022+00:00",
+      "resolvedAt": "2026-06-23T21:08:33.763732+00:00",
+      "openedRunId": 841497,
+      "resolvedRunId": null,
+      "consecutiveFailures": 2,
+      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
+      "checkName": "rca-demo",
+      "checkKind": "http",
+      "rca": null
+    },
+    {
+      "id": 23,
+      "checkId": 4,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-23T19:55:25.188596+00:00",
+      "resolvedAt": "2026-06-23T20:05:18.27033+00:00",
+      "openedRunId": 841493,
+      "resolvedRunId": 841496,
+      "consecutiveFailures": 2,
+      "summary": "Check \"SynthWatch API health\" down (fail) from 2 of 2 locations.",
+      "checkName": "SynthWatch API health",
+      "checkKind": "http",
+      "rca": null
+    },
+    {
+      "id": 19,
+      "checkId": 59,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-23T01:25:18.810434+00:00",
+      "resolvedAt": "2026-06-23T19:46:11.837749+00:00",
+      "openedRunId": 840840,
+      "resolvedRunId": 841485,
+      "consecutiveFailures": 3,
+      "summary": "Check \"rca-demo\" down (fail) 3 consecutive times.",
+      "checkName": "rca-demo",
+      "checkKind": "http",
+      "rca": {
+        "classification": "real-outage",
+        "confidence": "high",
+        "observed": [
+          "HTTP status: 500",
+          "Error message: expected status eq 200, got 500",
+          "duration: 95ms",
+          "Recent run history: fail, fail",
+          "Multi-location: failing from 1 of 1 location(s)"
+        ],
+        "inferred": [
+          "The endpoint is returning 500 responses, which indicates a server-side error",
+          "Consecutive failures suggest this is not a single transient blip",
+          "Because the check is a simple HTTP check (no selectors), the problem is likely with the target service rather than the monitor",
+          "Investigate server logs, health checks, and recent deploys for the target endpoint"
+        ],
+        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
+        "signature": "59|expected status eq 200, got 500|",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-06-23T01:25:29.799Z"
+      }
+    },
+    {
+      "id": 8,
+      "checkId": 4,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-22T12:15:29.383239+00:00",
+      "resolvedAt": "2026-06-22T12:35:24.161835+00:00",
+      "openedRunId": 840484,
+      "resolvedRunId": 840489,
+      "consecutiveFailures": 2,
+      "summary": "Check \"SynthWatch API health\" down (error) 2 consecutive times.",
+      "checkName": "SynthWatch API health",
+      "checkKind": "http",
+      "rca": null
+    },
+    {
+      "id": 2,
+      "checkId": 2,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-21T13:51:04.229749+00:00",
+      "resolvedAt": "2026-06-21T15:34:16.20549+00:00",
+      "openedRunId": 640145,
+      "resolvedRunId": 840164,
+      "consecutiveFailures": 3,
+      "summary": "Check \"homepage search funnel\" failed 3 consecutive times (died at step: focus search box).",
+      "checkName": "Wegmans homepage",
+      "checkKind": "browser",
+      "rca": null
+    },
+    {
+      "id": 1,
+      "checkId": 2,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-20T22:26:05.01733+00:00",
+      "resolvedAt": "2026-06-21T12:13:12.841259+00:00",
+      "openedRunId": 10,
+      "resolvedRunId": 640129,
+      "consecutiveFailures": 3,
+      "summary": "Check \"homepage search funnel\" failed 3 consecutive times (died at step: focus search box).",
+      "checkName": "Wegmans homepage",
+      "checkKind": "browser",
+      "rca": null
+    }
+  ],
+  "nextCursor": null,
+  "pageSize": 50
+}

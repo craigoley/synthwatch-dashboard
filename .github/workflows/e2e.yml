@@ -31,6 +31,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Contract checks: run the REAL api-client mappers against CAPTURED REAL API responses
+      # (contract/real/*.json) so the client can't silently assume a shape the API doesn't serve.
+      # Fast (no browser / no webServer) → early signal before the heavier suite.
+      - name: API contract checks
+        run: pnpm contract
+
       # Cache the browser binaries (keyed on the lockfile, which pins the
       # @playwright/test version) so we don't re-download ~100MB every run.
       - name: Cache Playwright browsers

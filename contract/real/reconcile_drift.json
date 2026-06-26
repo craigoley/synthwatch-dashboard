@@ -1,0 +1,27 @@
+{
+  "items": [
+    {
+      "sourceKey": "synthwatch-self-homepage",
+      "driftType": "new",
+      "detail": {
+        "kind": "browser",
+        "name": "SynthWatch dashboard homepage",
+        "flow_name": "dashboard-homepage",
+        "target_url": "https://synthwatch-dashboard.vercel.app"
+      },
+      "detectedAt": "2026-06-26T01:00:18.255654+00:00"
+    },
+    {
+      "sourceKey": "wegmans-recipe-nav",
+      "driftType": "new",
+      "detail": {
+        "kind": "browser",
+        "name": "Wegmans: recipe navigation",
+        "flow_name": "recipe-nav",
+        "target_url": "https://www.wegmans.com"
+      },
+      "detectedAt": "2026-06-26T01:00:18.255654+00:00"
+    }
+  ],
+  "detectedAt": "2026-06-26T01:00:18.255654+00:00"
+}
