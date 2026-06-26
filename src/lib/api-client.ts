@@ -39,6 +39,12 @@ import type {
   ReconcileDrift,
   SpecCatalog,
   SpecCatalogEntry,
+  AiInsight,
+  AiInsightConfidence,
+  AiInsightScope,
+  AiInsightSeverity,
+  AiInsights,
+  AiInsightsResult,
   Check,
   CheckAuth,
   CheckDetail,
@@ -559,6 +565,81 @@ export async function getRuns(id: number, query: RunsQuery = {}): Promise<RunsPa
 export async function getSteps(runId: number): Promise<RunStep[]> {
   const raw = await request<RawStep[]>(`/runs/${runId}/steps`);
   return raw.map(mapStep);
+}
+
+// ─── Trace AI insights (POST /api/runs/:id/ai-insights — slice 2 endpoint, gated editor/admin) ────────
+// Contract this UI consumes (the endpoint returns 200 for all non-fatal states; the gate handles 401/403):
+//   { configured: false, message? }                       → not configured yet (AOAI deploy prereq)
+//   { configured: true,  insights: null,  message? }      → AOAI/extraction failed (non-fatal) → retry
+//   { configured: true,  insights: { summary, performance[], network[], errors[], suggestions[], caveats[] } }
+interface RawAiInsight {
+  severity?: string;
+  confidence?: string;
+  title?: string;
+  detail?: string;
+  evidence?: string | null;
+  scope?: string | null;
+}
+interface RawAiInsights {
+  summary?: string;
+  performance?: RawAiInsight[];
+  network?: RawAiInsight[];
+  errors?: RawAiInsight[];
+  suggestions?: RawAiInsight[];
+  caveats?: string[];
+}
+interface RawAiInsightsResponse {
+  configured?: boolean;
+  message?: string;
+  insights?: RawAiInsights | null;
+}
+
+const AI_SEVERITIES: readonly string[] = ["critical", "high", "medium", "low", "info"];
+const AI_CONFIDENCES: readonly string[] = ["high", "medium", "low"];
+
+function mapAiInsight(r: RawAiInsight): AiInsight {
+  return {
+    severity: (AI_SEVERITIES.includes(r.severity ?? "") ? r.severity : "info") as AiInsightSeverity,
+    confidence: (AI_CONFIDENCES.includes(r.confidence ?? "") ? r.confidence : "low") as AiInsightConfidence,
+    title: String(r.title ?? ""),
+    detail: String(r.detail ?? ""),
+    evidence: r.evidence ?? null,
+    scope:
+      r.scope === "site" || r.scope === "third_party" || r.scope === "unknown"
+        ? (r.scope as AiInsightScope)
+        : null,
+  };
+}
+
+function mapAiInsights(r: RawAiInsights): AiInsights {
+  const arr = (a?: RawAiInsight[]) => (a ?? []).map(mapAiInsight);
+  return {
+    summary: String(r.summary ?? ""),
+    performance: arr(r.performance),
+    network: arr(r.network),
+    errors: arr(r.errors),
+    suggestions: arr(r.suggestions),
+    caveats: (r.caveats ?? []).map(String),
+  };
+}
+
+/**
+ * POST /api/runs/:id/ai-insights — on-demand AOAI trace analysis. Normalizes the endpoint's three
+ * non-fatal states (see the contract above). 401/403 are NOT swallowed here — they propagate so the
+ * global request() interceptor drives re-login / the permission toast; the caller resets its own UI.
+ */
+export async function getAiInsights(runId: number): Promise<AiInsightsResult> {
+  const raw = await request<RawAiInsightsResponse | null>(`/runs/${runId}/ai-insights`, undefined, {
+    method: "POST",
+  });
+  if (!raw || raw.configured === false) {
+    return { status: "not_configured", message: raw?.message ?? "AI insights aren’t configured yet." };
+  }
+  const ins = raw.insights ?? null;
+  if (!ins || typeof ins.summary !== "string" || ins.summary.trim() === "") {
+    return { status: "unavailable", message: raw.message ?? "Couldn’t generate insights for this trace." };
+  }
+  return { status: "ok", insights: mapAiInsights(ins) };
 }
 
 /** GET /api/checks/:id/metrics — run_metrics time series. */

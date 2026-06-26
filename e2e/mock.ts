@@ -82,6 +82,10 @@ export interface World {
   tags?: RawObj[];
   /** Reports served? false → /reports/* 404 (endpoint not deployed). Default true. */
   reportsServed?: boolean;
+  /** POST /api/runs/{id}/ai-insights body. Unset → not-configured (the live default until the AOAI deploy
+   *  prereq). Set { configured:true, insights:{…} } for the happy path; { configured:true, insights:null }
+   *  for the AOAI-null "unavailable" path. */
+  aiInsights?: RawObj;
   /** Reproduce the prod bug: /reports/availability + /reports/performance return 200 with EMPTY groups
    *  (the rollup-backed reports can be empty even when monitors exist). The per-monitor list must still
    *  render from /checks + /sla. Default false. */
@@ -348,6 +352,12 @@ export async function mockApi(
       return json(route, world.routing);
     }
     // Async test-send: POST enqueues (202 { requestId }); undefined → 404 (not deployed).
+    // Trace AI insights (slice 3). Default (world.aiInsights unset) = the LIVE state: AOAI not configured
+    // yet — a graceful 200, NOT an error. Tests set world.aiInsights to drive the configured/null paths.
+    if ((m = path.match(/^\/api\/runs\/(\d+)\/ai-insights$/)) && method === "POST") {
+      return json(route, world.aiInsights ?? { configured: false, message: "AI insights aren’t configured yet." });
+    }
+
     if ((m = path.match(/^\/api\/channels\/(\d+)\/test$/)) && method === "POST") {
       if (!world.channelTest) return json(route, { error: "not_found" }, 404);
       if (world.channelTest.enqueueError) {
