@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth-provider";
 import { AvailabilityChart, LatencyChart, MetricsCharts } from "@/components/charts";
 import { CheckSlaPanel, SloPanel } from "@/components/sla";
 import { RunHistory } from "@/components/run-history";
+import { LiveStepsChecklist } from "@/components/live-steps";
 import { TraceViewer } from "@/components/trace-viewer";
 import { StatusBadge, TONE_VAR } from "@/components/status-badge";
 import { TagChips } from "@/components/tag-chips";
@@ -391,6 +392,12 @@ export default function CheckDetailPage() {
           </button>
         </div>
       </header>
+
+      {/* Live step-by-step checklist — shown only while a run is in flight (the run-history funnel takes
+          over once it's terminal). Rides #108's fast poll; steps come from the runner's live run_steps. */}
+      {latestRunStatus === "running" && (check.kind === "browser" || check.kind === "multistep") && (
+        <LiveStepsChecklist run={recent_runs[0]!} templateRunId={recent_runs[1]?.id ?? null} />
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <ConfigChip label="Interval" value={`${secondsToMinutesLabel(check.interval_seconds)} min`} />

@@ -252,8 +252,12 @@ function rest<T>(h: ReturnType<typeof useCursorHistory<T>>) {
   };
 }
 
-export function useRunSteps(runId: number | null) {
-  return useSWR(runId ? keys.steps(runId) : null, () => getSteps(runId as number));
+export function useRunSteps(runId: number | null, live = false) {
+  return useSWR(runId ? keys.steps(runId) : null, () => getSteps(runId as number), {
+    // Ride the SAME fast cadence #108 uses for the run status: poll while the run is in flight so the
+    // step checklist advances live (running → pass/fail); 0 = no auto-refresh once it's terminal/static.
+    refreshInterval: live ? RUN_ACTIVE_POLL_MS : 0,
+  });
 }
 
 export function useMetrics(id: number | null) {

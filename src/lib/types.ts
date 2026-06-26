@@ -100,7 +100,7 @@ export interface TagInUse extends Tag {
 }
 
 export type RunStatus = "running" | "pass" | "warn" | "fail" | "error";
-export type RunStepStatus = "pass" | "fail" | "skip";
+export type RunStepStatus = "pass" | "fail" | "error" | "running" | "skip";
 export type IncidentSeverity = "warning" | "critical";
 export type IncidentStatus = "open" | "resolved";
 export type LighthouseFormFactor = "mobile" | "desktop";
