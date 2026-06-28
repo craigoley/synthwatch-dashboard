@@ -517,7 +517,6 @@ export interface ReportSeriesPoint {
 export interface AvailabilityCheckRow {
   check_id: number;
   name: string;
-  kind: CheckKind;
   availability_pct: number | null;
   downtime_minutes: number;
   incident_count: number;
@@ -556,7 +555,6 @@ export interface WebVitals {
 export interface PerformanceCheckRow {
   check_id: number;
   name: string;
-  kind: CheckKind;
   avg_ms: number | null;
   p50_ms: number | null;
   p95_ms: number | null;

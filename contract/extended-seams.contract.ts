@@ -63,6 +63,26 @@ test.describe("API contract — extended seams", () => {
     expect(c0.check_id).toBe(rc0.checkId);
     expect(c0.name).toBe(rc0.checkName);
     expect(c0.p95_ms).toBe(rc0.latency.p95Ms);
+
+    // ★ Series: API sends `day`+`avgMs` (NOT `date`+`value`). Pin + verify mapper.
+    expect(g.series.length).toBeGreaterThan(0);
+    expect(g.series[0]).toHaveProperty("day");
+    expect(g.series[0]).not.toHaveProperty("date");
+    expect(g.series[0]).toHaveProperty("avgMs");
+    expect(g.series[0]).not.toHaveProperty("value");
+    expect(grp.series.length).toBe(g.series.length);
+    expect(grp.series[0]!.date).toBe(g.series[0].day);
+    expect(grp.series[0]!.value).toBe(g.series[0].avgMs);
+
+    // ★ Per-check rows have NO `kind` field; group has no `browserCheckCount`/`checkCount`.
+    expect(g.checks[0]).not.toHaveProperty("kind");
+    expect(g).not.toHaveProperty("browserCheckCount");
+    expect(g).not.toHaveProperty("checkCount");
+
+    // ★ browser_check_count falls back to per-check webVitals presence.
+    const expectedBrowserCount = g.checks.filter((c: Record<string, unknown>) => c.webVitals != null).length;
+    expect(grp.browser_check_count).toBe(expectedBrowserCount);
+    expect(grp.check_count).toBe(g.checks.length);
   });
 
   test("/reports/narrative — factPack OBJECT → derived cited chips (guards the #82 blank-chips bug)", async () => {

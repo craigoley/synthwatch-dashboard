@@ -1349,9 +1349,12 @@ export async function getDeliveryReadiness(): Promise<DeliveryReadiness | null> 
 // the snake_case report types. FLAGGED DEP: return null on 404 (endpoint not served
 // yet → the page shows "reports pending", never a broken view).
 
-interface RawSeriesPoint { date: string; value: number | null }
-const mapSeries = (s?: RawSeriesPoint[] | null): ReportSeriesPoint[] =>
-  (s ?? []).map((p) => ({ date: p.date, value: p.value ?? null }));
+// ★ The API serves series with `day` (not `date`) and a metric-specific value field:
+// availability → `availabilityPct`, performance → `avgMs`. Map both to the domain
+// { date, value } so chart components stay agnostic.
+interface RawReportSeriesPoint { day: string; availabilityPct?: number | null; avgMs?: number | null }
+const mapSeries = (s?: RawReportSeriesPoint[] | null): ReportSeriesPoint[] =>
+  (s ?? []).map((p) => ({ date: p.day, value: p.availabilityPct ?? p.avgMs ?? null }));
 
 export async function getAvailabilityReport(
   window: ReportWindow,
@@ -1359,24 +1362,24 @@ export async function getAvailabilityReport(
 ): Promise<AvailabilityReport | null> {
   try {
     const raw = await request<Record<string, unknown>>("/reports/availability", { window, groupBy });
-    const groups = ((raw?.groups as Record<string, unknown>[]) ?? []).map((g) => ({
-      group: String(g.group ?? "ungrouped"),
-      availability_pct: (g.availabilityPct as number) ?? null,
-      downtime_minutes: (g.downtimeMinutes as number) ?? 0,
-      // ★ The API field is `incidentsOpened` (not `incidentCount`). Reading the wrong name made this
-      // always 0 → the reports "Incidents" sort had a constant key for every monitor → it never reordered.
-      incident_count: (g.incidentsOpened as number) ?? 0,
-      check_count: (g.checkCount as number) ?? 0,
-      series: mapSeries(g.series as RawSeriesPoint[]),
-      checks: ((g.checks as Record<string, unknown>[]) ?? []).map((c) => ({
+    const groups = ((raw?.groups as Record<string, unknown>[]) ?? []).map((g) => {
+      const checks = ((g.checks as Record<string, unknown>[]) ?? []).map((c) => ({
         check_id: c.checkId as number,
-        name: String(c.checkName ?? ""), // API serves `checkName`, not `name`
-        kind: c.kind as CheckKind,
+        name: String(c.checkName ?? ""),
         availability_pct: (c.availabilityPct as number) ?? null,
         downtime_minutes: (c.downtimeMinutes as number) ?? 0,
         incident_count: (c.incidentsOpened as number) ?? 0,
-      })),
-    }));
+      }));
+      return {
+        group: String(g.group ?? "ungrouped"),
+        availability_pct: (g.availabilityPct as number) ?? null,
+        downtime_minutes: (g.downtimeMinutes as number) ?? 0,
+        incident_count: (g.incidentsOpened as number) ?? 0,
+        check_count: (g.checkCount as number) ?? checks.length,
+        series: mapSeries(g.series as RawReportSeriesPoint[]),
+        checks,
+      };
+    });
     return { window, group_by: String(raw?.groupBy ?? groupBy), groups };
   } catch (err) {
     if (err instanceof ApiRequestError && err.status === 404) return null;
@@ -1457,12 +1460,12 @@ export async function getPerformanceReport(
       // test now (the missing test let this ship). INP is intentionally absent (never captured).
       const lat = (g.latency ?? {}) as Record<string, unknown>;
       const wv = g.webVitals as Record<string, unknown> | null | undefined;
-      const checks = ((g.checks as Record<string, unknown>[]) ?? []).map((c) => {
+      const rawChecks = (g.checks as Record<string, unknown>[]) ?? [];
+      const checks = rawChecks.map((c) => {
         const cl = (c.latency ?? {}) as Record<string, unknown>;
         return {
           check_id: c.checkId as number,
           name: String(c.checkName ?? ""),
-          kind: c.kind as CheckKind,
           avg_ms: (cl.avgMs as number) ?? null,
           p50_ms: (cl.p50Ms as number) ?? null,
           p95_ms: (cl.p95Ms as number) ?? null,
@@ -1475,8 +1478,7 @@ export async function getPerformanceReport(
         p50_ms: (lat.p50Ms as number) ?? null,
         p95_ms: (lat.p95Ms as number) ?? null,
         p99_ms: (lat.p99Ms as number) ?? null,
-        series: mapSeries(g.series as RawSeriesPoint[]),
-        // null when the group has no browser checks → the UI renders NO vitals.
+        series: mapSeries(g.series as RawReportSeriesPoint[]),
         web_vitals: wv
           ? {
               lcp_ms: (wv.lcpP75Ms as number) ?? null,
@@ -1485,7 +1487,7 @@ export async function getPerformanceReport(
               cls: (wv.clsP75 as number) ?? null,
             }
           : null,
-        browser_check_count: (g.browserCheckCount as number) ?? 0,
+        browser_check_count: (g.browserCheckCount as number) ?? rawChecks.filter((c) => c.webVitals != null).length,
         check_count: (g.checkCount as number) ?? checks.length,
         checks,
       };

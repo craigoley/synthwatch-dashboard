@@ -117,6 +117,36 @@ test.describe("API contract — real-response shape vs client mappers", () => {
     }
   });
 
+  test("★ GET /reports/availability — series uses `day`+`availabilityPct` (not `date`+`value`); no `kind` on checks; check_count fallback", async () => {
+    const raw = real("reports_availability_7d");
+    const g = raw.groups[0];
+
+    // Pin the real series shape: `day` (NOT `date`), `availabilityPct` (NOT `value`).
+    expect(g.series.length).toBeGreaterThan(0);
+    expect(g.series[0]).toHaveProperty("day");
+    expect(g.series[0]).not.toHaveProperty("date");
+    expect(g.series[0]).toHaveProperty("availabilityPct");
+    expect(g.series[0]).not.toHaveProperty("value");
+
+    // Pin: per-check rows have NO `kind` field.
+    expect(g.checks[0]).not.toHaveProperty("kind");
+
+    // Pin: group has NO `checkCount` — the API sends `totalCount` (run count).
+    expect(g).not.toHaveProperty("checkCount");
+    expect(g).toHaveProperty("totalCount");
+
+    const report = await withRealResponse(raw, () => getAvailabilityReport("7d", "none"));
+    const group = report!.groups[0]!;
+
+    // ★ Series: mapper must read `day` → `date`, `availabilityPct` → `value`.
+    expect(group.series.length).toBe(g.series.length);
+    expect(group.series[0]!.date).toBe(g.series[0].day);
+    expect(group.series[0]!.value).toBe(g.series[0].availabilityPct);
+
+    // ★ check_count falls back to checks.length (no checkCount in capture).
+    expect(group.check_count).toBe(g.checks.length);
+  });
+
   test("GET /reconcile/drift + /specs are envelopes ({items,…}); client reads .items", async () => {
     const drift = real("reconcile_drift");
     const driftRes = await withRealResponse(drift, () => getReconcileDrift());
