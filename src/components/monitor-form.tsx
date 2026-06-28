@@ -929,7 +929,7 @@ export function MonitorForm({ initial, activation, onDone, onCancel }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-3">
         <Field label="Interval (minutes)">
           <input
             className="sw-input sw-mono"
