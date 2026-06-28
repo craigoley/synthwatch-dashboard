@@ -458,8 +458,10 @@ export async function mockApi(
       const gb = url.searchParams.get("groupBy") ?? "none";
       const days = win === "7d" ? 7 : win === "90d" ? 90 : 30;
       const base = Date.parse("2026-03-01T00:00:00Z");
-      const series = (v: number) =>
-        Array.from({ length: days }, (_, i) => ({ date: new Date(base + i * 86400000).toISOString().slice(0, 10), value: v }));
+      const availSeries = (pct: number) =>
+        Array.from({ length: days }, (_, i) => ({ day: new Date(base + i * 86400000).toISOString().slice(0, 10), availabilityPct: pct, upCount: 100, downCount: Math.round((100 - pct) / 100 * 100) }));
+      const perfSeries = (avgMs: number) =>
+        Array.from({ length: days }, (_, i) => ({ day: new Date(base + i * 86400000).toISOString().slice(0, 10), avgMs }));
       // Per-check rows mirror the real checks so they align with useChecks (tags) by
       // id; metrics vary by id so sorting reorders observably.
       const checks = world.checks ?? [];
@@ -472,13 +474,14 @@ export async function mockApi(
           const id = Number(c.id);
           const pct = availPct(id);
           return {
-            checkId: id, checkName: c.name, kind: c.kind, availabilityPct: pct,
+            checkId: id, checkName: c.name, availabilityPct: pct,
+            upCount: Math.round(pct), downCount: Math.round(100 - pct),
             downtimeMinutes: Math.round(((100 - pct) / 100) * days * 1440), incidentsOpened: id % 5,
           };
         });
         const allGroup = {
           group: "all", availabilityPct: 98, downtimeMinutes: 200, incidentsOpened: rows.reduce((s, r) => s + r.incidentsOpened, 0),
-          checkCount: rows.length, series: series(98), checks: rows,
+          totalCount: rows.length * 100, series: availSeries(98), checks: rows,
         };
         const groups = gb === "none" ? [allGroup] : gb === "team"
           ? [{ ...allGroup, group: "platform", checks: rows.slice(0, 1) }, { ...allGroup, group: "web", checks: rows.slice(1) }]
@@ -493,17 +496,17 @@ export async function mockApi(
         const id = Number(c.id);
         const p95 = p95Of(id);
         return {
-          checkId: id, checkName: c.name, kind: c.kind,
+          checkId: id, checkName: c.name,
           latency: { sampleCount: 100, avgMs: Math.round(p95 * 0.5), p50Ms: Math.round(p95 * 0.6), p95Ms: p95, p99Ms: Math.round(p95 * 1.5) },
-          webVitals: null,
+          webVitals: c.kind === "browser" ? { sampleCount: 50, lcpP75Ms: 1800, fcpP75Ms: 900, ttfbP75Ms: 200, clsP75: 0.05 } : null,
         };
       });
       const allGroup = {
         group: "all",
         latency: { sampleCount: 1000, avgMs: 200, p50Ms: 180, p95Ms: 400, p99Ms: 600 },
-        series: series(400),
+        series: perfSeries(400),
         webVitals: browserCount ? { sampleCount: 200, lcpP75Ms: 1800, fcpP75Ms: 900, ttfbP75Ms: 200, clsP75: 0.05 } : null,
-        browserCheckCount: browserCount, checkCount: rows.length, checks: rows,
+        checks: rows,
       };
       const groups = gb === "none" ? [allGroup] : gb === "team"
         ? [{ ...allGroup, group: "platform" }, { ...allGroup, group: "web" }]
