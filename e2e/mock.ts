@@ -238,7 +238,7 @@ export async function mockApi(
     }
 
     // Editor management — admin-only on EVERY verb (mirrors the handler self-guard, independent of the flag).
-    if (path === "/api/editors" || path.startsWith("/api/editors/") || path === "/api/access-requests") {
+    if (path === "/api/editors" || path.startsWith("/api/editors/") || path === "/api/access-requests" || path.startsWith("/api/access-requests/")) {
       const r = roleOf();
       if (r === null) return json(route, { error: "unauthorized", message: "Authentication required." }, 401);
       if (r !== "admin")
@@ -263,6 +263,11 @@ export async function mockApi(
       if (path === "/api/access-requests" && method === "GET") {
         const have = new Set((world.editors ?? []).map((e) => e.email));
         return json(route, (world.accessRequests ?? []).filter((a) => !have.has(a.email as string)));
+      }
+      if (path.startsWith("/api/access-requests/") && method === "DELETE") {
+        const email = decodeURIComponent(path.slice("/api/access-requests/".length)).toLowerCase();
+        world.accessRequests = (world.accessRequests ?? []).filter((a) => a.email !== email);
+        return route.fulfill({ status: 204 });
       }
     }
 

@@ -10,7 +10,7 @@
 import { useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
-import { useEditors, useAccessRequests, addEditor, removeEditor } from "@/lib/client";
+import { useEditors, useAccessRequests, addEditor, removeEditor, dismissAccessRequest } from "@/lib/client";
 import { ApiRequestError } from "@/lib/api-client";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { formatRelative } from "@/lib/format";
@@ -45,6 +45,18 @@ export default function UsersPage() {
       await removeEditor(target);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Could not remove editor.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function dismiss(target: string) {
+    setBusy(target);
+    setError(null);
+    try {
+      await dismissAccessRequest(target);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Could not dismiss request.");
     } finally {
       setBusy(null);
     }
@@ -146,14 +158,25 @@ export default function UsersPage() {
                     requested {formatRelative(r.requested_at)}{r.count > 1 ? ` · ${r.count}×` : ""}
                   </span>
                 </div>
-                <button
-                  onClick={() => void add(r.email)}
-                  disabled={busy === r.email}
-                  className="sw-btn sw-btn-sm"
-                  data-testid={`grant-${r.email}`}
-                >
-                  {busy === r.email ? "…" : "Add as editor"}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => void dismiss(r.email)}
+                    disabled={busy === r.email}
+                    className="sw-btn sw-btn-ghost sw-btn-sm"
+                    style={{ color: "var(--color-fail)" }}
+                    data-testid={`dismiss-${r.email}`}
+                  >
+                    {busy === r.email ? "…" : "Dismiss"}
+                  </button>
+                  <button
+                    onClick={() => void add(r.email)}
+                    disabled={busy === r.email}
+                    className="sw-btn sw-btn-sm"
+                    data-testid={`grant-${r.email}`}
+                  >
+                    {busy === r.email ? "…" : "Add as editor"}
+                  </button>
+                </div>
               </div>
             ))}
           </div>

@@ -1669,3 +1669,8 @@ export async function listAccessRequests(): Promise<AccessRequestRow[]> {
   const raw = await request<RawAccessRequest[]>("/access-requests");
   return (raw ?? []).map((a) => ({ email: a.email, requested_at: a.requestedAt, count: a.count }));
 }
+
+/** DELETE /api/access-requests/{email} — dismiss a pending access request (admin-only). */
+export async function dismissAccessRequest(email: string): Promise<void> {
+  await request<unknown>(`/access-requests/${encodeURIComponent(email)}`, undefined, { method: "DELETE" });
+}
