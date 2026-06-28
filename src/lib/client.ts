@@ -52,6 +52,7 @@ import {
   addEditor as apiAddEditor,
   removeEditor as apiRemoveEditor,
   listAccessRequests,
+  dismissAccessRequest as apiDismissAccessRequest,
   type ChannelInput,
   createCheck as apiCreateCheck,
   updateCheck as apiUpdateCheck,
@@ -434,6 +435,12 @@ export async function addEditor(email: string) {
 export async function removeEditor(email: string) {
   await apiRemoveEditor(email);
   await Promise.all([globalMutate(keys.editors), globalMutate(keys.accessRequests)]);
+}
+
+/** Dismiss a pending access request, then refresh the list. */
+export async function dismissAccessRequest(email: string) {
+  await apiDismissAccessRequest(email);
+  await globalMutate(keys.accessRequests);
 }
 
 export function useSla(window: SlaWindow = "24h") {
