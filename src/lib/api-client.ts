@@ -154,6 +154,14 @@ async function request<T>(
   try {
     const res = await fetch(buildUrl(path, params), {
       ...init,
+      // ★ Live-monitoring data must never come from the browser HTTP cache. The fetch default (cache:
+      // "default") let the browser reuse a cached GET on every poll tick — the run-history list polled 40+
+      // times yet kept returning the SAME page 0 (same newestId + identical nextCursor) until a hard refresh
+      // (which sends no-cache and bypassed it). The API doesn't help: /checks/{id}/runs sends NO Cache-Control
+      // (heuristically cacheable) and /checks even sends `public, max-age=10`. SWR is our ONLY cache layer;
+      // the HTTP layer must always hit the network so a freshly-written run/incident shows within a poll.
+      // Overridable per-call (init.cache) for any future genuinely-static GET.
+      cache: init?.cache ?? "no-store",
       signal: controller?.signal ?? init?.signal,
       headers: {
         accept: "application/json",
