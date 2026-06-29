@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
@@ -286,6 +286,26 @@ export default function CheckDetailPage() {
     if (valid && latestRunStatus !== null) void revalidateRunHistory(id);
   }, [latestRunStatus, valid, id]);
 
+  // ★ Post-terminal "settle" window: when a run goes running→terminal, keep the list + trace on the FAST
+  // poll for a few beats so the completed row AND a trace_url that lands JUST AFTER the status flip are
+  // picked up. Without this the lifecycle would stop ON the transition (one beat too early) and the trace
+  // (uploaded around the terminal write) could lag until a manual refresh.
+  const [settling, setSettling] = useState(false);
+  const prevStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = latestRunStatus;
+    if (prev === "running" && latestRunStatus !== null && latestRunStatus !== "running") {
+      setSettling(true);
+      const t = setTimeout(() => setSettling(false), 6000);
+      return () => clearTimeout(t);
+    }
+  }, [latestRunStatus]);
+
+  // The run-history list + per-run trace are "live" while a run is expected (Run now just clicked), actively
+  // running, or just settled — the SAME poll-while-running lifecycle as the status badge.
+  const runLive = expectRun || latestRunStatus === "running" || settling;
+
   if (!valid) return <ErrorState message="Invalid check id." />;
   if (isLoading && !data) return <div className="py-16"><Spinner label="Loading monitor…" /></div>;
   if (error)
@@ -488,7 +508,7 @@ export default function CheckDetailPage() {
 
       {/* Cursor-paginated run history: date-range control (default last 7d) + Load more.
           The default window keeps the first fetch BOUNDED — never an all-time scan. */}
-      <RunHistory checkId={check.id} />
+      <RunHistory checkId={check.id} live={runLive} />
 
       <Modal open={editing} onClose={() => setEditing(false)} title={`Edit · ${check.name}`}>
         <MonitorForm initial={check} onDone={() => setEditing(false)} onCancel={() => setEditing(false)} />

@@ -115,8 +115,15 @@ export function useChecks() {
   return useSWR(keys.checks, () => listChecks(), live);
 }
 
-/** Poll cadence while a run is in-flight (or just triggered) — fast enough to SEE pending→running→done. */
+/**
+ * SHARED run-aware poll cadence (#108): poll FAST while a run is in-flight/expected, fall back to the idle
+ * cadence otherwise — self-stopping. The status badge (useCheck) AND the run-history LIST + per-run TRACE
+ * (useRunHistory) all consume this ONE rule, so the three seams stay in lockstep through a run's lifecycle
+ * instead of the list/trace lagging on a static interval.
+ */
 const RUN_ACTIVE_POLL_MS = 2500;
+const IDLE_POLL_MS = 15_000;
+const runAwareInterval = (active: boolean): number => (active ? RUN_ACTIVE_POLL_MS : IDLE_POLL_MS);
 
 export function useCheck(id: number | null, opts: { expectRun?: boolean } = {}) {
   return useSWR(id ? keys.check(id) : null, () => getCheck(id as number), {
@@ -126,7 +133,7 @@ export function useCheck(id: number | null, opts: { expectRun?: boolean } = {}) 
     // cadence once it settles. Never a perpetual fast loop: the fast tick only persists while there's an
     // in-flight/expected run. (refreshInterval as a function is re-evaluated each tick against the latest data.)
     refreshInterval: (latest) =>
-      opts.expectRun || latest?.recent_runs?.[0]?.status === "running" ? RUN_ACTIVE_POLL_MS : 15_000,
+      runAwareInterval(Boolean(opts.expectRun) || latest?.recent_runs?.[0]?.status === "running"),
   });
 }
 
@@ -163,6 +170,13 @@ function useCursorHistory<T>(
   scope: readonly (string | number | null)[] | null,
   fetchPage: (cursor: string | null) => Promise<CursorPageData<T>>,
   pageSize: number,
+  // Opt-in run-aware live refresh (run history). Defaults preserve the prior static behavior (incidents):
+  //  - live: externally "a run is in-flight/expected" (primed by Run now + the post-terminal settle window)
+  //  - runningWhile: derive in-flight from the loaded items (the newest run's status === 'running')
+  //  - revalidateFirstPage: MUST be true for live lists — a brand-new run lands on page 0, and with this
+  //    false (the prior default) page 0 was skipped on every tick, so the new run never appeared until a
+  //    manual reload. That was the bug.
+  opts: { live?: boolean; runningWhile?: (items: T[]) => boolean; revalidateFirstPage?: boolean } = {},
 ) {
   const getKey = (index: number, prev: CursorPageData<T> | null) => {
     if (!scope) return null;
@@ -174,7 +188,16 @@ function useCursorHistory<T>(
   const swr = useSWRInfinite<CursorPageData<T>>(
     getKey,
     (key) => fetchPage((key[key.length - 1] as string | null) ?? null),
-    { refreshInterval: 15_000, revalidateOnFocus: true, revalidateFirstPage: false, keepPreviousData: true },
+    {
+      // SHARED run-aware cadence (matches useCheck): fast while a run is live, idle otherwise.
+      refreshInterval: (pages) =>
+        runAwareInterval(
+          Boolean(opts.live) || (opts.runningWhile?.((pages ?? []).flatMap((p) => p.items)) ?? false),
+        ),
+      revalidateOnFocus: true,
+      revalidateFirstPage: opts.revalidateFirstPage ?? false,
+      keepPreviousData: true,
+    },
   );
 
   const pages = swr.data ?? [];
@@ -203,6 +226,9 @@ export function useRunHistory(
   id: number | null,
   range: { from?: string; to?: string },
   pageSize = RUN_PAGE_SIZE,
+  // ★ live: externally "a run is in-flight/expected" (Run now + the post-terminal settle window), so the
+  // list + trace ride the SAME poll-while-running lifecycle as the status badge — no manual refresh.
+  opts: { live?: boolean } = {},
 ) {
   const h = useCursorHistory<Run>(
     id ? ["run-history", id, range.from ?? null, range.to ?? null] : null,
@@ -211,6 +237,11 @@ export function useRunHistory(
         (p) => ({ items: p.runs, nextCursor: p.next_cursor }),
       ),
     pageSize,
+    {
+      live: opts.live,
+      runningWhile: (items) => items[0]?.status === "running", // self-fast-poll while the newest run runs
+      revalidateFirstPage: true, // page 0 holds the newest run — it MUST refresh on the live tick
+    },
   );
   return { runs: h.items, ...rest(h) };
 }
