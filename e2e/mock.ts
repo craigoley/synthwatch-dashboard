@@ -113,6 +113,8 @@ export interface World {
   reconcileTriggerError?: { status: number };
   /** POST /api/runs/{id}/baseline-diff response (LocationDiffDto shape). Unset → configured:false (inert). */
   baselineDiff?: RawObj;
+  /** Check ids whose on-demand run trigger should 500 (the "Run all" partial-failure path). */
+  runTriggerFailIds?: number[];
   /**
    * Spec catalog (Phase 13). Unset → /api/specs 404 → the catalog page shows a neutral "not
    * available" notice. Set to { items: [] } for the "no specs yet" empty state, or with rows.
@@ -563,8 +565,11 @@ export async function mockApi(
         ? json(route, world.notificationsHealth)
         : json(route, { error: "not_found" }, 404); // readiness endpoint not deployed (flagged dep)
     }
-    // On-demand run trigger (the "Run now" affordance) — the API enqueues + returns { requestId }.
-    if (/^\/api\/checks\/(\d+)\/run$/.test(path) && method === "POST") {
+    // On-demand run trigger (the "Run now" / "Run all" affordance) — the API enqueues + returns { requestId }.
+    // runTriggerFailIds forces specific monitors' triggers to 500 (the "couldn't start" partial-failure path).
+    if ((m = path.match(/^\/api\/checks\/(\d+)\/run$/)) && method === "POST") {
+      if (world.runTriggerFailIds?.includes(Number(m[1])))
+        return json(route, { error: "unavailable" }, 500);
       return json(route, { requestId: (nextRequestId += 1) }, 202);
     }
     if ((m = path.match(/^\/api\/checks\/(\d+)$/))) {

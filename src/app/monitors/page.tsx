@@ -11,6 +11,7 @@ import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { ReconcileDriftSurface } from "@/components/reconcile-drift";
+import { RunAllControl } from "@/components/run-all";
 import { useAuth } from "@/components/auth-provider";
 import { SignInToEdit } from "@/components/write-gate";
 import { formatRelative } from "@/lib/format";
@@ -109,7 +110,9 @@ function DeleteDialog({
 }
 
 export default function MonitorsPage() {
-  const { data, error, isLoading } = useChecks();
+  // While a "Run all" batch is in flight, fast-poll the list so the aggregate progress advances live.
+  const [batchRunning, setBatchRunning] = useState(false);
+  const { data, error, isLoading } = useChecks({ fast: batchRunning });
   const { data: inUseTags } = useTags();
   const { canWrite } = useAuth();
   const { selected, toggle, clear } = useTagFilter();
@@ -137,11 +140,15 @@ export default function MonitorsPage() {
           <p className="sw-eyebrow">Configuration</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Monitors</h1>
         </div>
-        {canWrite && (
-          <button onClick={() => setCreating(true)} className="sw-btn sw-btn-primary">
-            + New monitor
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Run the CURRENT filtered set in one click — editor-only, capped fan-out, live aggregate progress. */}
+          <RunAllControl allChecks={data ?? []} scope={visible} onRunningChange={setBatchRunning} />
+          {canWrite && (
+            <button onClick={() => setCreating(true)} className="sw-btn sw-btn-primary">
+              + New monitor
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Read-only-by-default: viewers see a sign-in prompt; write affordances are gated on canWrite. */}
