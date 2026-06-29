@@ -222,6 +222,12 @@ export interface Run {
   trace_url: string | null;
   /** SSL runs: structured days-until-expiry (negative if expired; null otherwise). */
   cert_days_remaining: number | null;
+  /**
+   * Attempts taken to reach this run's verdict (runner migration 0048). 1 = clean first try; >1 = settled
+   * after fast-retry. null for pre-telemetry runs. A `pass` with retry_count > 1 is "degrading-but-green" —
+   * the monitor only passes on retry — surfaced as a soft-warning in the run row.
+   */
+  retry_count: number | null;
 }
 
 /** Check detail payload: the check plus its most recent runs. */

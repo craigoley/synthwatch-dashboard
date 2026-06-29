@@ -487,4 +487,33 @@ test.describe("check detail", () => {
     await page.waitForTimeout(600);
     expect(runsUrls.some((u) => /[?&]to=/.test(u)), "custom range pins to").toBe(true);
   });
+
+  // ★ retry_count (runner 0048): a PASS that needed >1 attempt is "degrading-but-green" → soft-warning badge.
+  // A clean pass (1) and a pre-telemetry run (null) show nothing; a fail's retries render faint (status is the
+  // signal there). The badge only appears when retry_count > 1.
+  test("run-history: pass-on-retry shows a soft-warning attempts badge; clean/null show none; fail is faint", async ({ page }) => {
+    const w = defaultWorld();
+    const at = new Date(Date.now() - 60_000).toISOString(); // recent → inside the live (now-7d) window
+    const passOnRetry = run({ id: 510, checkId: 1, status: "pass", retryCount: 3, startedAt: at }); // degrading-but-green
+    const cleanPass = run({ id: 509, checkId: 1, status: "pass", retryCount: 1, startedAt: at }); // healthy → no badge
+    const preTelemetry = run({ id: 508, checkId: 1, status: "pass", startedAt: at }); // retryCount absent → null → no badge
+    const failRetried = run({ id: 507, checkId: 1, status: "fail", errorMessage: "boom", retryCount: 3, startedAt: at }); // confirmed-down
+    w.details[1] = detail({ id: 1, name: "API health", kind: "http", currentStatus: "pass" }, [
+      passOnRetry,
+      cleanPass,
+      preTelemetry,
+      failRetried,
+    ]);
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+    await expect(page.getByTestId("run-history")).toBeVisible();
+
+    // only the two runs with retry_count > 1 get a badge (clean=1 and null show nothing)
+    await expect(page.getByTestId("retry-badge")).toHaveCount(2);
+    // the degrading PASS is framed as a soft-warning ("Degrading: passed only after 3 attempts")
+    await expect(page.getByTitle("Degrading: passed only after 3 attempts")).toBeVisible();
+    await expect(page.getByTitle("Degrading: passed only after 3 attempts")).toContainText("3 attempts");
+    // the FAIL's retries are secondary (status already says down) → neutral "Took N attempts", not degrading
+    await expect(page.getByTitle("Took 3 attempts")).toBeVisible();
+  });
 });
