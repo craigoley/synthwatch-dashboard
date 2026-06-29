@@ -10,6 +10,7 @@ import { DateRangeControl, useDateRange } from "@/components/date-range-control"
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { runStatusMeta } from "@/lib/status";
 import { formatDuration, formatLocalDateTime } from "@/lib/format";
+import { runsDebug } from "@/lib/debug";
 import { TraceViewer } from "@/components/trace-viewer";
 import { AiInsightsPanel } from "@/components/ai-insights";
 import { BaselineDiffPanel } from "@/components/baseline-diff";
@@ -170,9 +171,33 @@ export function RunHistory({ checkId, live = false }: { checkId: number; live?: 
   //   arrived COLLAPSED at the top — it looked like "nothing happened until I refreshed". When NOT live, keep
   //   the old rule (expand only if nothing is open) so a background poll never yanks a row the user is reading.
   const firstId = runs[0]?.id ?? null;
+  const firstStatus = runs[0]?.status ?? null;
+  const rowCount = runs.length;
   useEffect(() => {
+    // ★ Funnel stage (e): the #126 auto-expand. Logs whether the effect ran and on which firstId/live — the
+    //   render log below shows the resulting expandedId, so a "row present but collapsed" failure is visible.
+    if (firstId !== null) runsDebug(`auto-expand effect → ran (firstId=${firstId}, live=${live})`, { firstId, live });
     if (firstId !== null) setExpanded((cur) => (live || cur === null ? firstId : cur));
   }, [firstId, live]);
+
+  // ★ Funnel stage (c)+(d): the MERGED list that actually reached the component, and what renders. If the
+  //   page-0 fetch log showed the fresh run (stage b) but topRowId here is stale, SWR dropped it on merge.
+  useEffect(() => {
+    runsDebug(`post-merge → render: ${rowCount} rows, top id=${firstId}`, {
+      totalRows: rowCount,
+      topRowId: firstId,
+      topRowStatus: firstStatus,
+      expandedId: expanded,
+      hasMore,
+      live,
+    });
+  }, [rowCount, firstId, firstStatus, expanded, hasMore, live]);
+
+  // ★ The "updating…" indicator on/off transitions — ties the user's "flashes twice" to which live windows
+  //   actually opened (each ON should coincide with fast poll-ticks in the engine logs above).
+  useEffect(() => {
+    runsDebug(`updating-indicator ${live ? "ON" : "OFF"}`, { live });
+  }, [live]);
 
   // Deep-link target: a `#run-<id>` hash (e.g. the per-location panel's "View run" → that location's latest
   // run) expands that run and scrolls to it — surfacing its trace + "Get AI insights". Re-applies once runs

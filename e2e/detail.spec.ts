@@ -425,4 +425,32 @@ test.describe("check detail", () => {
     await expect(page.getByTestId("run-history-live")).toBeVisible();
     await expect(page.getByTestId("run-history-live")).toContainText("updating");
   });
+
+  // ★ Gated diagnostics: the [runs-debug] funnel is OFF for normal users and ON with ?debug=runs (or
+  // localStorage.SYNTHWATCH_DEBUG='1'). Lets the user capture the fetch→merge→render→expand funnel in
+  // DevTools during a Run-now to pinpoint where a new run falls out — with zero behavior change when off.
+  test("debug funnel: [runs-debug] telemetry is gated — silent by default, emits with ?debug=runs", async ({ page }) => {
+    await mockApi(page);
+    const logs: string[] = [];
+    page.on("console", (m) => {
+      if (m.text().includes("[runs-debug]")) logs.push(m.text());
+    });
+
+    // OFF by default — no funnel noise for normal users
+    await page.goto("/checks/1");
+    await expect(page.getByTestId("run-history")).toBeVisible();
+    await page.waitForTimeout(700);
+    expect(logs, "no [runs-debug] logs without the flag").toEqual([]);
+
+    // ON with ?debug=runs — the funnel emits its stages
+    await page.goto("/checks/1?debug=runs");
+    await expect(page.getByTestId("run-history")).toBeVisible();
+    await page.waitForTimeout(900);
+    expect(logs.length, "funnel emits with ?debug=runs").toBeGreaterThan(0);
+    expect(logs.some((l) => l.includes("post-merge → render")), "render stage present").toBe(true);
+    expect(
+      logs.some((l) => l.includes("page-0 fetch") || l.includes("poll-tick")),
+      "engine stage (fetch/poll) present",
+    ).toBe(true);
+  });
 });
