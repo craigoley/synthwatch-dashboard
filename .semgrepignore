@@ -1,0 +1,8 @@
+# Vendored / generated third-party bundles — not our source, not ours to fix.
+# The Playwright trace-viewer Vite build (committed wholesale in #79; forking is out-of-scope per #97).
+# Stops recurring Semgrep findings on the minified bundle (e.g. detect-non-literal-regexp, alert #9).
+public/trace-viewer/
+
+# Build output (not committed, but excluded for local runs).
+.next/
+node_modules/
