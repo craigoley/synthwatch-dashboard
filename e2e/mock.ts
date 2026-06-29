@@ -111,6 +111,8 @@ export interface World {
   reconcileDrift?: { items: RawObj[]; detectedAt?: string | null };
   /** Force POST /api/reconcile/trigger to fail (the "couldn't start the reconcile" path), e.g. { status: 503 }. */
   reconcileTriggerError?: { status: number };
+  /** POST /api/runs/{id}/baseline-diff response (LocationDiffDto shape). Unset → configured:false (inert). */
+  baselineDiff?: RawObj;
   /**
    * Spec catalog (Phase 13). Unset → /api/specs 404 → the catalog page shows a neutral "not
    * available" notice. Set to { items: [] } for the "no specs yet" empty state, or with rows.
@@ -387,6 +389,22 @@ export async function mockApi(
       return json(
         route,
         world.aiInsights ?? { configured: false, note: "AI insights are not configured for this environment yet." },
+      );
+    }
+
+    // Location comparison ("Why is this failing?"). Default (unset) = configured:false (inert). Set
+    // world.baselineDiff to a LocationDiffDto-shaped body (incl. insight.verdict) to drive the verdict badge.
+    if (/^\/api\/runs\/(\d+)\/baseline-diff$/.test(path) && method === "POST") {
+      return json(
+        route,
+        world.baselineDiff ?? {
+          configured: false,
+          note: "AI insights are not configured for this environment yet.",
+          failing: { runId: 0, location: null, status: "fail" },
+          baseline: { source: "success-baseline", capturedAt: null, location: null },
+          diff: { console: { onlyInA: [], onlyInB: [], shared: 0 }, network: {} },
+          insight: null,
+        },
       );
     }
 

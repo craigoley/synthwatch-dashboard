@@ -516,4 +516,51 @@ test.describe("check detail", () => {
     // the FAIL's retries are secondary (status already says down) → neutral "Took N attempts", not degrading
     await expect(page.getByTitle("Took 3 attempts")).toBeVisible();
   });
+
+  // ★ RCA verdict badge (#118): the baseline-diff insight's verdict ("which layer failed") renders as an
+  // at-a-glance badge — additive to the existing cause/summary; absent on legacy insights → no badge.
+  function baselineDiffBody(verdict?: string) {
+    return {
+      configured: true,
+      failing: { runId: 200, location: "eastus2", status: "fail" },
+      baseline: { source: "success-baseline", capturedAt: null, location: "centralus" },
+      diff: { console: { onlyInA: [], onlyInB: [], shared: 0 }, network: {} },
+      insight: {
+        summary: "Login selector not found — the page itself rendered.",
+        ...(verdict ? { verdict } : {}),
+        likelyCause: "undetermined",
+        confidence: "high",
+        isFlaky: false,
+        findings: [],
+        caveats: [],
+      },
+    };
+  }
+
+  test("baseline-diff: a monitor-verification-bug verdict shows a distinct badge, additive to the cause", async ({ page }) => {
+    const w = defaultWorld();
+    w.baselineDiff = baselineDiffBody("monitor-verification-bug");
+    await mockApi(page, w);
+    await page.goto("/checks/2"); // browser check with a failing run (200), auto-expanded
+    await page.getByTestId("get-baseline-diff-200").click();
+
+    const verdict = page.getByTestId("baseline-diff-verdict");
+    await expect(verdict).toBeVisible();
+    await expect(verdict).toHaveAttribute("data-verdict", "monitor-verification-bug");
+    await expect(verdict).toContainText("Monitor bug"); // false-negative flagged: site may be OK
+    // additive: the existing cause + summary still render
+    await expect(page.getByTestId("baseline-diff-cause")).toBeVisible();
+    await expect(page.getByTestId("baseline-diff-insight")).toContainText("Login selector not found");
+  });
+
+  test("baseline-diff: a legacy insight without a verdict renders NO badge (back-compat)", async ({ page }) => {
+    const w = defaultWorld();
+    w.baselineDiff = baselineDiffBody(undefined); // pre-#118 shape
+    await mockApi(page, w);
+    await page.goto("/checks/2");
+    await page.getByTestId("get-baseline-diff-200").click();
+
+    await expect(page.getByTestId("baseline-diff-insight")).toBeVisible(); // the insight still renders
+    await expect(page.getByTestId("baseline-diff-verdict")).toHaveCount(0); // but no verdict badge
+  });
 });
