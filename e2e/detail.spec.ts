@@ -331,6 +331,39 @@ test.describe("check detail", () => {
     await expect(page.getByTestId("view-trace-7000")).toBeVisible();
   });
 
+  // ★ Craig's exact "Run now" case: the list is ALREADY populated with historical runs, then a BRAND-NEW run
+  // is prepended to page 0 by the poll. This is the strongest page-0 assertion (the prior test started from a
+  // near-empty list). It rides revalidateFirstPage:true — if page 0 were skipped on the tick the fresh run
+  // would never appear (only after a hard reload), which is the reported symptom.
+  test("live: a NEW run appears at the TOP of an already-populated run-history list via the poll (no reload)", async ({ page }) => {
+    const w = defaultWorld();
+    const r100 = run({ id: 100, checkId: 1, status: "pass" });
+    const r99 = run({ id: 99, checkId: 1, status: "pass" });
+    const freshRunning = run({ id: 9999, checkId: 1, status: "running", finishedAt: null, durationMs: null, httpStatus: null, traceUrl: null });
+    const freshDone = run({ id: 9999, checkId: 1, status: "fail", errorMessage: "fresh failure", traceUrl: "/api/runs/9999/trace" });
+    // The page derives the live state from recent_runs[0].status — so the badge carries the RUNNING fresh run
+    // for runLive to engage and the list to fast-poll (running → fail, plus the post-terminal settle window).
+    w.detailSequence = {
+      1: [
+        detail({ id: 1, name: "API health", kind: "http", currentStatus: "running" }, [freshRunning, r100, r99]),
+        detail({ id: 1, name: "API health", kind: "http", currentStatus: "fail" }, [freshDone, r100, r99]),
+      ],
+    };
+    // page 0 starts populated (r100, r99); the poll PREPENDS the brand-new completed run — the "Run now" flow.
+    w.runsSequence = { 1: [[r100, r99], [freshDone, r100, r99]] };
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+
+    // populated, but the fresh run is not there yet
+    await expect(page.getByTestId("run-history")).toBeVisible();
+    await expect(page.getByTestId("view-trace-9999")).toHaveCount(0);
+
+    // ★ the fresh run appears at the TOP of the populated page-0 list via the poll — WITHOUT a reload (rides
+    //    revalidateFirstPage:true; if page 0 were skipped it would never show, the reported symptom).
+    await expect(page.getByTestId("run-row").first()).toHaveAttribute("id", "run-9999", { timeout: 15000 });
+    await expect(page.getByTestId("view-trace-9999")).toBeVisible({ timeout: 15000 });
+  });
+
   // ★ The metrics ("Telemetry") section is collapsible, and the preference persists APP-WIDE — collapse it on
   // one monitor and every monitor opens collapsed, surviving reloads (check-id-agnostic localStorage key).
   test("metrics section: collapse persists across monitors AND reloads (app-wide), default expanded", async ({ page }) => {

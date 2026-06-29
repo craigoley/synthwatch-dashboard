@@ -162,12 +162,17 @@ export function RunHistory({ checkId, live = false }: { checkId: number; live?: 
   );
 
   const [expanded, setExpanded] = useState<number | null>(null);
-  // Default-expand the most recent run so failures are visible immediately (parity with
-  // the prior static run list). Keyed on the first run id so it re-arms when the range changes.
+  // Default-expand the most recent run so failures are visible immediately (parity with the prior static
+  // run list). Keyed on the first run id so it re-arms when the range changes.
+  // ★ While LIVE (a run is in-flight/just-finished on this check — i.e. after "Run now"), FOLLOW the newest
+  //   run: when a fresh run lands on page 0 via the poll, auto-expand it so its result + trace surface the
+  //   same way a hard reload would. Without this the previously-expanded row stayed open and the new run
+  //   arrived COLLAPSED at the top — it looked like "nothing happened until I refreshed". When NOT live, keep
+  //   the old rule (expand only if nothing is open) so a background poll never yanks a row the user is reading.
   const firstId = runs[0]?.id ?? null;
   useEffect(() => {
-    if (firstId !== null) setExpanded((cur) => (cur === null ? firstId : cur));
-  }, [firstId]);
+    if (firstId !== null) setExpanded((cur) => (live || cur === null ? firstId : cur));
+  }, [firstId, live]);
 
   // Deep-link target: a `#run-<id>` hash (e.g. the per-location panel's "View run" → that location's latest
   // run) expands that run and scrolls to it — surfacing its trace + "Get AI insights". Re-applies once runs
