@@ -51,6 +51,7 @@ import type {
   BaselineDiffResult,
   DiffConsoleLine,
   Check,
+  RedactionHealth,
   CheckAuth,
   CheckDetail,
   CheckKind,
@@ -314,9 +315,14 @@ interface RawCheck {
   sourceKey?: string | null;
   specPath?: string | null;
   successTraceAt?: string | null;
+  sensitive?: boolean;
+  hasRedactPatterns?: boolean;
+  redactionHealth?: string;
   lastRunAt: string | null;
   createdAt: string;
 }
+
+const REDACTION_HEALTHS: readonly string[] = ["ok", "misconfigured", "n/a"];
 
 interface RawCheckListItem extends RawCheck {
   currentStatus: RunStatus | null;
@@ -481,6 +487,12 @@ function mapCheck(raw: RawCheck): Check {
     source_key: raw.sourceKey ?? null,
     spec_path: raw.specPath ?? null,
     success_trace_at: raw.successTraceAt ?? null,
+    // B10 redaction (#121): null when the API predates it (no field) OR off-taxonomy → renders no badge.
+    sensitive: raw.sensitive === true,
+    has_redact_patterns: raw.hasRedactPatterns === true,
+    redaction_health: REDACTION_HEALTHS.includes(raw.redactionHealth ?? "")
+      ? (raw.redactionHealth as RedactionHealth)
+      : null,
   };
 }
 

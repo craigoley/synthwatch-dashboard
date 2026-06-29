@@ -12,6 +12,7 @@ import { MonitorForm } from "@/components/monitor-form";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { ReconcileDriftSurface } from "@/components/reconcile-drift";
 import { RunAllControl } from "@/components/run-all";
+import { RedactionBadge, RedactionFleetSummary } from "@/components/redaction";
 import { useAuth } from "@/components/auth-provider";
 import { SignInToEdit } from "@/components/write-gate";
 import { formatRelative } from "@/lib/format";
@@ -157,6 +158,9 @@ export default function MonitorsPage() {
       {/* Monitors-as-code drift (Phase 6b) — read-only; hides until the reconcile endpoint serves. */}
       <ReconcileDriftSurface />
 
+      {/* Fleet-level B10 redaction posture — a sensitive-but-unredacted gap is loud here. */}
+      {data && data.length > 0 && <RedactionFleetSummary checks={data} />}
+
       {data && data.length > 0 && (
         <TagFilter
           available={inUseTags ?? []}
@@ -223,6 +227,8 @@ export default function MonitorsPage() {
                         {c.flow_name ?? c.target_url}
                       </span>
                     )}
+                    {/* B10: a sensitive-but-unredacted monitor must be visible right here, not in a DB query. */}
+                    <div className="mt-0.5"><RedactionBadge health={c.redaction_health} /></div>
                   </div>
                 </div>
                 <span className="sw-mono text-xs uppercase text-[var(--color-ink-dim)]">{c.kind}</span>
