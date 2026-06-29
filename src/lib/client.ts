@@ -170,12 +170,12 @@ function useCursorHistory<T>(
   scope: readonly (string | number | null)[] | null,
   fetchPage: (cursor: string | null) => Promise<CursorPageData<T>>,
   pageSize: number,
-  // Opt-in run-aware live refresh (run history). Defaults preserve the prior static behavior (incidents):
+  // Run-aware live refresh:
   //  - live: externally "a run is in-flight/expected" (primed by Run now + the post-terminal settle window)
   //  - runningWhile: derive in-flight from the loaded items (the newest run's status === 'running')
-  //  - revalidateFirstPage: MUST be true for live lists — a brand-new run lands on page 0, and with this
-  //    false (the prior default) page 0 was skipped on every tick, so the new run never appeared until a
-  //    manual reload. That was the bug.
+  //  - revalidateFirstPage: see the SAFE DEFAULT below (= true). A new item on these lists ALWAYS lands on
+  //    page 0; if page 0 isn't revalidated on the poll it stays stale until a manual reload. Opt OUT (false)
+  //    only for a NON-newest-first list where page 0 never gains the freshest row.
   opts: { live?: boolean; runningWhile?: (items: T[]) => boolean; revalidateFirstPage?: boolean } = {},
 ) {
   const getKey = (index: number, prev: CursorPageData<T> | null) => {
@@ -195,7 +195,12 @@ function useCursorHistory<T>(
           Boolean(opts.live) || (opts.runningWhile?.((pages ?? []).flatMap((p) => p.items)) ?? false),
         ),
       revalidateOnFocus: true,
-      revalidateFirstPage: opts.revalidateFirstPage ?? false,
+      // ★ SAFE DEFAULT = true. Every consumer here is a NEWEST-FIRST list, so a brand-new item (run #115,
+      // incident #123, the live auto-expand #126) always lands on page 0 — page 0 MUST be revalidated on
+      // each poll tick or the new item never shows until a manual reload. We hit that exact bug three times
+      // because the old default was false (bug-biased). Default true so new list consumers are correct by
+      // default; a rare non-newest-first list opts OUT with an explicit revalidateFirstPage:false + reason.
+      revalidateFirstPage: opts.revalidateFirstPage ?? true,
       keepPreviousData: true,
     },
   );
@@ -240,7 +245,7 @@ export function useRunHistory(
     {
       live: opts.live,
       runningWhile: (items) => items[0]?.status === "running", // self-fast-poll while the newest run runs
-      revalidateFirstPage: true, // page 0 holds the newest run — it MUST refresh on the live tick
+      // revalidateFirstPage inherits the safe default (true) — page 0 holds the newest run.
     },
   );
   return { runs: h.items, ...rest(h) };
@@ -268,12 +273,10 @@ export function useIncidentHistory(
         cursor: cursor ?? undefined,
       }).then((p) => ({ items: p.incidents, nextCursor: p.next_cursor })),
     pageSize,
-    // ★ Live-refresh the alert surface (the #115 sibling fix): revalidateFirstPage:true so a brand-new
-    // incident — always page 0 — appears on the steady poll instead of staying stale until a manual reload.
-    // No runLive/runningWhile here: incidents have no in-flight "running" signal (one can open from any
-    // scheduled run at any time), so a STEADY poll (the 15s idle cadence) is the right trigger, not a
-    // run-gated fast poll. revalidateOnFocus (already on) also surfaces new incidents when the tab refocuses.
-    { revalidateFirstPage: true },
+    // Live-refresh the alert surface: a brand-new incident — always page 0 — appears on the steady poll via
+    // the safe-default revalidateFirstPage (true), instead of staying stale until a manual reload. No
+    // runLive/runningWhile here: incidents have no in-flight "running" signal (one can open from any scheduled
+    // run at any time), so the STEADY idle poll (+ revalidateOnFocus) is the right trigger, not a fast poll.
   );
   return { incidents: h.items, ...rest(h) };
 }
