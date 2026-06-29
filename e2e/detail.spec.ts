@@ -341,10 +341,18 @@ test.describe("check detail", () => {
     await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByTestId("metrics-body")).toBeVisible();
 
-    // collapse on check 1
+    // ★ the disclosure wraps the WHOLE chart stack — Availability + Latency + Telemetry all inside it
+    const body = page.getByTestId("metrics-body");
+    await expect(body.getByText("Availability over time")).toBeVisible();
+    await expect(body.getByText("Latency over time")).toBeVisible();
+    await expect(body.getByRole("heading", { name: "Telemetry" })).toBeVisible();
+
+    // collapse on check 1 → the ENTIRE stack collapses (not just Telemetry); the header stays
     await page.getByTestId("metrics-toggle").click();
     await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByTestId("metrics-body")).toHaveCount(0); // only the body collapses; header stays
+    await expect(page.getByTestId("metrics-body")).toHaveCount(0);
+    await expect(page.getByText("Availability over time")).toHaveCount(0); // the big charts collapsed too
+    await expect(page.getByText("Latency over time")).toHaveCount(0);
 
     // ★ a DIFFERENT monitor opens collapsed too (the key is not per-check)
     await page.goto("/checks/2");
@@ -360,5 +368,28 @@ test.describe("check detail", () => {
     await expect(page.getByTestId("metrics-body")).toBeVisible();
     await page.goto("/checks/1");
     await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "true");
+  });
+
+  // ★ Run-history "updating…" affordance: while a run is in-flight the list is fast-polling — show it so the
+  // short wait reads as ACTIVE, not stuck. Hidden when idle.
+  test("run history shows an 'updating…' live indicator only while a run is in-flight", async ({ page }) => {
+    // idle check → no live indicator
+    await mockApi(page);
+    await page.goto("/checks/1");
+    await expect(page.getByTestId("run-history")).toBeVisible();
+    await expect(page.getByTestId("run-history-live")).toHaveCount(0);
+
+    // an in-flight run → the indicator appears (run is 'running' → runLive → list fast-polls)
+    const w = defaultWorld();
+    w.detailSequence = {
+      1: [
+        detail({ id: 1, name: "API health", kind: "http", currentStatus: "running" },
+          [run({ id: 8000, checkId: 1, status: "running", finishedAt: null, durationMs: null, httpStatus: null })]),
+      ],
+    };
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+    await expect(page.getByTestId("run-history-live")).toBeVisible();
+    await expect(page.getByTestId("run-history-live")).toContainText("updating");
   });
 });

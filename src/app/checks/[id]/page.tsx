@@ -487,17 +487,11 @@ export default function CheckDetailPage() {
 
       <CheckSlaPanel checkId={check.id} />
 
-      {/* Availability SHAPE over time — complements the SLA panel's point-in-time %. */}
-      <AvailabilityChart checkId={check.id} />
-
-      {/* SLO complements SLA: only when an SLO target is set (opt-in) */}
-      {check.slo && <SloPanel slo={check.slo} />}
-
-      <LatencyChart runs={recent_runs} />
-
+      {/* ★ ONE "Metrics" disclosure over the WHOLE tall chart stack (availability + latency + web vitals),
+          so collapsing actually shrinks the page (the old toggle only hid the small Telemetry block below
+          the big charts). Reuses the app-wide persisted key from #120. The header matches the bold
+          chart-card section headers (text-sm font-semibold ink) with a chevron that rotates on expand. */}
       <section data-testid="metrics-section">
-        {/* Collapsible: the header (a button, keyboard-toggleable) stays visible when collapsed so the
-            section can be re-expanded; only the tall chart body collapses. State persists app-wide. */}
         <h2 className="mb-3">
           <button
             type="button"
@@ -505,27 +499,42 @@ export default function CheckDetailPage() {
             aria-expanded={!metricsCollapsed}
             aria-controls="metrics-body"
             data-testid="metrics-toggle"
-            className="flex w-full items-center gap-2 text-left text-sm font-semibold text-[var(--color-ink)]"
+            className="group flex w-full items-center gap-2 text-left text-sm font-semibold text-[var(--color-ink)]"
           >
-            <span
+            <svg
               aria-hidden
-              className="text-xs text-[var(--color-ink-faint)] transition-transform"
+              viewBox="0 0 16 16"
+              className="h-3.5 w-3.5 shrink-0 text-[var(--color-ink-dim)] transition-transform"
               style={{ transform: metricsCollapsed ? "none" : "rotate(90deg)" }}
             >
-              ▸
+              <path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Metrics
+            <span className="ml-0.5 text-[10px] font-normal uppercase tracking-wider text-[var(--color-ink-faint)]">
+              availability · latency · web vitals
             </span>
-            Telemetry
           </button>
         </h2>
         {!metricsCollapsed && (
-          <div id="metrics-body" data-testid="metrics-body">
-            {metrics ? (
-              <MetricsCharts data={metrics} />
-            ) : (
-              <div className="sw-panel p-6">
-                <Spinner label="Loading telemetry…" />
-              </div>
-            )}
+          <div id="metrics-body" data-testid="metrics-body" className="space-y-6">
+            {/* Availability SHAPE over time — complements the SLA panel's point-in-time %. */}
+            <AvailabilityChart checkId={check.id} />
+
+            {/* SLO complements SLA: only when an SLO target is set (opt-in) */}
+            {check.slo && <SloPanel slo={check.slo} />}
+
+            <LatencyChart runs={recent_runs} />
+
+            <div data-testid="telemetry-block">
+              <h3 className="mb-3 text-sm font-semibold text-[var(--color-ink)]">Telemetry</h3>
+              {metrics ? (
+                <MetricsCharts data={metrics} />
+              ) : (
+                <div className="sw-panel p-6">
+                  <Spinner label="Loading telemetry…" />
+                </div>
+              )}
+            </div>
           </div>
         )}
       </section>
