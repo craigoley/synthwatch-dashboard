@@ -87,6 +87,12 @@ function RunRow({
   onToggle: () => void;
 }) {
   const failed = run.status === "fail" || run.status === "error";
+  // retry_count telemetry (runner 0048): only meaningful when >1 (a clean first-try pass shows nothing, and
+  // null = pre-telemetry → nothing). A PASS that needed multiple attempts is "degrading-but-green" — the
+  // valuable, otherwise-invisible signal — so it gets a soft amber warning. A fail's retries are secondary
+  // (the red status already says "down"), so it renders faint/neutral.
+  const retried = run.retry_count != null && run.retry_count > 1;
+  const degrading = retried && !failed;
   return (
     <>
       <button
@@ -106,6 +112,27 @@ function RunRow({
           {run.failed_step && (
             <span className="sw-mono ml-2 text-[11px]" style={{ color: "var(--color-fail)" }}>
               ✕ {run.failed_step}
+            </span>
+          )}
+          {retried && (
+            <span
+              data-testid="retry-badge"
+              title={
+                degrading
+                  ? `Degrading: passed only after ${run.retry_count} attempts`
+                  : `Took ${run.retry_count} attempts`
+              }
+              className="sw-mono ml-2 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px]"
+              style={
+                degrading
+                  ? {
+                      color: "var(--color-warn)",
+                      background: "color-mix(in srgb, var(--color-warn) 12%, transparent)",
+                    }
+                  : { color: "var(--color-ink-faint)" }
+              }
+            >
+              ↻ {run.retry_count} attempts
             </span>
           )}
         </div>

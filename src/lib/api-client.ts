@@ -343,6 +343,7 @@ interface RawRun {
   screenshotUrl: string | null;
   traceUrl: string | null;
   certDaysRemaining: number | null;
+  retryCount?: number | null; // runner 0048; optional → tolerant of pre-deploy API responses without it
 }
 
 interface RawCheckDetail extends RawCheck {
@@ -515,6 +516,7 @@ function mapRun(raw: RawRun): Run {
     screenshot_url: raw.screenshotUrl,
     trace_url: raw.traceUrl ?? null,
     cert_days_remaining: raw.certDaysRemaining ?? null,
+    retry_count: raw.retryCount ?? null, // null when the API predates 0048 → row shows nothing
   };
 }
 

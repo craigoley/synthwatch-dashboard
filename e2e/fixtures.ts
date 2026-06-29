@@ -6,7 +6,12 @@
  * mapping together.
  */
 
-const NOW = "2026-06-22T18:00:00Z";
+// Recent RELATIVE to the test run. This was a hardcoded date that silently went stale: once real time crossed
+// NOW+7d, every run/incident dated NOW fell OUTSIDE the live "last 7d" run-history window, so the API mock
+// filtered them out and every run-row-dependent test (ai-insights, screenshot/trace, per-location, live
+// run-history) went red on a wall-clock boundary. Deriving it from now() keeps NOW-dated fixtures in-window
+// forever. Evaluated once at module load → a single stable value per test process.
+const NOW = new Date(Date.now() - 60_000).toISOString();
 
 export type RawObj = Record<string, unknown>;
 
