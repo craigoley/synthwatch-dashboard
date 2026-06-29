@@ -330,4 +330,35 @@ test.describe("check detail", () => {
     // …then the completed run's TRACE affordance shows up in the history list — via polling, no manual reload.
     await expect(page.getByTestId("view-trace-7000")).toBeVisible();
   });
+
+  // ★ The metrics ("Telemetry") section is collapsible, and the preference persists APP-WIDE — collapse it on
+  // one monitor and every monitor opens collapsed, surviving reloads (check-id-agnostic localStorage key).
+  test("metrics section: collapse persists across monitors AND reloads (app-wide), default expanded", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/checks/1");
+
+    // default: EXPANDED (nothing stored yet — don't surprise existing users)
+    await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByTestId("metrics-body")).toBeVisible();
+
+    // collapse on check 1
+    await page.getByTestId("metrics-toggle").click();
+    await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByTestId("metrics-body")).toHaveCount(0); // only the body collapses; header stays
+
+    // ★ a DIFFERENT monitor opens collapsed too (the key is not per-check)
+    await page.goto("/checks/2");
+    await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByTestId("metrics-body")).toHaveCount(0);
+
+    // ★ persists across a reload
+    await page.reload();
+    await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "false");
+
+    // re-expand → the preference flips back app-wide
+    await page.getByTestId("metrics-toggle").click();
+    await expect(page.getByTestId("metrics-body")).toBeVisible();
+    await page.goto("/checks/1");
+    await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "true");
+  });
 });
