@@ -13,6 +13,7 @@ import { LiveStepsChecklist } from "@/components/live-steps";
 import { TraceViewer } from "@/components/trace-viewer";
 import { StatusBadge, TONE_VAR } from "@/components/status-badge";
 import { TagChips } from "@/components/tag-chips";
+import { RedactionBadge } from "@/components/redaction";
 import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
@@ -368,6 +369,8 @@ export default function CheckDetailPage() {
                 paused
               </span>
             )}
+            {/* B10: a sensitive-but-unredacted monitor is flagged loudly right in the header. */}
+            <RedactionBadge health={check.redaction_health} />
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-[var(--color-ink-dim)]">
             <span className="sw-mono uppercase">{check.kind}</span>

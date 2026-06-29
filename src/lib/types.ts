@@ -150,7 +150,19 @@ export interface Check {
   /** Last-known-good success-trace baseline timestamp (migration 0039); null = none yet. When set
    *  (browser checks), the monitor page shows "View last success trace". */
   success_trace_at: string | null;
+  /** B10 redaction status (synthwatch-api #121). `sensitive` = the monitor handles secrets; `redaction_health`
+   *  derives the leak risk. null on legacy responses (no field) → no badge. */
+  sensitive: boolean;
+  has_redact_patterns: boolean;
+  redaction_health: RedactionHealth | null;
 }
+
+/**
+ * B10 redaction health (#121): "misconfigured" = sensitive but NO redact patterns → the monitor runs
+ * UNREDACTED and secrets can persist into traces/screenshots (the leak state that hid for months);
+ * "ok" = sensitive + patterns wired; "n/a" = not sensitive.
+ */
+export type RedactionHealth = "ok" | "misconfigured" | "n/a";
 
 /**
  * SLO error-budget + burn-rate over a window (opt-in per check). Complements SLA
