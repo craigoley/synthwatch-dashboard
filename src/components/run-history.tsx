@@ -152,12 +152,20 @@ function RunRow({
  */
 export function RunHistory({ checkId, live = false }: { checkId: number; live?: boolean }) {
   const dateRange = useDateRange("7d");
+  // ★ Frozen-`to` fix (the real run-history "not updating" root cause): a preset window's `to` is Date.now()
+  //   captured ONCE at mount (useDateRange's memo deps exclude time), so the live list kept requesting
+  //   [mount-7d, mount) on EVERY poll and the API correctly EXCLUDED every run with started_at >= mount — a
+  //   freshly-completed run never appeared until a reload remounted the window. For a live preset, OMIT `to`
+  //   so the server windows to its OWN now() each poll (no client-clock dependency). A CUSTOM range is a
+  //   deliberately historical window — keep its frozen `to`. `from` stays (the lookback start can be fixed).
+  const effectiveRange =
+    dateRange.mode === "custom" ? dateRange.range : { from: dateRange.range.from };
   // ★ `live` (a run is in-flight/expected on the parent page) puts the list + trace on the fast
   // poll-while-running cadence — the same lifecycle the status badge uses — so a freshly-completed run row
   // and its now-populated trace appear without a manual refresh.
   const { runs, error, isLoading, isLoadingMore, hasMore, loadMore, reset } = useRunHistory(
     checkId,
-    dateRange.range,
+    effectiveRange,
     undefined,
     { live },
   );
