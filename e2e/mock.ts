@@ -327,7 +327,7 @@ export async function mockApi(
       return json(route, tags);
     }
     // PUT location assignment — mirrors the API's ≥1-location rule (empty → 400).
-    if ((m = path.match(/^\/api\/checks\/(\d+)\/locations$/)) && method === "PUT") {
+    if (/^\/api\/checks\/(\d+)\/locations$/.test(path) && method === "PUT") {
       const body = JSON.parse(req.postData() || "{}");
       const locs = Array.isArray(body.locations) ? (body.locations as string[]) : [];
       if (locs.length === 0) {
@@ -374,7 +374,7 @@ export async function mockApi(
     // Async test-send: POST enqueues (202 { requestId }); undefined → 404 (not deployed).
     // Trace AI insights. aiInsightsStatus forces a 401/403 (the gate); else a 200 flat AiInsightsDto.
     // Default (unset) = configured:false (note-bearing), the inert-until-AOAI-prereq state.
-    if ((m = path.match(/^\/api\/runs\/(\d+)\/ai-insights$/)) && method === "POST") {
+    if (/^\/api\/runs\/(\d+)\/ai-insights$/.test(path) && method === "POST") {
       // aiInsightsAbort = a TRANSPORT failure: the fetch never gets a usable response (edge/network) —
       // route.abort() rejects the fetch, mirroring the transient that was mislabeled "unavailable".
       if (world.aiInsightsAbort) return route.abort("failed");
@@ -399,7 +399,7 @@ export async function mockApi(
     }
     // Poll the queued test send. Walks statusSequence (last entry repeats); the
     // default is an immediate `delivered`. Unknown requestId → 404.
-    if ((m = path.match(/^\/api\/channels\/(\d+)\/test\/status$/)) && method === "GET") {
+    if (/^\/api\/channels\/(\d+)\/test\/status$/.test(path) && method === "GET") {
       const requestId = Number(url.searchParams.get("requestId"));
       const reqState = testRequests.get(requestId);
       if (!reqState) return json(route, { error: "not_found", message: "unknown requestId" }, 404);
@@ -536,7 +536,7 @@ export async function mockApi(
         : json(route, { error: "not_found" }, 404); // readiness endpoint not deployed (flagged dep)
     }
     // On-demand run trigger (the "Run now" affordance) — the API enqueues + returns { requestId }.
-    if ((m = path.match(/^\/api\/checks\/(\d+)\/run$/)) && method === "POST") {
+    if (/^\/api\/checks\/(\d+)\/run$/.test(path) && method === "POST") {
       return json(route, { requestId: (nextRequestId += 1) }, 202);
     }
     if ((m = path.match(/^\/api\/checks\/(\d+)$/))) {
