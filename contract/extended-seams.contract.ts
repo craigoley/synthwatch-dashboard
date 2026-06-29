@@ -136,4 +136,26 @@ test.describe("API contract — extended seams", () => {
     expect(r0.cert_days_remaining).toBe(rr0.certDaysRemaining ?? null);
     expect(r0.started_at).toBe(rr0.startedAt);
   });
+
+  // ★ Regression guard for the stale page-0 bug (run #849177): the api-client fetch seam MUST send
+  // cache:"no-store" so live-monitoring GETs never come from the browser HTTP cache (the run-history list
+  // polled 40+ times but kept returning the same stale page 0 until a hard refresh). SWR is the only cache.
+  test("★ api-client forces cache:'no-store' on every request (live data bypasses the HTTP cache)", async () => {
+    const orig = globalThis.fetch;
+    const seen: (string | undefined)[] = [];
+    globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+      seen.push(init?.cache);
+      return new Response(JSON.stringify({ items: [], nextCursor: null, pageSize: 50 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      await getRuns(4, { pageSize: 10 });
+    } finally {
+      globalThis.fetch = orig;
+    }
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((c) => c === "no-store"), "every fetch sent cache:'no-store'").toBe(true);
+  });
 });
