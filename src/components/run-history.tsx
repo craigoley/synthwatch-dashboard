@@ -198,9 +198,19 @@ export function RunHistory({ checkId, live = false }: { checkId: number; live?: 
   return (
     <section data-testid="run-history">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-sm font-semibold text-[var(--color-ink)]">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--color-ink)]">
           Run history{" "}
           <span className="sw-mono text-xs text-[var(--color-ink-faint)]">({runs.length}{hasMore ? "+" : ""})</span>
+          {/* ★ Visible "watching" affordance: while a run is in-flight/expected (live), the list is fast-
+              polling — show it so the wait reads as ACTIVE, not stuck. Hidden when idle. */}
+          {live && (
+            <span
+              className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-running)]"
+              data-testid="run-history-live"
+            >
+              <span className="sw-dot sw-dot-running" aria-hidden /> updating…
+            </span>
+          )}
         </h2>
         <DateRangeControl
           state={dateRange}
