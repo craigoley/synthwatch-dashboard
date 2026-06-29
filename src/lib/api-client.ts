@@ -46,6 +46,7 @@ import type {
   AiInsightsResult,
   BaselineDiff,
   BaselineDiffCause,
+  BaselineDiffVerdict,
   BaselineDiffInsight,
   BaselineDiffResult,
   DiffConsoleLine,
@@ -805,6 +806,7 @@ interface RawBaselineDiffDto {
   };
   insight?: {
     summary?: string;
+    verdict?: string;
     likelyCause?: string;
     confidence?: string;
     isFlaky?: boolean;
@@ -816,6 +818,10 @@ interface RawBaselineDiffDto {
 const DIFF_CAUSES: readonly string[] = [
   "regional-waf-cdn", "network-allowlist", "geo-dns", "region-timeout", "third-party-blocked",
   "flaky-transient", "undetermined",
+];
+
+const DIFF_VERDICTS: readonly string[] = [
+  "site-failure", "monitor-verification-bug", "transient", "undetermined",
 ];
 
 const mapDiffLine = (r: RawDiffConsoleLine): DiffConsoleLine => ({
@@ -855,6 +861,9 @@ function mapBaselineDiff(r: RawBaselineDiffDto): BaselineDiff {
 function mapBaselineDiffInsight(i: NonNullable<RawBaselineDiffDto["insight"]>): BaselineDiffInsight {
   return {
     summary: String(i.summary ?? ""),
+    // verdict (#118): a valid taxonomy value → the value; absent (legacy/pre-#118) or off-taxonomy → null,
+    // which renders NO badge (back-compat). "undetermined" is a real value → it DOES get a neutral badge.
+    verdict: (DIFF_VERDICTS.includes(i.verdict ?? "") ? i.verdict : null) as BaselineDiffVerdict | null,
     likelyCause: (DIFF_CAUSES.includes(i.likelyCause ?? "") ? i.likelyCause : "undetermined") as BaselineDiffCause,
     confidence: (AI_CONFIDENCES.includes(i.confidence ?? "") ? i.confidence : "low") as AiInsightConfidence,
     isFlaky: i.isFlaky === true,

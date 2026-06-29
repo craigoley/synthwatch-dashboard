@@ -6,7 +6,7 @@ import { getBaselineDiff, ApiRequestError } from "@/lib/api-client";
 import { InsightCard } from "@/components/ai-insights";
 import { useAuth } from "@/components/auth-provider";
 import { Spinner } from "@/components/states";
-import type { BaselineDiff, BaselineDiffCause, BaselineDiffInsight, BaselineDiffResult, DiffConsoleLine } from "@/lib/types";
+import type { BaselineDiff, BaselineDiffCause, BaselineDiffInsight, BaselineDiffResult, BaselineDiffVerdict, DiffConsoleLine } from "@/lib/types";
 
 /**
  * Location comparison (POST /api/runs/{id}/baseline-diff): on a FAILING run, "Why is this failing?" diffs the
@@ -24,6 +24,16 @@ const CAUSE_LABEL: Record<BaselineDiffCause, string> = {
   "third-party-blocked": "Third-party blocked in one region",
   "flaky-transient": "Likely flaky / transient",
   "undetermined": "Couldn’t determine",
+};
+
+// ★ Verdict (#118) — the PRIMARY "which layer failed" badge. monitor-verification-bug gets a distinct amber
+// treatment so a false-negative red is visibly flagged as NOT a site outage; site-failure is red; transient
+// muted; undetermined neutral.
+const VERDICT_META: Record<BaselineDiffVerdict, { label: string; tone: string }> = {
+  "site-failure": { label: "Site failure", tone: "var(--color-fail)" },
+  "monitor-verification-bug": { label: "Monitor bug — site may be OK", tone: "var(--color-warn)" },
+  "transient": { label: "Likely transient", tone: "var(--color-ink-dim)" },
+  "undetermined": { label: "Undetermined", tone: "var(--color-idle)" },
 };
 
 type View = "idle" | "loading" | BaselineDiffResult;
@@ -90,6 +100,21 @@ function InsightBody({ insight }: { insight: BaselineDiffInsight }) {
   return (
     <div className="space-y-3" data-testid="baseline-diff-insight">
       <div className="flex flex-wrap items-center gap-2">
+        {/* ★ Verdict badge (#118) — the at-a-glance "which layer failed". Absent on legacy insights → no badge. */}
+        {insight.verdict && (
+          <span
+            className="rounded-md px-2 py-0.5 text-[11px] font-semibold"
+            style={{
+              background: `color-mix(in srgb, ${VERDICT_META[insight.verdict].tone} 14%, transparent)`,
+              color: VERDICT_META[insight.verdict].tone,
+              border: `1px solid color-mix(in srgb, ${VERDICT_META[insight.verdict].tone} 34%, transparent)`,
+            }}
+            data-testid="baseline-diff-verdict"
+            data-verdict={insight.verdict}
+          >
+            {VERDICT_META[insight.verdict].label}
+          </span>
+        )}
         <span
           className="rounded-md px-2 py-0.5 text-[11px] font-semibold"
           style={{

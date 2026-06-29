@@ -58,6 +58,10 @@ test.describe("API contract — POST /runs/{id}/baseline-diff (LocationDiffDto)"
     expect(res.diff.failing.location).toBe(raw.failing.location);
     expect(res.diff.baseline.source).toBe(raw.baseline.source);
 
+    // ★ verdict (#118) — the primary "which layer failed" classification, mapped through:
+    expect(raw.insight.verdict).toBe("site-failure");
+    expect(res.insight.verdict).toBe(raw.insight.verdict);
+
     // ★ the insight taxonomy + flakiness call:
     expect(res.insight.likelyCause).toBe(raw.insight.likelyCause);
     expect(res.insight.isFlaky).toBe(raw.insight.isFlaky);
@@ -79,5 +83,25 @@ test.describe("API contract — POST /runs/{id}/baseline-diff (LocationDiffDto)"
     expect(res.diff.console.onlyInThisRun.length).toBe(raw.diff.console.onlyInA.length);
     // message comes from the API's `note`.
     expect(res.message).toBe(raw.note);
+  });
+
+  // ★ verdict back-compat: a LEGACY insight (pre-#118, no verdict) and an OFF-TAXONOMY value both map to
+  // null → the dashboard renders NO verdict badge (never a broken/garbage badge). "undetermined" is a real
+  // taxonomy value and is preserved (it gets a neutral badge).
+  test("verdict is null when absent (legacy) or off-taxonomy; a valid value (incl. undetermined) is kept", async () => {
+    const base = real("baseline_diff_ok");
+
+    const legacy = { ...base, insight: { ...base.insight } };
+    delete legacy.insight.verdict; // pre-#118 shape
+    const r1 = await withRealResponse(legacy, () => getBaselineDiff(1));
+    expect(r1.status === "ok" && r1.insight.verdict).toBe(null);
+
+    const garbage = { ...base, insight: { ...base.insight, verdict: "aliens" } };
+    const r2 = await withRealResponse(garbage, () => getBaselineDiff(1));
+    expect(r2.status === "ok" && r2.insight.verdict).toBe(null);
+
+    const undet = { ...base, insight: { ...base.insight, verdict: "undetermined" } };
+    const r3 = await withRealResponse(undet, () => getBaselineDiff(1));
+    expect(r3.status === "ok" && r3.insight.verdict).toBe("undetermined");
   });
 });

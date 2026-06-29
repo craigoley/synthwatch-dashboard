@@ -756,6 +756,18 @@ export type BaselineDiffCause =
   | "flaky-transient"
   | "undetermined";
 
+/**
+ * The PRIMARY classification (which LAYER failed) — synthwatch-api #118. The at-a-glance signal that
+ * separates a real outage from a false-negative red: site-failure (the site broke) vs
+ * monitor-verification-bug (the monitor's own verification broke; the site may be fine) vs transient vs
+ * undetermined. Distinct from `likelyCause` (the finer regional taxonomy). null on legacy/pre-#118 insights.
+ */
+export type BaselineDiffVerdict =
+  | "site-failure"
+  | "monitor-verification-bug"
+  | "transient"
+  | "undetermined";
+
 /** A console line in the delta: error/warning, the site's own vs an embedded third party, and the text. */
 export interface DiffConsoleLine {
   level: string;
@@ -779,6 +791,8 @@ export interface BaselineDiff {
 /** The AI comparison over the delta — a categorized regional cause + the honest flakiness call. */
 export interface BaselineDiffInsight {
   summary: string;
+  /** Primary layer-failed classification (#118). null on legacy insights → no verdict badge. */
+  verdict: BaselineDiffVerdict | null;
   likelyCause: BaselineDiffCause;
   confidence: AiInsightConfidence;
   isFlaky: boolean;
