@@ -85,6 +85,9 @@ export interface World {
   /** Successive GET /checks/{id} bodies for live-run polling tests: each poll advances; the last repeats.
    *  e.g. [runningDetail, passDetail] → the page shows 'running', then 'pass', via polling (no reload). */
   detailSequence?: Record<number, RawObj[]>;
+  /** Successive GET /checks/{id}/runs item-arrays for live run-history tests: each poll advances; the last
+   *  repeats. e.g. [[runningRun], [doneRunWithTrace]] → the list row + trace appear live (no reload). */
+  runsSequence?: Record<number, RawObj[][]>;
   /** POST /api/runs/{id}/ai-insights 200 body — the REAL flat AiInsightsDto shape:
    *  { configured, summary, performance[], network[], errors[], suggestions[], caveats[], note }.
    *  Unset → not-configured default. Set configured:true + categories for the happy path. */
@@ -189,6 +192,8 @@ export async function mockApi(
   // Per-check cursor into world.detailSequence — advances each GET /checks/{id} so a live-run test can
   // serve running → terminal across polls.
   const detailSeqIdx = new Map<number, number>();
+  // Per-check cursor into world.runsSequence — advances each GET /checks/{id}/runs (the live run-history list).
+  const runsSeqIdx = new Map<number, number>();
 
   await page.route(`${API_ORIGIN}/**`, async (route) => {
     const req = route.request();
@@ -548,8 +553,18 @@ export async function mockApi(
       return d ? json(route, d) : json(route, { error: "not_found" }, 404);
     }
     if ((m = path.match(/^\/api\/checks\/(\d+)\/runs$/))) {
-      const d = world.details[Number(m[1])];
-      let runs = ((d?.recentRuns as RawObj[]) ?? []).slice();
+      const cid = Number(m[1]);
+      // Live run-history sequence: successive polls advance through runsSequence (last entry repeats), so a
+      // test can show a run go running→done (with its trace) in the list without a reload. Falls back static.
+      const rseq = world.runsSequence?.[cid];
+      let runs: RawObj[];
+      if (rseq && rseq.length > 0) {
+        const i = Math.min(runsSeqIdx.get(cid) ?? 0, rseq.length - 1);
+        runsSeqIdx.set(cid, i + 1);
+        runs = (rseq[i] ?? []).slice();
+      } else {
+        runs = ((world.details[cid]?.recentRuns as RawObj[]) ?? []).slice();
+      }
       // Date-range filter (ISO strings sort lexicographically): [from, to).
       const from = url.searchParams.get("from");
       const to = url.searchParams.get("to");

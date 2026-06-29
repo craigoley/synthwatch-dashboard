@@ -149,11 +149,16 @@ function RunRow({
  * button. The default window keeps the very first request BOUNDED — it never asks the API
  * for all-time history. Shares the cursor engine + date-range control with the incidents list.
  */
-export function RunHistory({ checkId }: { checkId: number }) {
+export function RunHistory({ checkId, live = false }: { checkId: number; live?: boolean }) {
   const dateRange = useDateRange("7d");
+  // ★ `live` (a run is in-flight/expected on the parent page) puts the list + trace on the fast
+  // poll-while-running cadence — the same lifecycle the status badge uses — so a freshly-completed run row
+  // and its now-populated trace appear without a manual refresh.
   const { runs, error, isLoading, isLoadingMore, hasMore, loadMore, reset } = useRunHistory(
     checkId,
     dateRange.range,
+    undefined,
+    { live },
   );
 
   const [expanded, setExpanded] = useState<number | null>(null);

@@ -306,4 +306,28 @@ test.describe("check detail", () => {
     await expect(page.getByText("Pass", { exact: true })).toBeVisible();
     await expect(runNow).toHaveText("Run now"); // poll settled → button re-enabled
   });
+
+  // ★ The fix: the run-history LIST + the per-run TRACE ride the SAME poll-while-running lifecycle as the
+  // badge — so a completed run's row + its trace appear WITHOUT a manual reload (the list was previously on
+  // a static interval with revalidateFirstPage:false, so page 0 — the new run — never refreshed).
+  test("live: a completed run's row + trace appear in the run history without a reload", async ({ page }) => {
+    const w = defaultWorld();
+    const runningRun = run({ id: 7000, checkId: 1, status: "running", finishedAt: null, durationMs: null, httpStatus: null, traceUrl: null });
+    const doneRun = run({ id: 7000, checkId: 1, status: "fail", errorMessage: "boom", traceUrl: "/api/runs/7000/trace" });
+    // badge (useCheck) goes running→fail; the list (useRunHistory) goes running → completed+trace.
+    w.detailSequence = {
+      1: [
+        detail({ id: 1, name: "API health", kind: "http", currentStatus: "running" }, [runningRun]),
+        detail({ id: 1, name: "API health", kind: "http", currentStatus: "fail" }, [doneRun]),
+      ],
+    };
+    w.runsSequence = { 1: [[runningRun], [doneRun]] };
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+
+    // the run is in-flight (puts the list on the fast lifecycle)…
+    await expect(page.getByText("Running", { exact: true })).toBeVisible();
+    // …then the completed run's TRACE affordance shows up in the history list — via polling, no manual reload.
+    await expect(page.getByTestId("view-trace-7000")).toBeVisible();
+  });
 });
