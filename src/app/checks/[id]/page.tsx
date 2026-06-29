@@ -17,6 +17,7 @@ import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { runStatusMeta } from "@/lib/status";
+import { usePersistedBoolean } from "@/lib/use-persisted-boolean";
 import { formatCertExpiry, formatDuration, formatRelative, secondsToMinutesLabel } from "@/lib/format";
 import type { ChainStep, Check, Run } from "@/lib/types";
 
@@ -258,6 +259,9 @@ export default function CheckDetailPage() {
   // ★ "expecting a run": true from clicking Run now until the run actually appears as 'running' — bridges
   // the trigger→start gap so the scoped fast poll is already active when the run begins.
   const [expectRun, setExpectRun] = useState(false);
+  // App-wide (check-id-agnostic) collapse preference for the tall metrics section — set it on one monitor
+  // page and every monitor page opens collapsed. Defaults to EXPANDED when unset. SSR-safe.
+  const [metricsCollapsed, setMetricsCollapsed] = usePersistedBoolean("synthwatch:metrics-section-collapsed", false);
   const { canWrite } = useAuth(); // editor/admin — gates the "Run now" affordance (it spends compute)
 
   const { data, error, isLoading } = useCheck(valid ? id : null, { expectRun });
@@ -491,13 +495,37 @@ export default function CheckDetailPage() {
 
       <LatencyChart runs={recent_runs} />
 
-      <section>
-        <h2 className="mb-3 text-sm font-semibold text-[var(--color-ink)]">Telemetry</h2>
-        {metrics ? (
-          <MetricsCharts data={metrics} />
-        ) : (
-          <div className="sw-panel p-6">
-            <Spinner label="Loading telemetry…" />
+      <section data-testid="metrics-section">
+        {/* Collapsible: the header (a button, keyboard-toggleable) stays visible when collapsed so the
+            section can be re-expanded; only the tall chart body collapses. State persists app-wide. */}
+        <h2 className="mb-3">
+          <button
+            type="button"
+            onClick={() => setMetricsCollapsed(!metricsCollapsed)}
+            aria-expanded={!metricsCollapsed}
+            aria-controls="metrics-body"
+            data-testid="metrics-toggle"
+            className="flex w-full items-center gap-2 text-left text-sm font-semibold text-[var(--color-ink)]"
+          >
+            <span
+              aria-hidden
+              className="text-xs text-[var(--color-ink-faint)] transition-transform"
+              style={{ transform: metricsCollapsed ? "none" : "rotate(90deg)" }}
+            >
+              ▸
+            </span>
+            Telemetry
+          </button>
+        </h2>
+        {!metricsCollapsed && (
+          <div id="metrics-body" data-testid="metrics-body">
+            {metrics ? (
+              <MetricsCharts data={metrics} />
+            ) : (
+              <div className="sw-panel p-6">
+                <Spinner label="Loading telemetry…" />
+              </div>
+            )}
           </div>
         )}
       </section>
