@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 import { mockApi, defaultWorld } from "./mock";
+import { incident } from "./fixtures";
 
 test.describe("incidents — RCA render", () => {
   test("a populated rca shows the badge, confidence, and observed-vs-inferred", async ({ page }) => {
@@ -95,5 +96,33 @@ test.describe("incident detail page", () => {
     await expect(page.getByRole("heading", { name: "Incident #2" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Run timeline" })).toBeVisible(); // timeline still renders
     await expect(page.getByText("Root cause")).toHaveCount(0); // no RCA panel
+  });
+
+  // ★ The #115 sibling fix: a NEW incident (always page 0) must appear on the steady poll WITHOUT a manual
+  // reload. Pre-fix (revalidateFirstPage:false) page 0 was skipped on every tick → a fresh incident stayed
+  // invisible until reload — the worst place for that, since incidents are the alert surface.
+  test("live: a new incident appears in the open list without a manual reload", async ({ page }) => {
+    const w = defaultWorld();
+    await mockApi(page, w);
+    await page.goto("/incidents");
+    await expect(page.getByTestId("incidents-open")).toBeVisible();
+    await expect(page.getByText("FRESH OUTAGE on payments")).toHaveCount(0); // not yet
+
+    // a new incident opens (mutate the shared world — the mock reads world.incidents fresh on each poll)
+    w.incidents.unshift(
+      incident({
+        id: 99001,
+        checkId: 1,
+        status: "open",
+        severity: "critical",
+        checkName: "Payments API",
+        summary: "FRESH OUTAGE on payments",
+        openedAt: new Date(Date.now() + 1000).toISOString(), // newest → page 0
+      }),
+    );
+
+    // ★ the steady poll refetches page 0 (revalidateFirstPage:true) → it shows up, NO reload.
+    // (timeout > the 15s idle cadence; fails pre-fix because page 0 was never refetched.)
+    await expect(page.getByText("FRESH OUTAGE on payments")).toBeVisible({ timeout: 20000 });
   });
 });
