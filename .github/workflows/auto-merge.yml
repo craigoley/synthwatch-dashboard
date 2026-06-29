@@ -18,7 +18,10 @@ name: Auto-merge
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    # ★ auto_merge_disabled added so a DROPPED auto-merge recovers: GitHub sometimes disables auto-merge
+    # AFTER we enable it (a race when a required check resolves as "skipped" — what stranded PR #118:
+    # auto_merge_enabled → auto_merge_disabled → orphaned CLEAN-but-unmerged, with no event to re-trigger).
+    types: [opened, synchronize, reopened, ready_for_review, auto_merge_disabled]
 
 permissions:
   contents: write # merge the PR
@@ -35,9 +38,17 @@ jobs:
       contains(fromJSON('["craigoley", "cao825", "craigoleyagent", "dependabot[bot]"]'),
       github.event.pull_request.user.login)
     steps:
-      - name: Enable native auto-merge (waits for required checks, incl. E2E)
+      - name: Enable native auto-merge (or merge directly if already mergeable)
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
-        run: gh pr merge "$PR" --auto --squash --delete-branch --repo "$REPO"
+        # Enable GitHub's native auto-merge — it waits for the required checks, then squash-merges. If it
+        # CAN'T be enabled because the PR is ALREADY mergeable (all required checks green by the time this
+        # runs — e.g. an auto_merge_disabled re-run on a now-CLEAN PR), fall back to a direct squash merge.
+        # ★ Neither path uses --admin, so branch protection is NEVER bypassed: the direct merge only
+        # succeeds when GitHub already considers the PR mergeable. The trust gate above is still the only
+        # authorization. This recovers the #118 "enabled-then-dropped, left CLEAN-but-open" stall.
+        run: >-
+          gh pr merge "$PR" --auto --squash --delete-branch --repo "$REPO"
+          || gh pr merge "$PR" --squash --delete-branch --repo "$REPO"
