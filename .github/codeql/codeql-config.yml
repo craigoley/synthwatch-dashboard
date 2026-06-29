@@ -1,0 +1,8 @@
+# CodeQL config — exclude vendored / generated third-party code from analysis.
+name: "synthwatch-dashboard CodeQL config"
+
+# The Playwright trace-viewer is a VENDORED Vite bundle (public/trace-viewer/, minified + hashed, committed
+# wholesale in #79; forking is out-of-scope per #97). It is not our source, so its findings aren't
+# actionable — the JS analog of generated *.g.cs. Exclude it so they don't recur on re-vendor.
+paths-ignore:
+  - public/trace-viewer
