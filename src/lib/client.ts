@@ -47,6 +47,7 @@ import {
   getPerformanceReport,
   getNarrative,
   getReconcileDrift,
+  triggerReconcile,
   getSpecCatalog,
   listEditors,
   addEditor as apiAddEditor,
@@ -406,6 +407,9 @@ export { sendChannelTest, getChannelTestStatus };
 // On-demand "Run now": POST → 202 { requestId }; the run then appears in the history.
 export { runCheckNow };
 
+// "Reconcile now": POST → 202 { triggered }; the off-cron job re-syncs the drift snapshot (detected_at advances).
+export { triggerReconcile };
+
 /** Revalidate a check's run-history (all date-range pages) — call after triggering an on-demand run
  *  so the new run shows up live. Matches the useRunHistory cache key ["run-history", checkId, …]. */
 export async function revalidateRunHistory(checkId: number) {
@@ -468,10 +472,14 @@ export function useNarrative(scope: "fleet" | "monitor", window: ReportWindow, k
 // data null and the surface hides; an empty items array (reconcile ran, in sync) still renders the
 // positive "in sync with Git" state. Read-only — there is no write/apply hook (apply is a later runner
 // capability; reconcile runs in report mode).
-export function useReconcileDrift() {
+export function useReconcileDrift(opts: { reconciling?: boolean } = {}) {
   return useSWR(keys.reconcileDrift, () => getReconcileDrift(), {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
+    // While a manual "Reconcile now" is in flight, fast-poll so the off-cron job's fresh snapshot (detected_at
+    // advanced) is caught within seconds — the same scoped-fast-poll idea as useCheck's expectRun. Idle (no
+    // auto-poll) otherwise: reconcile is hourly, the read is cheap-but-not-free, and the surface is read-only.
+    refreshInterval: opts.reconciling ? 3000 : 0,
   });
 }
 

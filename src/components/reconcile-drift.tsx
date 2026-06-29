@@ -17,9 +17,11 @@
  * empty snapshot (reconcile ran, nothing differs) renders the positive "in sync with Git" state.
  */
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
-import { useReconcileDrift } from "@/lib/client";
+import { useReconcileDrift, triggerReconcile } from "@/lib/client";
+import { useAuth } from "@/components/auth-provider";
 import { formatRelative } from "@/lib/format";
 import type { DriftRow, DriftType } from "@/lib/types";
 
@@ -138,7 +140,61 @@ function DriftRowItem({ row }: { row: DriftRow }) {
 }
 
 export function ReconcileDriftSurface() {
-  const { data } = useReconcileDrift();
+  // ── "Reconcile now": event-driven, off-cron trigger (the #115-proven path). Mirrors the runCheckNow
+  //    live-progress UX — disabled while running, fast-polls for completion, re-enables when the snapshot
+  //    re-syncs. Reconcile is fire-and-forget (202, no execution id), so "done" = the drift snapshot's
+  //    detected_at advancing past the pre-trigger value (the off-cron job re-ran and rewrote the snapshot).
+  const { canWrite } = useAuth(); // editor/admin only — the API gates this write; it spends compute
+  const [reconciling, setReconciling] = useState(false);
+  const [triggerError, setTriggerError] = useState<string | null>(null);
+  const { data } = useReconcileDrift({ reconciling });
+  const baseline = useRef<string | null>(null); // detected_at captured at trigger time
+  const detectedAt = data?.detected_at ?? null;
+
+  // Completion: the off-cron job re-synced the snapshot (detected_at advanced) → leave the live state.
+  useEffect(() => {
+    if (reconciling && detectedAt !== baseline.current) setReconciling(false);
+  }, [reconciling, detectedAt]);
+
+  // Safety stop: the ACA job can be slow (cold start) — don't spin forever if no fresh snapshot lands.
+  useEffect(() => {
+    if (!reconciling) return;
+    const t = setTimeout(() => setReconciling(false), 120_000);
+    return () => clearTimeout(t);
+  }, [reconciling]);
+
+  async function handleReconcileNow() {
+    setTriggerError(null);
+    baseline.current = detectedAt; // remember the pre-trigger snapshot so we can detect the re-synced one
+    setReconciling(true); // turns on the scoped fast-poll (useReconcileDrift) — catches the re-sync live
+    try {
+      await triggerReconcile(); // 202 fire-and-forget; the fast-poll watches detected_at from here
+    } catch {
+      // 401/403 are handled globally by the api-client interceptor; a 503 (job-start failed)/other → surface.
+      setReconciling(false);
+      setTriggerError("Couldn't start the reconcile — try again.");
+    }
+  }
+
+  const reconcileControl = canWrite ? (
+    <div className="flex items-center gap-2">
+      {triggerError && (
+        <span data-testid="reconcile-error" className="text-[12px]" style={{ color: "var(--color-fail)" }}>
+          {triggerError}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={handleReconcileNow}
+        disabled={reconciling}
+        data-testid="reconcile-now"
+        className="rounded-md border border-[var(--color-border-strong)] bg-[var(--color-bg)] px-2.5 py-1 text-xs font-medium text-[var(--color-ink)] transition hover:bg-[var(--color-panel-2)] disabled:opacity-60"
+      >
+        {reconciling ? "Reconciling…" : "Reconcile now"}
+      </button>
+    </div>
+  ) : null;
+
   if (!data) return null; // loading (undefined) or endpoint absent (null) → hide cleanly
 
   const config = data.items.filter((r) => r.drift_type !== "orphan");
@@ -160,9 +216,12 @@ export function ReconcileDriftSurface() {
               No monitors differ from the manifest.
             </span>
           </div>
-          {when && (
-            <span className="sw-mono text-[10px] text-[var(--color-ink-faint)]">reconciled {when}</span>
-          )}
+          <div className="flex items-center gap-2">
+            {when && (
+              <span className="sw-mono text-[10px] text-[var(--color-ink-faint)]">reconciled {when}</span>
+            )}
+            {reconcileControl}
+          </div>
         </div>
         <div className="mt-2"><CatalogLink newCount={newCount} /></div>
       </section>
@@ -171,6 +230,15 @@ export function ReconcileDriftSurface() {
 
   return (
     <section className="space-y-3" data-testid="reconcile-drift">
+      {(reconcileControl || when) && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {when && (
+            <span className="sw-mono text-[10px] text-[var(--color-ink-faint)]">reconciled {when}</span>
+          )}
+          {reconcileControl}
+        </div>
+      )}
+
       {/* ── Resolvable config drift (new / changed / missing) ── amber "attention, not down". ── */}
       {config.length > 0 ? (
         <div className="sw-panel overflow-hidden" data-testid="drift-config">

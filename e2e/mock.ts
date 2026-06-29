@@ -109,6 +109,8 @@ export interface World {
    * Set to { items: [] } for the "in sync" empty state, or with rows to list drift.
    */
   reconcileDrift?: { items: RawObj[]; detectedAt?: string | null };
+  /** Force POST /api/reconcile/trigger to fail (the "couldn't start the reconcile" path), e.g. { status: 503 }. */
+  reconcileTriggerError?: { status: number };
   /**
    * Spec catalog (Phase 13). Unset → /api/specs 404 → the catalog page shows a neutral "not
    * available" notice. Set to { items: [] } for the "no specs yet" empty state, or with rows.
@@ -426,6 +428,14 @@ export async function mockApi(
       const detectedAt =
         world.reconcileDrift.detectedAt ?? (items.length ? "2026-06-25T12:00:00Z" : null);
       return json(route, { items, detectedAt });
+    }
+    // POST /api/reconcile/trigger — fire-and-forget off-cron start. 202 { triggered:true }; reconcileTriggerError
+    // forces the failure path (e.g. 503 job-start failed). Tests then mutate world.reconcileDrift (advance
+    // detectedAt) to simulate the off-cron job re-syncing the snapshot.
+    if (path === "/api/reconcile/trigger" && method === "POST") {
+      if (world.reconcileTriggerError)
+        return json(route, { error: "unavailable" }, world.reconcileTriggerError.status);
+      return json(route, { triggered: true }, 202);
     }
     // Spec catalog (Phase 13). Unset → 404 (endpoint not deployed → "not available" notice);
     // { items: [] } → "no specs yet"; items present → catalog listed. probedAt defaults to a fixed time.

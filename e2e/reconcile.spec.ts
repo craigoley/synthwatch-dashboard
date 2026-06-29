@@ -123,4 +123,48 @@ test.describe("phase 6b — reconcile drift surface", () => {
     await expect(page.getByRole("heading", { name: "Monitors" })).toBeVisible();
     await expect(page.getByTestId("reconcile-drift")).toHaveCount(0);
   });
+
+  // ── "Reconcile now": event-driven off-cron trigger with runCheckNow-style live progress. ──
+  test("★ Reconcile now triggers an off-cron reconcile and re-syncs the snapshot live (no reload)", async ({ page }) => {
+    const w = worldWithDrift(); // 4 drift rows, detectedAt 2026-06-25T12:00:00Z
+    await mockApi(page, w);
+    await page.goto("/monitors");
+
+    const btn = page.getByTestId("reconcile-now");
+    await expect(btn).toBeEnabled();
+    await expect(page.getByTestId("drift-config")).toBeVisible(); // drift present before reconcile
+
+    // trigger → live progress: the POST is accepted (202) and the button shows it's running
+    await btn.click();
+    await expect(btn).toHaveText(/Reconciling/);
+    await expect(btn).toBeDisabled();
+
+    // the off-cron job completes: it re-runs and rewrites the snapshot (now in sync, detected_at advanced)
+    w.reconcileDrift = { items: [], detectedAt: new Date().toISOString() };
+
+    // the scoped fast-poll catches the re-synced snapshot → button re-enables + the surface shows in-sync,
+    // WITHOUT a reload (the runCheckNow live-progress pattern, keyed on detected_at advancing)
+    await expect(btn).toHaveText("Reconcile now", { timeout: 8000 });
+    await expect(page.getByTestId("drift-insync")).toContainText("In sync with Git");
+    await expect(page.getByTestId("drift-config")).toHaveCount(0);
+  });
+
+  test("a failed reconcile trigger surfaces a clear error and re-enables (no silent failure)", async ({ page }) => {
+    const w = worldWithDrift();
+    w.reconcileTriggerError = { status: 503 }; // the API couldn't ARM-start the job
+    await mockApi(page, w);
+    await page.goto("/monitors");
+
+    await page.getByTestId("reconcile-now").click();
+    await expect(page.getByTestId("reconcile-error")).toBeVisible();
+    await expect(page.getByTestId("reconcile-now")).toBeEnabled(); // recovered, not stuck "Reconciling…"
+  });
+
+  test("Reconcile now is editor-gated — hidden for a signed-out viewer (surface still shows read-only)", async ({ page }) => {
+    await mockApi(page, worldWithDrift(), { seedSession: false });
+    await page.goto("/monitors");
+
+    await expect(page.getByTestId("reconcile-drift")).toBeVisible(); // read-only surface still renders
+    await expect(page.getByTestId("reconcile-now")).toHaveCount(0); // but no compute-spending trigger
+  });
 });
