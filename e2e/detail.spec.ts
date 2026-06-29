@@ -458,4 +458,33 @@ test.describe("check detail", () => {
       "raw-HTTP fetch line present",
     ).toBe(true);
   });
+
+  // ★ Frozen-`to` root cause: the live run-history window's `to` was Date.now() pinned at mount, so every poll
+  // requested [mount-7d, mount) and the API excluded new runs (started_at >= mount) until a reload. The live
+  // preset must OMIT `to` (server windows to its own now); a CUSTOM range must still pin `to` (historical).
+  test("live run-history omits the `to` window param (so new runs aren't excluded); custom range keeps it", async ({ page }) => {
+    await mockApi(page);
+    const runsUrls: string[] = [];
+    page.on("request", (r) => {
+      if (/\/checks\/1\/runs(\?|$)/.test(r.url())) runsUrls.push(r.url());
+    });
+
+    await page.goto("/checks/1");
+    await expect(page.getByTestId("run-history")).toBeVisible();
+    await page.waitForTimeout(600);
+
+    // default preset (Last 7d): `from` is sent (bounded lookback) but `to` is OMITTED → API windows to now
+    expect(runsUrls.length, "run-history fetched").toBeGreaterThan(0);
+    expect(runsUrls.some((u) => /[?&]from=/.test(u)), "preset keeps from").toBe(true);
+    expect(runsUrls.every((u) => !/[?&]to=/.test(u)), "live preset omits to").toBe(true);
+
+    // custom range: `to` IS pinned (a historical window legitimately freezes its upper bound)
+    runsUrls.length = 0;
+    const rh = page.getByTestId("run-history");
+    await rh.getByRole("button", { name: "Custom" }).click();
+    await page.getByTestId("run-history-from").fill("2026-06-01");
+    await page.getByTestId("run-history-to").fill("2026-06-15");
+    await page.waitForTimeout(600);
+    expect(runsUrls.some((u) => /[?&]to=/.test(u)), "custom range pins to").toBe(true);
+  });
 });
