@@ -98,9 +98,11 @@ test.describe("incident detail page", () => {
     await expect(page.getByText("Root cause")).toHaveCount(0); // no RCA panel
   });
 
-  // ★ The #115 sibling fix: a NEW incident (always page 0) must appear on the steady poll WITHOUT a manual
-  // reload. Pre-fix (revalidateFirstPage:false) page 0 was skipped on every tick → a fresh incident stayed
-  // invisible until reload — the worst place for that, since incidents are the alert surface.
+  // ★ A NEW incident (always page 0) must appear on the steady poll WITHOUT a manual reload — page 0 stale =
+  // a missed alert. Pre-fix (revalidateFirstPage:false) page 0 was skipped on every tick → invisible until
+  // reload. ★★ DEFAULT TEETH: useIncidentHistory no longer passes revalidateFirstPage explicitly — it relies
+  // on the useCursorHistory SAFE DEFAULT (true). So this test now ALSO guards that default: flip the default
+  // back to false and this fails. (The run-history live tests in detail.spec.ts guard it the same way.)
   test("live: a new incident appears in the open list without a manual reload", async ({ page }) => {
     const w = defaultWorld();
     await mockApi(page, w);
@@ -121,8 +123,8 @@ test.describe("incident detail page", () => {
       }),
     );
 
-    // ★ the steady poll refetches page 0 (revalidateFirstPage:true) → it shows up, NO reload.
-    // (timeout > the 15s idle cadence; fails pre-fix because page 0 was never refetched.)
+    // ★ the steady poll refetches page 0 (via the safe-default revalidateFirstPage) → it shows up, NO reload.
+    // (timeout > the 15s idle cadence; fails if the default is false because page 0 is never refetched.)
     await expect(page.getByText("FRESH OUTAGE on payments")).toBeVisible({ timeout: 20000 });
   });
 });
