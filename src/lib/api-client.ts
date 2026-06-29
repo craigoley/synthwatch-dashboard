@@ -1099,6 +1099,19 @@ export async function getReconcileDrift(): Promise<ReconcileDrift | null> {
   }
 }
 
+/**
+ * POST /api/reconcile/trigger — ARM-start the reconcile job NOW (off-cron), the #115-proven path. Editor/
+ * admin-gated by the API (write verb). 202 { triggered: true } on success; 503 if the ACA job-start failed.
+ * Fire-and-forget — there's NO execution id to poll; the result surfaces as the drift snapshot's detected_at
+ * advancing on the next /reconcile/drift read (poll it while reconciling).
+ */
+export async function triggerReconcile(): Promise<{ triggered: boolean }> {
+  return request<{ triggered: boolean }>("/reconcile/trigger", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+  });
+}
+
 // ─── spec catalog (Phase 13 — read-only inventory) ───────────────────────────
 // GET /api/specs serves the runner-owned spec_catalog snapshot LEFT JOINed to checks (coverage + health),
 // mirroring the reconcile read path. FLAGGED DEP: a 404 (endpoint not deployed yet) → null, so the catalog
