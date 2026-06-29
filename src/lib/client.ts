@@ -113,8 +113,13 @@ const live: SWRConfiguration = {
 
 // ─── read hooks ────────────────────────────────────────────────────────────────
 
-export function useChecks() {
-  return useSWR(keys.checks, () => listChecks(), live);
+export function useChecks(opts: { fast?: boolean } = {}) {
+  return useSWR(keys.checks, () => listChecks(), {
+    ...live,
+    // fast: while a "Run all" batch is in flight, poll at the run-active cadence so the aggregate
+    // running/done/pass/fail counts advance live as each monitor's run settles. Idle 15s otherwise.
+    ...(opts.fast ? { refreshInterval: RUN_ACTIVE_POLL_MS } : {}),
+  });
 }
 
 /**
