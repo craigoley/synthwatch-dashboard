@@ -59,6 +59,7 @@ import {
   deleteCheck as apiDeleteCheck,
 } from "@/lib/api-client";
 import type { CreateCheckInput, UpdateCheckInput } from "@/lib/schemas";
+import { runsDebug } from "@/lib/debug";
 import type {
   IncidentWithCheck,
   ReportWindow,
@@ -176,7 +177,14 @@ function useCursorHistory<T>(
   //  - revalidateFirstPage: see the SAFE DEFAULT below (= true). A new item on these lists ALWAYS lands on
   //    page 0; if page 0 isn't revalidated on the poll it stays stale until a manual reload. Opt OUT (false)
   //    only for a NON-newest-first list where page 0 never gains the freshest row.
-  opts: { live?: boolean; runningWhile?: (items: T[]) => boolean; revalidateFirstPage?: boolean } = {},
+  //  - debugLabel: when set AND the "runs" debug channel is on, emit the gated [runs-debug] funnel (poll-tick →
+  //    page-0 fetch response) so a live-update failure shows exactly where the newest item falls out. Off-by-default.
+  opts: {
+    live?: boolean;
+    runningWhile?: (items: T[]) => boolean;
+    revalidateFirstPage?: boolean;
+    debugLabel?: string;
+  } = {},
 ) {
   const getKey = (index: number, prev: CursorPageData<T> | null) => {
     if (!scope) return null;
@@ -187,13 +195,42 @@ function useCursorHistory<T>(
 
   const swr = useSWRInfinite<CursorPageData<T>>(
     getKey,
-    (key) => fetchPage((key[key.length - 1] as string | null) ?? null),
+    async (key) => {
+      const cursor = (key[key.length - 1] as string | null) ?? null;
+      const res = await fetchPage(cursor);
+      // ★ Funnel stage (b): does page 0's RESPONSE contain the new item? If newestId here is the fresh run but
+      //   it never reaches "post-merge"/"render", the fault is SWR merge (c), not the fetch.
+      if (opts.debugLabel) {
+        const newest = res.items[0] as Record<string, unknown> | undefined;
+        runsDebug(`${opts.debugLabel}: page-${cursor === null ? "0" : "N"} fetch ← returned ${res.items.length}`, {
+          cursor: cursor ?? "(page0/null)",
+          returned: res.items.length,
+          newestId: newest?.id ?? null,
+          newestStatus: newest?.status ?? null,
+          nextCursor: res.nextCursor,
+        });
+      }
+      return res;
+    },
     {
       // SHARED run-aware cadence (matches useCheck): fast while a run is live, idle otherwise.
-      refreshInterval: (pages) =>
-        runAwareInterval(
-          Boolean(opts.live) || (opts.runningWhile?.((pages ?? []).flatMap((p) => p.items)) ?? false),
-        ),
+      refreshInterval: (pages) => {
+        const active = Boolean(opts.live) || (opts.runningWhile?.((pages ?? []).flatMap((p) => p.items)) ?? false);
+        const interval = runAwareInterval(active);
+        // ★ Funnel stage (a): is the poll even fast-firing? interval=2500 → live/active; 15000 → idle. If this
+        //   stays 15000 right after a "Run now", runLive never engaged on this page.
+        if (opts.debugLabel) {
+          const newest = (pages ?? [])[0]?.items?.[0] as Record<string, unknown> | undefined;
+          runsDebug(`${opts.debugLabel}: poll-tick (interval recompute) interval=${interval}`, {
+            live: Boolean(opts.live),
+            runningActive: active,
+            intervalMs: interval,
+            loadedPages: (pages ?? []).length,
+            newestLoadedId: newest?.id ?? null,
+          });
+        }
+        return interval;
+      },
       revalidateOnFocus: true,
       // ★ SAFE DEFAULT = true. Every consumer here is a NEWEST-FIRST list, so a brand-new item (run #115,
       // incident #123, the live auto-expand #126) always lands on page 0 — page 0 MUST be revalidated on
@@ -246,6 +283,7 @@ export function useRunHistory(
       live: opts.live,
       runningWhile: (items) => items[0]?.status === "running", // self-fast-poll while the newest run runs
       // revalidateFirstPage inherits the safe default (true) — page 0 holds the newest run.
+      debugLabel: "run-history", // gated [runs-debug] funnel (poll + page-0 fetch); see src/lib/debug.ts
     },
   );
   return { runs: h.items, ...rest(h) };
