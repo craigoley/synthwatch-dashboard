@@ -78,6 +78,62 @@ import type {
 } from "@/lib/types";
 import type { CreateCheckInput, UpdateCheckInput } from "@/lib/schemas";
 import { getToken, clearSession, emitAuthEvent, type Role } from "@/lib/auth";
+import { isDebugOn, runsDebug } from "@/lib/debug";
+
+// Monotonic counter of REAL request() fetch invocations (gated debug only). Lets the [runs-debug] funnel prove
+// whether N "fetches" are N genuine network calls vs SWR replaying one cached result.
+let runsFetchSeq = 0;
+
+/**
+ * Gated raw-response telemetry for the run-history page-0 fetch (the #128 funnel only saw the PARSED newestId,
+ * so "newestId X forty times" was ambiguous: stale cache vs nothing newer). Logs the ground truth at the HTTP
+ * layer — status, the cache/freshness headers, AND whether the browser served it from its HTTP cache (Resource
+ * Timing transferSize/deliveryType) — so a cache HIT or a frozen `date` is self-evident. Off unless the "runs"
+ * debug channel is on; scoped to /checks/{id}/runs to avoid noise.
+ */
+function logRunsFetch(path: string, url: string, res: Response, startedAt: number): void {
+  if (!/^\/checks\/\d+\/runs(\?|$)/.test(path) || !isDebugOn("runs")) return;
+  const seq = (runsFetchSeq += 1);
+  let elapsedMs: number | null = null;
+  let deliveryType: string | null = null;
+  let transferSize: number | null = null;
+  try {
+    elapsedMs = Math.round(performance.now() - startedAt);
+    // Resource Timing: a browser HTTP-cache hit reports transferSize 0 (or deliveryType "cache"); a real
+    // network call reports bytes + a non-trivial duration. This is the decisive browser-cache signal here —
+    // Age/x-cache only appear for SHARED caches, of which there are none in front of the direct Kestrel API.
+    const entries = performance.getEntriesByType("resource") as PerformanceResourceTiming[];
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (entries[i]!.name === url) {
+        const e = entries[i]!;
+        transferSize = e.transferSize;
+        deliveryType =
+          (e as PerformanceResourceTiming & { deliveryType?: string }).deliveryType ||
+          (e.transferSize === 0 ? "(transferSize=0 → likely cache)" : "network");
+        break;
+      }
+    }
+  } catch {
+    /* performance API unavailable — skip the timing fields */
+  }
+  runsDebug(`request ← #${seq} ${path} status=${res.status} elapsed=${elapsedMs ?? "?"}ms`, {
+    seq,
+    status: res.status,
+    elapsedMs,
+    // ★ Frozen `date` across ticks = a cached response replaying its original headers; advancing `date` with a
+    //   stale newestId = real network calls returning stale data → a SERVER-SIDE problem, not a client cache.
+    date: res.headers.get("date"),
+    age: res.headers.get("age"), // shared-cache age; expected null here (no proxy/edge in front of the API)
+    xCache:
+      res.headers.get("x-cache") ??
+      res.headers.get("cf-cache-status") ??
+      res.headers.get("x-vercel-cache") ??
+      null,
+    cacheControl: res.headers.get("cache-control"),
+    deliveryType, // ★ "cache"/transferSize=0 → browser HTTP cache HIT (the bug #129 was meant to kill)
+    transferSize,
+  });
+}
 
 /**
  * Base URL for the API. Set via NEXT_PUBLIC_API_BASE_URL (Vercel env + .env.local
@@ -152,7 +208,11 @@ async function request<T>(
   const timer =
     controller && opts?.timeoutMs != null ? setTimeout(() => controller.abort(), opts.timeoutMs) : undefined;
   try {
-    const res = await fetch(buildUrl(path, params), {
+    const url = buildUrl(path, params);
+    // Gated [runs-debug] timing: capture before the network call so logRunsFetch can report elapsed ms (a
+    // sub-millisecond fetch is a tell-tale cache hit). No-op cost when debug is off (just a perf.now read).
+    const startedAt = typeof performance !== "undefined" ? performance.now() : 0;
+    const res = await fetch(url, {
       ...init,
       // ★ Live-monitoring data must never come from the browser HTTP cache. The fetch default (cache:
       // "default") let the browser reuse a cached GET on every poll tick — the run-history list polled 40+
@@ -169,6 +229,8 @@ async function request<T>(
         ...init?.headers,
       },
     });
+
+    logRunsFetch(path, url, res, startedAt); // gated [runs-debug] raw-HTTP ground truth (cache headers + timing)
 
     if (!res.ok) {
       let body: { error?: string; message?: string; details?: unknown } = {};

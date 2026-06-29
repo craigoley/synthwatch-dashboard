@@ -452,5 +452,10 @@ test.describe("check detail", () => {
       logs.some((l) => l.includes("page-0 fetch") || l.includes("poll-tick")),
       "engine stage (fetch/poll) present",
     ).toBe(true);
+    // ★ the raw-HTTP ground-truth line (status + cache headers + a monotonic real-fetch seq) emits too
+    expect(
+      logs.some((l) => l.includes("request ←") && l.includes("status=")),
+      "raw-HTTP fetch line present",
+    ).toBe(true);
   });
 });
