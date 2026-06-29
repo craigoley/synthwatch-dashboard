@@ -268,6 +268,12 @@ export function useIncidentHistory(
         cursor: cursor ?? undefined,
       }).then((p) => ({ items: p.incidents, nextCursor: p.next_cursor })),
     pageSize,
+    // ★ Live-refresh the alert surface (the #115 sibling fix): revalidateFirstPage:true so a brand-new
+    // incident — always page 0 — appears on the steady poll instead of staying stale until a manual reload.
+    // No runLive/runningWhile here: incidents have no in-flight "running" signal (one can open from any
+    // scheduled run at any time), so a STEADY poll (the 15s idle cadence) is the right trigger, not a
+    // run-gated fast poll. revalidateOnFocus (already on) also surfaces new incidents when the tab refocuses.
+    { revalidateFirstPage: true },
   );
   return { incidents: h.items, ...rest(h) };
 }
