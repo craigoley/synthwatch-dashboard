@@ -29,6 +29,7 @@ import type {
   Tag,
   TagInUse,
   ReportWindow,
+  IncidentBreakdown,
   ReportSeriesPoint,
   AvailabilityReport,
   PerformanceReport,
@@ -1836,4 +1837,29 @@ export async function listAccessRequests(): Promise<AccessRequestRow[]> {
 /** DELETE /api/access-requests/{email} — dismiss a pending access request (admin-only). */
 export async function dismissAccessRequest(email: string): Promise<void> {
   await request<unknown>(`/access-requests/${encodeURIComponent(email)}`, undefined, { method: "DELETE" });
+}
+
+// Reports P6 — GET /api/reports/incident-breakdown?window= . The verdict-taxonomy breakdown +
+// alert-precision (real-outage / classified). Serves camelCase; `precision` is null when nothing's classified.
+export async function getIncidentBreakdown(window: ReportWindow): Promise<IncidentBreakdown | null> {
+  try {
+    const raw = await request<Record<string, unknown>>("/reports/incident-breakdown", { window });
+    const buckets = ((raw?.buckets as Record<string, unknown>[]) ?? []).map((b) => ({
+      classification: String(b.classification ?? "unclassified"),
+      count: (b.count as number) ?? 0,
+      pctOfTotal: (b.pctOfTotal as number) ?? 0,
+    }));
+    return {
+      window: (raw?.window as ReportWindow) ?? window,
+      total: (raw?.total as number) ?? 0,
+      classified: (raw?.classified as number) ?? 0,
+      unclassified: (raw?.unclassified as number) ?? 0,
+      realOutages: (raw?.realOutages as number) ?? 0,
+      precision: (raw?.precision as number) ?? null, // null on the wire → null here (honest empty)
+      buckets,
+    };
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null;
+    throw err;
+  }
 }

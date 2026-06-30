@@ -525,6 +525,24 @@ export interface Routing {
 // ─── reporting (Layer 2): availability + performance, grouped by tag, windowed ──
 export type ReportWindow = "7d" | "30d" | "90d";
 
+// Reports P6 — the verdict-taxonomy breakdown (incidents.rca.classification). `precision` = real-outage /
+// classified (the fraction of JUDGED reds that were genuine outages); null when classified === 0 (honest empty,
+// not a fake 0%). `unclassified` is an explicit bucket — incidents with no RCA yet are never dropped.
+export interface IncidentBreakdownBucket {
+  classification: string; // one of the 5 enum values, or "unclassified"
+  count: number;
+  pctOfTotal: number;
+}
+export interface IncidentBreakdown {
+  window: ReportWindow;
+  total: number;
+  classified: number;
+  unclassified: number;
+  realOutages: number;
+  precision: number | null;
+  buckets: IncidentBreakdownBucket[];
+}
+
 /** One point in a daily report time-series (date = YYYY-MM-DD). */
 export interface ReportSeriesPoint {
   date: string;

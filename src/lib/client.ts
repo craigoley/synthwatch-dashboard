@@ -45,6 +45,7 @@ import {
   getSuggestedKeys,
   getAvailabilityReport,
   getPerformanceReport,
+  getIncidentBreakdown,
   getNarrative,
   getReconcileDrift,
   getReconcilePlan,
@@ -100,6 +101,7 @@ const keys = {
   tags: ["tags"] as const,
   suggestedKeys: ["tags-suggested"] as const,
   availabilityReport: (w: string, g: string) => ["report-availability", w, g] as const,
+  incidentBreakdown: (w: string) => ["report-incident-breakdown", w] as const,
   performanceReport: (w: string, g: string) => ["report-performance", w, g] as const,
   narrative: (scope: string, w: string, key: number | null) => ["narrative", scope, w, key] as const,
   reconcileDrift: ["reconcile-drift"] as const,
@@ -463,6 +465,13 @@ export function useAvailabilityReport(window: ReportWindow, groupBy: string) {
 
 export function usePerformanceReport(window: ReportWindow, groupBy: string) {
   return useSWR(keys.performanceReport(window, groupBy), () => getPerformanceReport(window, groupBy), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+}
+
+export function useIncidentBreakdown(window: ReportWindow) {
+  return useSWR(keys.incidentBreakdown(window), () => getIncidentBreakdown(window), {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });

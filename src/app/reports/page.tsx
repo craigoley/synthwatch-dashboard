@@ -6,6 +6,7 @@ import { useAvailabilityReport, usePerformanceReport, useChecks, useSla, useTags
 import { EmptyState, Spinner } from "@/components/states";
 import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { NarrativeCard } from "@/components/narrative-card";
+import { IncidentBreakdownCard } from "@/components/incident-breakdown-card";
 import { MonitorReportCard, type ReportRow } from "@/components/monitor-report-card";
 import { ReportWebVitals, ReportSeriesArea } from "@/components/charts";
 import { formatDuration } from "@/lib/format";
@@ -127,6 +128,9 @@ export default function ReportsPage() {
 
       {/* AI narrative summary (Layer 3) — hides entirely until the endpoint serves one (currently 7d). */}
       <NarrativeCard scope="fleet" window={window} />
+
+      {/* P6 — alert-quality breakdown: how many reds were real vs monitor-bug vs transient (leads with precision). */}
+      <IncidentBreakdownCard window={window} />
 
       {/* ★ Fleet Core Web Vitals (p75) — the /reports/performance group web_vitals we already fetch; hides
           when there are no browser monitors / no vitals (honest absence, not a zero). */}
