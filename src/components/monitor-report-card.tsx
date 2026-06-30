@@ -38,7 +38,33 @@ export interface ReportRow {
   max_open_severity: IncidentSeverity | null;
   /** Incidents opened during the window (rollup report); null when that source is unavailable. */
   incident_window_count: number | null;
+  /** Signed days to TLS cert expiry (SSL checks only; null for everything else — never 0 as a sentinel). */
+  last_cert_days_remaining: number | null;
   spark: SparkPoint[];
+}
+
+/**
+ * TLS cert runway badge. SSL checks only — `null` (non-cert) renders NOTHING (gaps-not-zeros: never a
+ * misleading "0 days"). For a cert check, 0 = expires today, negative = already expired (both real, loud).
+ * Thresholds use the status tokens: < 7d fail, < 14d warn, else pass.
+ */
+function CertRunway({ days }: { days: number | null }) {
+  if (days == null) return null;
+  const tone = days < 7 ? "fail" : days < 14 ? "warn" : "pass";
+  const label = days < 0 ? "cert expired" : days === 0 ? "cert expires today" : `cert ${days}d`;
+  return (
+    <span
+      data-testid="cert-runway"
+      className="sw-mono inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px]"
+      style={{
+        color: `var(--color-${tone})`,
+        background: `color-mix(in srgb, var(--color-${tone}) 12%, transparent)`,
+      }}
+      title={`TLS certificate ${days < 0 ? "expired" : `expires in ${days} day${days === 1 ? "" : "s"}`}`}
+    >
+      {label}
+    </span>
+  );
 }
 
 function Metric({
@@ -112,8 +138,9 @@ export function MonitorReportCard({
             <StatusDot status={row.current_status} />
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium text-[var(--color-ink)]">{row.name}</span>
-              <span className="flex items-center gap-1.5">
+              <span className="flex flex-wrap items-center gap-1.5">
                 <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">{row.kind}</span>
+                <CertRunway days={row.last_cert_days_remaining} />
                 <TagChips tags={row.tags} />
               </span>
             </span>
