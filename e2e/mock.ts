@@ -82,6 +82,8 @@ export interface World {
   tags?: RawObj[];
   /** Reports served? false → /reports/* 404 (endpoint not deployed). Default true. */
   reportsServed?: boolean;
+  /** Chat-to-prefill: set false to make /checks/parse-intent report unconfigured (the input hides). */
+  parseIntentConfigured?: boolean;
   /** Successive GET /checks/{id} bodies for live-run polling tests: each poll advances; the last repeats.
    *  e.g. [runningDetail, passDetail] → the page shows 'running', then 'pass', via polling (no reload). */
   detailSequence?: Record<number, RawObj[]>;
@@ -297,6 +299,21 @@ export async function mockApi(
     }
 
     // Writes first (don't get caught by failAllReads).
+    // Chat-to-prefill (#132/#149): NL → a validated non-browser monitor suggestion. Deterministic from the text
+    // so tests can assert prefill / redirect / field-errors. Shared by the monitors + status pages (#150).
+    if (path === "/api/checks/parse-intent" && method === "POST") {
+      if (world.parseIntentConfigured === false) return json(route, { configured: false, note: "AI monitor-prefill isn’t configured." });
+      const t = String(JSON.parse(req.postData() || "{}").text ?? "").toLowerCase();
+      if (/browser|checkout flow|playwright/.test(t))
+        return json(route, { configured: true, redirect: "browser", reason: "Browser monitors are authored as code in the monitors repo, then set up from the Catalog." });
+      // Pick the first dotted token as the host (split, not a backtracking regex); strip any scheme.
+      const host = (t.split(/\s+/).find((w) => w.includes(".")) ?? "example.com").replace(/^https?:\/\//, "");
+      if (/invalid|nonsense/.test(t)) // validate-don't-trust: a parsed-but-invalid suggestion → inline field error
+        return json(route, { configured: true, valid: false, fields: { name: "Bad parse", kind: "tcp", targetUrl: "example.com" }, fieldErrors: { "netConfig.port": "TCP requires a port (host:port or net_config.port)." } });
+      const kind = /ssl/.test(t) ? "ssl" : /\bdns\b/.test(t) ? "dns" : /\btcp\b/.test(t) ? "tcp" : /ping|reachab/.test(t) ? "ping" : "http";
+      const targetUrl = kind === "http" || kind === "ssl" ? `https://${host}` : host;
+      return json(route, { configured: true, valid: true, fields: { name: `${kind} ${host}`, kind, targetUrl, intervalSeconds: 300 }, fieldErrors: {} });
+    }
     if (path === "/api/checks" && method === "POST") {
       if (world.createResponse) return json(route, world.createResponse.body, world.createResponse.status);
       const body = JSON.parse(req.postData() || "{}");
