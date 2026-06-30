@@ -564,3 +564,27 @@ test.describe("check detail", () => {
     await expect(page.getByTestId("baseline-diff-verdict")).toHaveCount(0); // but no verdict badge
   });
 });
+
+// ★ Write-gate: Pause/Resume + Edit on check detail are EDITOR-only (mirror Run-now). A viewer sees read-only —
+// these PATCH the check (and Edit's tag editor auto-saves), so they must not leak to viewers.
+test.describe("check detail — write gate", () => {
+  test("an EDITOR sees Run now / Pause / Edit", async ({ page }) => {
+    await mockApi(page); // default world = seeded editor session
+    await page.goto("/checks/1");
+
+    await expect(page.getByTestId("run-now")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Pause" })).toBeVisible(); // check 1 is enabled
+    await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
+  });
+
+  test("a VIEWER (non-editor) sees NONE of the write controls", async ({ page }) => {
+    await mockApi(page, defaultWorld(), { seedSession: false }); // no editor session → read-only
+    await page.goto("/checks/1");
+
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible(); // page still renders
+    await expect(page.getByTestId("run-now")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Pause" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Resume" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
+  });
+});
