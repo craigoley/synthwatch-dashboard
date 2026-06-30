@@ -31,11 +31,16 @@ export function MonitorChatInput({
           tone: "muted",
           text: r.reason ?? "Browser monitors are authored as code in the monitors repo, then set up from the Catalog.",
         });
+      } else if (r.prefill) {
+        // A valid prefill ALWAYS opens the modal — even if the parse also returned an informational `note`; a
+        // note must never suppress a usable suggestion. validate-don't-trust errors ride along as fieldErrors.
+        onPrefill(r.prefill, r.fieldErrors);
+        setText("");
       } else if (r.note) {
         setMsg({ tone: "error", text: r.note }); // AOAI failure (honest transient / deterministic message)
-      } else if (r.prefill) {
-        onPrefill(r.prefill, r.fieldErrors); // open the create modal prefilled (validate-don't-trust errors included)
-        setText("");
+      } else {
+        // configured, no redirect/prefill/note → the model couldn't extract a monitor. Never no-op silently.
+        setMsg({ tone: "muted", text: "Couldn’t turn that into a monitor — name the kind + host, e.g. “ssl for wegmans.com”." });
       }
     } catch {
       setMsg({ tone: "error", text: "Couldn’t reach the prefill service — please try again." });
