@@ -18,7 +18,7 @@
  * items (reconcile hasn't populated spec_catalog) → "no specs yet, run reconcile".
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { useSpecCatalog } from "@/lib/client";
@@ -42,6 +42,94 @@ const COVERAGE_META: Record<SpecCoverage, { label: string; tone: string }> = {
   paused: { label: "Paused", tone: "var(--color-idle)" },
   unmonitored: { label: "Unmonitored", tone: "var(--color-ink-faint)" },
 };
+
+// ── Filter / sort over the catalog (PURE UI — every field is already on each row). ──
+// Default view = "unmonitored" (the not-set-up specs Craig wants first). The default state (unmonitored view,
+// no tags, name-asc) is the NO-QUERYSTRING state, so a plain /specs URL is the default and a filtered view is
+// shareable via ?view=all&tags=…&sort=….
+
+type SpecView = "unmonitored" | "all";
+type SpecSortCol = "name" | "coverage" | "p95" | "interval";
+interface SpecSort {
+  col: SpecSortCol;
+  dir: "asc" | "desc";
+}
+const DEFAULT_SORT: SpecSort = { col: "name", dir: "asc" };
+const SPEC_SORTS: { col: SpecSortCol; label: string }[] = [
+  { col: "name", label: "Name" },
+  { col: "coverage", label: "Coverage" },
+  { col: "p95", label: "p95" },
+  { col: "interval", label: "Interval" },
+];
+// Coverage order for the "coverage" sort: not-set-up first (the page's focus), then paused, then active.
+const COVERAGE_RANK: Record<SpecCoverage, number> = { unmonitored: 0, paused: 1, active: 2 };
+const isSortCol = (v: string): v is SpecSortCol => SPEC_SORTS.some((s) => s.col === v);
+
+/** Sort comparator. Health/interval are absent on unmonitored rows → NULLS LAST regardless of dir; name is
+ *  the stable tiebreak so the order is deterministic. */
+function compareSpec(a: SpecCatalogEntry, b: SpecCatalogEntry, col: SpecSortCol, dir: "asc" | "desc"): number {
+  const s = dir === "asc" ? 1 : -1;
+  const byName = a.name.localeCompare(b.name);
+  if (col === "name") return byName * s;
+  if (col === "coverage") return (COVERAGE_RANK[coverageOf(a)] - COVERAGE_RANK[coverageOf(b)]) * s || byName;
+  const av = col === "p95" ? (a.health?.p95_ms ?? null) : a.suggested_interval_seconds;
+  const bv = col === "p95" ? (b.health?.p95_ms ?? null) : b.suggested_interval_seconds;
+  if (av == null && bv == null) return byName;
+  if (av == null) return 1; // nulls last, regardless of dir
+  if (bv == null) return -1;
+  return (av - bv) * s || byName;
+}
+
+/** URL-synced view + tag + sort state (mirrors useTagFilter's history.replaceState approach — no Suspense
+ *  needed). Bare-STRING tags (spec tags are string[], not the {key,value} Tag[] the shared TagFilter uses). */
+function useSpecFilters() {
+  const [view, setViewState] = useState<SpecView>("unmonitored");
+  const [tags, setTags] = useState<string[]>([]);
+  const [sort, setSortState] = useState<SpecSort>(DEFAULT_SORT);
+
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("view") === "all") setViewState("all");
+    const t = p.get("tags");
+    if (t) setTags(t.split(",").map((x) => x.trim()).filter(Boolean));
+    const sc = p.get("sort");
+    if (sc) {
+      const [col, dir] = sc.split(":");
+      if (col && isSortCol(col)) setSortState({ col, dir: dir === "desc" ? "desc" : "asc" });
+    }
+  }, []);
+
+  const write = (v: SpecView, tg: string[], st: SpecSort) => {
+    const url = new URL(window.location.href);
+    if (v === "all") url.searchParams.set("view", "all");
+    else url.searchParams.delete("view");
+    if (tg.length) url.searchParams.set("tags", tg.join(","));
+    else url.searchParams.delete("tags");
+    if (st.col !== DEFAULT_SORT.col || st.dir !== DEFAULT_SORT.dir)
+      url.searchParams.set("sort", `${st.col}:${st.dir}`);
+    else url.searchParams.delete("sort");
+    window.history.replaceState(null, "", url.toString());
+  };
+
+  return {
+    view,
+    tags,
+    sort,
+    setView: (v: SpecView) => { setViewState(v); write(v, tags, sort); },
+    toggleTag: (t: string) => {
+      const next = tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t];
+      setTags(next);
+      write(view, next, sort);
+    },
+    clearTags: () => { setTags([]); write(view, [], sort); },
+    setSort: (col: SpecSortCol) => {
+      const next: SpecSort =
+        sort.col === col ? { col, dir: sort.dir === "asc" ? "desc" : "asc" } : { col, dir: col === "p95" || col === "interval" ? "desc" : "asc" };
+      setSortState(next);
+      write(view, tags, next);
+    },
+  };
+}
 
 function CoverageBadge({ coverage }: { coverage: SpecCoverage }) {
   const meta = COVERAGE_META[coverage];
@@ -188,9 +276,165 @@ function SpecRow({
   );
 }
 
+/** The filtered/sorted catalog: the always-visible view toggle + count, the (all-view) sort + tag filter,
+ *  and the table. Default view is "not set up" so the catalog opens on the specs that need attention. */
+function CatalogBody({
+  items,
+  filters,
+  onActivate,
+}: {
+  items: SpecCatalogEntry[];
+  filters: ReturnType<typeof useSpecFilters>;
+  onActivate: (e: SpecCatalogEntry) => void;
+}) {
+  const notSetUp = items.filter((s) => coverageOf(s) === "unmonitored");
+  const base = filters.view === "unmonitored" ? notSetUp : items;
+  const tagged = filters.tags.length ? base.filter((s) => filters.tags.every((t) => s.tags.includes(t))) : base;
+  const shown = [...tagged].sort((a, b) => compareSpec(a, b, filters.sort.col, filters.sort.dir));
+
+  // Distinct bare tags across ALL specs (a stable facet), with counts.
+  const tagCounts = new Map<string, number>();
+  for (const s of items) for (const t of s.tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+  const availableTags = [...tagCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
+  return (
+    <div className="space-y-3">
+      {/* Control bar — the view toggle + count are ALWAYS visible so the default-filtered state is obvious
+          (never a mystery-empty list). */}
+      <div className="flex flex-wrap items-center gap-3" data-testid="spec-controls">
+        <div
+          className="inline-flex rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5"
+          role="group"
+          aria-label="coverage view"
+        >
+          {([
+            ["unmonitored", `Not set up (${notSetUp.length})`],
+            ["all", `All (${items.length})`],
+          ] as const).map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={filters.view === v}
+              data-testid={`view-${v}`}
+              onClick={() => filters.setView(v)}
+              className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                filters.view === v
+                  ? "bg-[var(--color-panel-2)] text-[var(--color-ink)]"
+                  : "text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className="sw-mono text-[11px] text-[var(--color-ink-faint)]" data-testid="spec-count">
+          Showing {shown.length} {filters.view === "unmonitored" ? "not set up" : filters.tags.length ? "matching" : ""} of{" "}
+          {items.length}
+        </span>
+      </div>
+
+      {/* Sort + tag filter only when showing ALL (the focused not-set-up view stays clean). */}
+      {filters.view === "all" && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--color-ink-faint)]">
+            <span className="uppercase tracking-wider">Sort</span>
+            {SPEC_SORTS.map((s) => {
+              const active = filters.sort.col === s.col;
+              return (
+                <button
+                  key={s.col}
+                  type="button"
+                  data-testid={`spec-sort-${s.col}`}
+                  onClick={() => filters.setSort(s.col)}
+                  className={`rounded-md border px-2 py-0.5 transition ${
+                    active
+                      ? "border-[var(--color-brand-dim)] text-[var(--color-ink)]"
+                      : "border-[var(--color-border-strong)] text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]"
+                  }`}
+                >
+                  {s.label}
+                  {active ? (filters.sort.dir === "asc" ? " ↑" : " ↓") : ""}
+                </button>
+              );
+            })}
+          </div>
+          {availableTags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5" data-testid="spec-tag-filter">
+              <span className="text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">Tags</span>
+              {availableTags.map(([tag, count]) => {
+                const on = filters.tags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={on}
+                    aria-label={`filter ${tag}`}
+                    data-testid={`spec-tag-${tag}`}
+                    onClick={() => filters.toggleTag(tag)}
+                    className={`sw-mono inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] transition ${
+                      on
+                        ? "border-[var(--color-brand-dim)] bg-[color-mix(in_srgb,var(--color-brand)_14%,transparent)] text-[var(--color-ink)]"
+                        : "border-[var(--color-border-strong)] bg-[var(--color-bg)] text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]"
+                    }`}
+                  >
+                    {tag} <span className="text-[var(--color-ink-faint)]">{count}</span>
+                  </button>
+                );
+              })}
+              {filters.tags.length > 0 && (
+                <button
+                  type="button"
+                  onClick={filters.clearTags}
+                  data-testid="spec-clear-tags"
+                  className="sw-mono text-[11px] text-[var(--color-ink-faint)] transition hover:text-[var(--color-ink)]"
+                >
+                  Clear ✕
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {shown.length === 0 ? (
+        filters.view === "unmonitored" ? (
+          <EmptyState
+            title="All monitors are set up."
+            hint="Every spec in the catalog has an active monitor. Switch to “All” to browse them."
+          />
+        ) : (
+          <EmptyState
+            title="No specs match these tags."
+            hint="No spec carries all the selected tags."
+            action={<button onClick={filters.clearTags} className="sw-btn">Clear tags</button>}
+          />
+        )
+      ) : (
+        <div className="sw-panel overflow-hidden" data-testid="spec-catalog">
+          <div className="hidden grid-cols-[1fr_120px_170px_150px_120px_150px] gap-3 border-b border-[var(--color-border)] px-4 py-2.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)] sm:grid">
+            <span>Spec</span>
+            <span>Coverage</span>
+            <span>Runnable?</span>
+            <span>Linked monitor</span>
+            <span>Health</span>
+            <span>Action</span>
+          </div>
+          <div className="divide-y divide-[var(--color-border)]">
+            {shown.map((entry) => (
+              <SpecRow key={entry.source_key} entry={entry} onActivate={onActivate} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SpecCatalogPage() {
   const { data, isLoading } = useSpecCatalog();
   const [activating, setActivating] = useState<SpecCatalogEntry | null>(null);
+  const filters = useSpecFilters();
 
   const when = data?.probed_at ? formatRelative(data.probed_at) : null;
 
@@ -238,21 +482,7 @@ export default function SpecCatalogPage() {
           hint="The reconcile job populates the catalog from the Git manifest. Run reconcile, then refresh."
         />
       ) : (
-        <div className="sw-panel overflow-hidden" data-testid="spec-catalog">
-          <div className="hidden grid-cols-[1fr_120px_170px_150px_120px_150px] gap-3 border-b border-[var(--color-border)] px-4 py-2.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)] sm:grid">
-            <span>Spec</span>
-            <span>Coverage</span>
-            <span>Runnable?</span>
-            <span>Linked monitor</span>
-            <span>Health</span>
-            <span>Action</span>
-          </div>
-          <div className="divide-y divide-[var(--color-border)]">
-            {data.items.map((entry) => (
-              <SpecRow key={entry.source_key} entry={entry} onActivate={setActivating} />
-            ))}
-          </div>
-        </div>
+        <CatalogBody items={data.items} filters={filters} onActivate={setActivating} />
       )}
 
       {/* Activation: MonitorForm in activation mode — prefilled + locked spec identity. On success the
