@@ -59,6 +59,8 @@ import type {
   CheckAuth,
   CheckDetail,
   CheckKind,
+  DnsRecordType,
+  ParseIntentResult,
   Flow,
   NetConfig,
   CheckWithStatus,
@@ -1872,4 +1874,44 @@ export async function getIncidentBreakdown(window: ReportWindow, tags: Tag[] = [
     if (err instanceof ApiRequestError && err.status === 404) return null;
     throw err;
   }
+}
+
+// POST /api/checks/parse-intent — chat-to-prefill. Free text → a validated non-browser monitor suggestion.
+// ★ Never creates: returns fields to PREFILL the create modal; the human reviews + clicks Create.
+export async function getParseIntent(text: string): Promise<ParseIntentResult> {
+  const raw = await request<Record<string, unknown>>("/checks/parse-intent", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  const f = (raw?.fields as Record<string, unknown>) ?? null;
+  const nc = f?.netConfig as Record<string, unknown> | null | undefined;
+  const prefill: Partial<Check> | null = f
+    ? {
+        name: (f.name as string) ?? undefined,
+        kind: (f.kind as CheckKind) ?? undefined,
+        target_url: (f.targetUrl as string) ?? undefined,
+        interval_seconds: (f.intervalSeconds as number) ?? undefined,
+        timeout_ms: (f.timeoutMs as number) ?? undefined,
+        cert_expiry_warn_days: (f.certExpiryWarnDays as number) ?? undefined,
+        net_config: nc
+          ? {
+              recordType: (nc.recordType as DnsRecordType) ?? null,
+              expectedValue: (nc.expectedValue as string) ?? null,
+              port: (nc.port as number) ?? null,
+            }
+          : undefined,
+      }
+    : null;
+  return {
+    configured: (raw?.configured as boolean) ?? false,
+    note: (raw?.note as string) ?? null,
+    retryable: (raw?.retryable as boolean) ?? false,
+    redirect: (raw?.redirect as string) ?? null,
+    reason: (raw?.reason as string) ?? null,
+    valid: (raw?.valid as boolean) ?? false,
+    prefill,
+    fieldErrors: (raw?.fieldErrors as Record<string, string>) ?? {},
+    notes: (raw?.notes as string) ?? null,
+  };
 }

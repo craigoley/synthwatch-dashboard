@@ -40,6 +40,13 @@ interface Props {
    * submit carries spec_path + source_key so the runner runs the Git spec (Option C) next tick.
    */
   activation?: ActivationContext | null;
+  /**
+   * Chat-to-prefill (non-browser): seed a BLANK create with parsed fields — all EDITABLE (unlike activation,
+   * which locks identity). The human reviews + clicks Create; nothing is auto-created. `prefillErrors` are the
+   * validator's field-keyed errors (from /checks/parse-intent), shown inline like a failed create.
+   */
+  prefill?: Partial<Check> | null;
+  prefillErrors?: Record<string, string> | null;
   onDone: () => void;
   onCancel: () => void;
 }
@@ -359,14 +366,16 @@ function Field({
   );
 }
 
-export function MonitorForm({ initial, activation, onDone, onCancel }: Props) {
+export function MonitorForm({ initial, activation, prefill, prefillErrors, onDone, onCancel }: Props) {
   const isActivation = Boolean(activation);
+  const isPrefill = Boolean(prefill);
   const [form, setForm] = useState<FormState>(() =>
-    activation ? formFromActivation(activation) : fromCheck(initial),
+    prefill ? fromCheck(prefill as Check) : activation ? formFromActivation(activation) : fromCheck(initial),
   );
-  const [http, setHttp] = useState<HttpConfigState>(() => httpConfigFromCheck(initial));
-  const [steps, setSteps] = useState<StepState[]>(() => stepsFromCheck(initial));
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [http, setHttp] = useState<HttpConfigState>(() => httpConfigFromCheck((prefill ?? initial) as Check | null));
+  const [steps, setSteps] = useState<StepState[]>(() => stepsFromCheck((prefill ?? initial) as Check | null));
+  // Seed the validator's field errors from the parse (so a parsed-but-invalid suggestion shows inline at once).
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>(() => prefillErrors ?? {});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { data: flows } = useFlows();
@@ -616,6 +625,16 @@ export function MonitorForm({ initial, activation, onDone, onCancel }: Props) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
+      {/* Chat-prefill: a clear "review before creating" banner — the fields are AI-suggested + all editable. */}
+      {isPrefill && (
+        <div
+          data-testid="prefill-banner"
+          className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-ink-dim)]"
+        >
+          <span className="font-medium text-[var(--color-ink)]">Parsed from your request.</span> Review before
+          creating — these fields are AI-suggested and all editable. Nothing is created until you click Create.
+        </div>
+      )}
       {error && (
         <div
           className="rounded-lg px-3 py-2 text-sm"
@@ -671,7 +690,7 @@ export function MonitorForm({ initial, activation, onDone, onCancel }: Props) {
                 { value: "ssl", label: "SSL" },
                 { value: "dns", label: "DNS" },
                 { value: "tcp", label: "TCP" },
-                { value: "ping", label: "Ping" },
+                { value: "ping", label: "Reachability (TCP)" }, // NOT ICMP — a TCP-reachability probe
                 { value: "multistep", label: "Multistep" },
               ]}
             />

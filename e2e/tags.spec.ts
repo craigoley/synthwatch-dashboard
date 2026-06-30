@@ -78,7 +78,7 @@ test.describe("tags editor", () => {
   test("on save, PUTs the tag set to /checks/{id}/tags", async ({ page }) => {
     await mockApi(page);
     await openNewMonitor(page);
-    await page.locator("input").first().fill("Tagged check");
+    await page.getByRole("dialog").locator("input").first().fill("Tagged check");
     await page.locator('input[inputmode="url"]').fill("https://example.com/health");
     await page.getByLabel("tag key").fill("service");
     await page.getByLabel("tag value").fill("api");

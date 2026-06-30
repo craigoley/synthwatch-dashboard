@@ -64,7 +64,7 @@ test.describe("monitor form", () => {
   test("interval entered in minutes is sent to the API as seconds (×60)", async ({ page }) => {
     await mockApi(page);
     await openNewMonitor(page);
-    await page.locator("input").first().fill("Interval check");
+    await page.getByRole("dialog").locator("input").first().fill("Interval check");
     await page.locator('input[inputmode="url"]').fill("https://example.com/health");
     await page.getByPlaceholder("5").fill("10"); // 10 minutes (non-default, proves the conversion)
 
@@ -110,7 +110,7 @@ test.describe("monitor form", () => {
   test("multistep builder builds the correct API payload (round-trip)", async ({ page }) => {
     await mockApi(page);
     await openNewMonitor(page);
-    await page.locator("input").first().fill("Chain test");
+    await page.getByRole("dialog").locator("input").first().fill("Chain test");
     await page.getByRole("button", { name: "Multistep", exact: true }).click();
 
     // step 1 — POST login, bearer secret-ref, extract token
@@ -160,7 +160,7 @@ test.describe("monitor form", () => {
     };
     await mockApi(page, world);
     await openNewMonitor(page);
-    await page.locator("input").first().fill("Bad chain");
+    await page.getByRole("dialog").locator("input").first().fill("Bad chain");
     await page.getByRole("button", { name: "Multistep", exact: true }).click();
 
     await page.getByRole("button", { name: "+ Add step" }).click();
@@ -183,7 +183,7 @@ test.describe("monitor form", () => {
   test("an extract row with a var but no jsonPath is dropped from the payload", async ({ page }) => {
     await mockApi(page);
     await openNewMonitor(page);
-    await page.locator("input").first().fill("Extract filter");
+    await page.getByRole("dialog").locator("input").first().fill("Extract filter");
     await page.getByRole("button", { name: "Multistep", exact: true }).click();
 
     await page.getByRole("button", { name: "+ Add step" }).click();
@@ -219,7 +219,7 @@ test.describe("monitor form", () => {
     };
     await mockApi(page, world);
     await openNewMonitor(page);
-    await page.locator("input").first().fill("Collapsed error");
+    await page.getByRole("dialog").locator("input").first().fill("Collapsed error");
     await page.getByRole("button", { name: "Multistep", exact: true }).click();
 
     await page.getByRole("button", { name: "+ Add step" }).click();
@@ -282,7 +282,7 @@ test.describe("location selector", () => {
   test("saving PUTs the selected location set", async ({ page }) => {
     await mockApi(page);
     await openNewMonitor(page);
-    await page.locator("input").first().fill("Geo check");
+    await page.getByRole("dialog").locator("input").first().fill("Geo check");
     await page.locator('input[inputmode="url"]').fill("https://example.com/health");
     await page.getByRole("checkbox", { name: "westeurope" }).click(); // deselect → eastus2 + centralus remain
 
@@ -301,7 +301,7 @@ test.describe("location selector", () => {
     world.locations = undefined; // endpoint 404s
     await mockApi(page, world);
     await openNewMonitor(page);
-    await page.locator("input").first().fill("No-geo check");
+    await page.getByRole("dialog").locator("input").first().fill("No-geo check");
     await page.locator('input[inputmode="url"]').fill("https://example.com/health");
     await expect(page.getByRole("checkbox", { name: "eastus2" })).toHaveCount(0); // no selector
     const post = page.waitForRequest((r) => r.url().endsWith("/api/checks") && r.method() === "POST");
