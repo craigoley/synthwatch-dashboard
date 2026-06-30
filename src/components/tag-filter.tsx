@@ -16,8 +16,12 @@ export function matchesTags(rowTags: Tag[] | undefined, selected: Tag[]): boolea
   return selected.every((sel) => tags.some((t) => eq(t, sel)));
 }
 
-const serialize = (tags: Tag[]) => tags.map((t) => `${t.key}:${t.value}`).join(",");
-function parse(qs: string | null): Tag[] {
+/** Tag equality — exported so pages driving selection through their own URL mechanism reuse it. */
+export const tagEquals = eq;
+/** The querystring format for a tag selection: `env:prod,team:web`. Exported so any page that drives tag
+ *  selection through its OWN url mechanism (e.g. the home page's useSearchParams) shares the exact format. */
+export const serializeTags = (tags: Tag[]) => tags.map((t) => `${t.key}:${t.value}`).join(",");
+export function parseTags(qs: string | null): Tag[] {
   if (!qs) return [];
   return qs
     .split(",")
@@ -37,14 +41,14 @@ export function useTagFilter() {
 
   // Hydrate from the URL on mount (client-only).
   useEffect(() => {
-    const fromUrl = parse(new URLSearchParams(window.location.search).get("tags"));
+    const fromUrl = parseTags(new URLSearchParams(window.location.search).get("tags"));
     if (fromUrl.length) setSelected(fromUrl);
   }, []);
 
   const sync = (next: Tag[]) => {
     setSelected(next);
     const url = new URL(window.location.href);
-    if (next.length) url.searchParams.set("tags", serialize(next));
+    if (next.length) url.searchParams.set("tags", serializeTags(next));
     else url.searchParams.delete("tags");
     window.history.replaceState(null, "", url.toString());
   };
