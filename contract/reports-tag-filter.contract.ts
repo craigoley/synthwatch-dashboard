@@ -49,4 +49,15 @@ test.describe("API contract — reports tag filter (?tag=)", () => {
     const brkNone = await captureUrl(() => getIncidentBreakdown("30d", []));
     expect(brkNone.has("tag")).toBe(false);
   });
+
+  // The group-by control forwards the tag KEY as ?groupBy= (the API GROUPs BY that key server-side). Pin the
+  // request shape so the wiring can't silently revert to ungrouped. Composes with ?tag=.
+  test("★ getAvailabilityReport + getPerformanceReport forward ?groupBy=<key> (composes with ?tag=)", async () => {
+    const avail = await captureUrl(() => getAvailabilityReport("30d", "team", TAGS));
+    expect(avail.get("groupBy")).toBe("team");
+    expect(avail.getAll("tag")).toEqual(["env:prod", "team:web"]); // group-by + filter stack
+
+    const perf = await captureUrl(() => getPerformanceReport("30d", "team", []));
+    expect(perf.get("groupBy")).toBe("team");
+  });
 });
