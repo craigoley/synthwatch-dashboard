@@ -20,10 +20,35 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
-import { useReconcileDrift, triggerReconcile } from "@/lib/client";
+import { useReconcileDrift, useReconcilePlan, triggerReconcile } from "@/lib/client";
 import { useAuth } from "@/components/auth-provider";
 import { formatRelative } from "@/lib/format";
-import type { DriftRow, DriftType } from "@/lib/types";
+import type { DriftRow, DriftType, ReconcileApplyPlanItem } from "@/lib/types";
+
+// ── Reconcile-apply Phase 0 (DRY-RUN): the read-only "what apply WOULD do" preview per drift row. status
+//    pending = needs a future human approval; auto = already auto-applied (#144); blocked = a forbidden
+//    redaction-strip (rendered loudly); noop = nothing to apply. NO approve/reject controls this phase.
+function PlanPreview({ plan }: { plan: ReconcileApplyPlanItem }) {
+  const blocked = plan.status === "blocked";
+  const badge =
+    blocked ? "🚫 BLOCKED" : plan.status === "auto" ? "auto (#144)" : plan.status === "noop" ? "no-op" : "would apply (needs approval)";
+  return (
+    <div
+      className={`mt-1.5 rounded border px-2 py-1.5 text-[12px] ${
+        blocked
+          ? "border-[var(--color-danger)] bg-[var(--color-danger-bg,rgba(220,38,38,0.06))] text-[var(--color-danger)]"
+          : "border-[var(--color-border)] text-[var(--color-ink-dim)]"
+      }`}
+      data-testid="apply-plan"
+      data-plan-status={plan.status}
+    >
+      <span className="font-medium">{badge}:</span> {plan.plan.summary}
+      {blocked && plan.plan.blockedReason ? (
+        <span className="mt-0.5 block text-[11px]">{plan.plan.blockedReason}</span>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * Cross-link to the spec catalog (Phase 13) — the browse home for ALL specs, where this focused drift
@@ -107,7 +132,7 @@ function DriftPill({ type }: { type: DriftType }) {
   );
 }
 
-function DriftRowItem({ row }: { row: DriftRow }) {
+function DriftRowItem({ row, plan }: { row: DriftRow; plan?: ReconcileApplyPlanItem }) {
   const fields = row.drift_type === "changed" ? changedFields(row) : [];
   return (
     <div
@@ -122,6 +147,7 @@ function DriftRowItem({ row }: { row: DriftRow }) {
           {row.source_key}
         </span>
         <p className="mt-0.5 text-[13px] text-[var(--color-ink-dim)]">{summarize(row)}</p>
+        {plan ? <PlanPreview plan={plan} /> : null}
         {fields.length > 0 && (
           <ul className="mt-1.5 space-y-1">
             {fields.map((f) => (
@@ -148,6 +174,9 @@ export function ReconcileDriftSurface() {
   const [reconciling, setReconciling] = useState(false);
   const [triggerError, setTriggerError] = useState<string | null>(null);
   const { data } = useReconcileDrift({ reconciling });
+  // The DRY-RUN apply plan (Phase 0), keyed by `${drift_type}:${source_key}` to attach to each drift row.
+  const { data: planData } = useReconcilePlan({ reconciling });
+  const planByKey = new Map((planData?.items ?? []).map((p) => [`${p.drift_type}:${p.source_key}`, p]));
   const baseline = useRef<string | null>(null); // detected_at captured at trigger time
   const detectedAt = data?.detected_at ?? null;
 
@@ -262,7 +291,11 @@ export function ReconcileDriftSurface() {
           </p>
           <div className="mt-1 divide-y divide-[var(--color-border)]">
             {config.map((r) => (
-              <DriftRowItem key={`${r.drift_type}:${r.source_key}`} row={r} />
+              <DriftRowItem
+                key={`${r.drift_type}:${r.source_key}`}
+                row={r}
+                plan={planByKey.get(`${r.drift_type}:${r.source_key}`)}
+              />
             ))}
           </div>
         </div>

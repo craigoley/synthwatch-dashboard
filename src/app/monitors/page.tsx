@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 
-import { useChecks, updateCheck, deleteCheck, useTags } from "@/lib/client";
+import { useChecks, updateCheck, deleteCheck, useTags, useReconcileDrift } from "@/lib/client";
 import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { ApiRequestError } from "@/lib/api-client";
 import { StatusDot } from "@/components/status-badge";
@@ -115,6 +115,10 @@ export default function MonitorsPage() {
   const [batchRunning, setBatchRunning] = useState(false);
   const { data, error, isLoading } = useChecks({ fast: batchRunning });
   const { data: inUseTags } = useTags();
+  // For the demoted "Monitors as code" section below the active list (gated so it never shows an empty
+  // labeled block when the reconcile endpoint is absent — mirrors ReconcileDriftSurface's own null guard).
+  // SWR-deduped with the component's own useReconcileDrift call (no extra fetch).
+  const { data: drift } = useReconcileDrift();
   const { canWrite } = useAuth();
   const { selected, toggle, clear } = useTagFilter();
   const [creating, setCreating] = useState(false);
@@ -154,9 +158,6 @@ export default function MonitorsPage() {
 
       {/* Read-only-by-default: viewers see a sign-in prompt; write affordances are gated on canWrite. */}
       <SignInToEdit />
-
-      {/* Monitors-as-code drift (Phase 6b) — read-only; hides until the reconcile endpoint serves. */}
-      <ReconcileDriftSurface />
 
       {/* Fleet-level B10 redaction posture — a sensitive-but-unredacted gap is loud here. */}
       {data && data.length > 0 && <RedactionFleetSummary checks={data} />}
@@ -265,6 +266,17 @@ export default function MonitorsPage() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* ── Demoted below the active monitors: monitors-as-code drift (new/changed/missing vs Git) + the
+          catalog cross-link. The manage page LEADS with current monitors; what differs from Git / isn't set
+          up yet is secondary context (set-up lives on the Catalog page). Gated on `drift` so an absent
+          reconcile endpoint shows no empty labeled block. */}
+      {drift && (
+        <section className="border-t border-[var(--color-border)] pt-6" aria-label="Monitors as code" data-testid="drift-section">
+          <p className="sw-eyebrow mb-3">Monitors as code</p>
+          <ReconcileDriftSurface />
+        </section>
       )}
 
       <Modal open={creating} onClose={() => setCreating(false)} title="New monitor">
