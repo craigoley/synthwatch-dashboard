@@ -15,7 +15,7 @@ import {
   YAxis,
 } from "recharts";
 
-import type { MetricPoint, Run, SlaWindow } from "@/lib/types";
+import type { MetricPoint, Run, SlaWindow, WebVitals, ReportSeriesPoint } from "@/lib/types";
 import { formatBytes, formatCount, formatDuration } from "@/lib/format";
 import { TONE_VAR } from "@/components/status-badge";
 import { cwvTone } from "@/lib/status";
@@ -362,6 +362,114 @@ function CoreWebVitals({ latest }: { latest: MetricPoint }) {
         <Vital label="FCP" value={formatDuration(latest.fcp_ms)} tone="idle" hint="for context" />
       </div>
     </div>
+  );
+}
+
+/**
+ * Fleet/group Core Web Vitals at p75 — fed by the /reports/performance group `web_vitals` the reports page
+ * already fetches (and previously dropped). Reuses the Vital tile + cwvTone threshold authority (single
+ * source). Gaps-not-zeros: a null vital renders "—", never a 0 or a false "good". INP is not yet captured
+ * at the rollup (proposal P9) → shown as "—" with an explicit "not captured yet" hint, never faked.
+ */
+export function ReportWebVitals({
+  vitals,
+  browserCheckCount,
+}: {
+  vitals: WebVitals | null;
+  browserCheckCount: number;
+}) {
+  if (!vitals || browserCheckCount === 0) return null; // no browser monitors → no vitals (honest absence)
+  const ms = (v: number | null) => (v != null ? formatDuration(v) : "—");
+  return (
+    <div className="sw-panel p-4" data-testid="report-cwv">
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <h3 className="text-sm font-semibold text-[var(--color-ink)]">Core Web Vitals · p75</h3>
+        <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+          {browserCheckCount} browser monitor{browserCheckCount === 1 ? "" : "s"}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <Vital label="LCP" value={ms(vitals.lcp_ms)} tone={cwvTone("lcp", vitals.lcp_ms)} hint="good ≤ 2.5s" />
+        <Vital
+          label="CLS"
+          value={vitals.cls != null ? vitals.cls.toFixed(3) : "—"}
+          tone={cwvTone("cls", vitals.cls)}
+          hint="good ≤ 0.1"
+        />
+        <Vital label="FCP" value={ms(vitals.fcp_ms)} tone={cwvTone("fcp", vitals.fcp_ms)} hint="good ≤ 1.8s" />
+        <Vital label="TTFB" value={ms(vitals.ttfb_ms)} tone={cwvTone("ttfb", vitals.ttfb_ms)} hint="good ≤ 0.8s" />
+        {/* INP is a Core Web Vital but isn't aggregated into the rollup yet (P9) — honest placeholder, not a fake 0. */}
+        <Vital label="INP" value="—" tone="idle" hint="not captured yet" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Generic area trend over a report's daily `series` ({date, value}) — the FLEET availability + avg-latency
+ * trends the reports page already fetches in groups[0].series but never rendered. null buckets are a GAP
+ * (connectNulls=false), not a 0 (the gaps-not-zeros discipline). The line uses the brand token (decorative,
+ * not a status encoding).
+ */
+export function ReportSeriesArea({
+  title,
+  unit,
+  points,
+  fmt,
+}: {
+  title: string;
+  unit: string;
+  points: ReportSeriesPoint[];
+  fmt: (v: number | null) => string;
+}) {
+  const slug = title.replace(/\W+/g, "");
+  const data = points.map((p) => ({ ts: new Date(p.date).getTime(), value: p.value }));
+  if (data.length === 0) {
+    return (
+      <ChartCard title={title} unit={unit}>
+        <div className="flex h-full items-center justify-center text-xs text-[var(--color-ink-faint)]">
+          no data in this window
+        </div>
+      </ChartCard>
+    );
+  }
+  return (
+    <ChartCard title={title} unit={unit}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -8 }}>
+          <defs>
+            <linearGradient id={`rs-${slug}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-brand)" stopOpacity={0.35} />
+              <stop offset="100%" stopColor="var(--color-brand)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke={GRID} vertical={false} />
+          <XAxis
+            dataKey="ts"
+            type="number"
+            domain={["dataMin", "dataMax"]}
+            scale="time"
+            tickFormatter={timeTick}
+            stroke={AXIS}
+            tick={{ fontSize: 10 }}
+            minTickGap={36}
+          />
+          <YAxis stroke={AXIS} tick={{ fontSize: 10 }} tickFormatter={(v) => fmt(v)} width={56} />
+          <Tooltip content={<ChartTooltip fmt={fmt} />} />
+          <Area
+            type="monotone"
+            dataKey="value"
+            name={title}
+            stroke="var(--color-brand)"
+            strokeWidth={1.6}
+            fill={`url(#rs-${slug})`}
+            connectNulls={false}
+            dot={false}
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </ChartCard>
   );
 }
 

@@ -7,6 +7,8 @@ import { EmptyState, Spinner } from "@/components/states";
 import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { NarrativeCard } from "@/components/narrative-card";
 import { MonitorReportCard, type ReportRow } from "@/components/monitor-report-card";
+import { ReportWebVitals, ReportSeriesArea } from "@/components/charts";
+import { formatDuration } from "@/lib/format";
 import type { ReportWindow } from "@/lib/types";
 
 const WINDOWS: ReportWindow[] = ["7d", "30d", "90d"];
@@ -121,6 +123,34 @@ export default function ReportsPage() {
 
       {/* AI narrative summary (Layer 3) — hides entirely until the endpoint serves one (currently 7d). */}
       <NarrativeCard scope="fleet" window={window} />
+
+      {/* ★ Fleet Core Web Vitals (p75) — the /reports/performance group web_vitals we already fetch; hides
+          when there are no browser monitors / no vitals (honest absence, not a zero). */}
+      <ReportWebVitals
+        vitals={perf?.groups[0]?.web_vitals ?? null}
+        browserCheckCount={perf?.groups[0]?.browser_check_count ?? 0}
+      />
+
+      {/* ★ Fleet trend over the window — the report `series` we already fetch (availability % from the
+          availability report, AVG latency from the performance report) but previously dropped. These are
+          GROUP/fleet-level (the report has no per-check series); the per-monitor drill-down keeps its raw-run
+          latency chart (which shows p95 spikiness the fleet avg would smooth away). */}
+      {((avail?.groups[0]?.series?.length ?? 0) > 0 || (perf?.groups[0]?.series?.length ?? 0) > 0) && (
+        <div className="grid gap-4 sm:grid-cols-2" data-testid="report-fleet-trend">
+          <ReportSeriesArea
+            title="Fleet availability"
+            unit="% per day"
+            points={avail?.groups[0]?.series ?? []}
+            fmt={(v) => (v == null ? "—" : `${v.toFixed(1)}%`)}
+          />
+          <ReportSeriesArea
+            title="Fleet avg latency"
+            unit="avg ms per day"
+            points={perf?.groups[0]?.series ?? []}
+            fmt={formatDuration}
+          />
+        </div>
+      )}
 
       {/* Tags FILTER the list (multi-tag AND); only real in-use tags are offered. */}
       {(inUseTags?.length ?? 0) > 0 && (
