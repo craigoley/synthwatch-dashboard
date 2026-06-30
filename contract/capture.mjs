@@ -35,6 +35,13 @@ const SEAMS = {
   narrative_fleet_7d: "/reports/narrative?scope=fleet&window=7d",
   runs_check4: "/checks/4/runs?pageSize=10",
   check_detail_10: "/checks/10",
+  // ★ Previously orphaned: these fixtures are consumed by high-risk-seams.contract.ts but were missing here,
+  // so capture:contracts never refreshed them — the drift-detection net silently didn't run for the seams
+  // with FABRICATED/derived fields (getMetrics derives started_at + hardcodes status; getAvailabilitySeries;
+  // getIncident). Wired in so a re-capture covers them. Match the IDs/window the contract tests use.
+  metrics_check80: "/checks/80/metrics",
+  availability_series_check80: "/checks/80/availability-series?window=7d",
+  incident_detail_34: "/incidents/34",
 };
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "real");
@@ -78,6 +85,30 @@ if (AI_TOKEN) {
   }
 } else {
   console.log("skipped  ai-insights            (set SYNTHWATCH_API_TOKEN [+ SYNTHWATCH_AI_RUN_ID] to capture the gated POST)");
+}
+
+// ─── gated seam: baseline-diff (editor/admin only) ──────────────────────────────────────────────────
+// Like ai-insights, POST /runs/{id}/baseline-diff is authed. Previously the baseline_diff_* fixtures were
+// hand-derived from the server DTO (a latent F-01 risk). With a token this captures the live shape; the body
+// saves as baseline_diff_ok.json (or baseline_diff_not_configured.json if the API reports configured:false).
+const BASELINE_RUN_ID = process.env.SYNTHWATCH_BASELINE_RUN_ID ?? "844834";
+if (AI_TOKEN) {
+  try {
+    const res = await fetch(`${BASE}/runs/${BASELINE_RUN_ID}/baseline-diff`, {
+      method: "POST",
+      headers: { accept: "application/json", authorization: `Bearer ${AI_TOKEN}` },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const name = data && data.configured === false ? "baseline_diff_not_configured" : "baseline_diff_ok";
+    writeFileSync(join(dir, `${name}.json`), JSON.stringify(data, null, 2) + "\n");
+    console.log(`captured ${name.padEnd(26)} POST /runs/${BASELINE_RUN_ID}/baseline-diff`);
+  } catch (e) {
+    failed += 1;
+    console.error(`FAILED   baseline-diff POST /runs/${BASELINE_RUN_ID}: ${e.message}`);
+  }
+} else {
+  console.log("skipped  baseline-diff          (set SYNTHWATCH_API_TOKEN [+ SYNTHWATCH_BASELINE_RUN_ID] to capture the gated POST)");
 }
 
 process.exit(failed ? 1 : 0);

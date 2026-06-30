@@ -411,12 +411,19 @@ export default function CheckDetailPage() {
               {latestRunStatus === "running" ? "Running…" : running || expectRun ? "Starting…" : "Run now"}
             </button>
           )}
-          <button onClick={togglePause} disabled={pausing} className="sw-btn">
-            {pausing ? "…" : check.enabled ? "Pause" : "Resume"}
-          </button>
-          <button onClick={() => setEditing(true)} className="sw-btn sw-btn-primary">
-            Edit
-          </button>
+          {/* Editor-only writes (mirror Run-now): a viewer sees read-only — these PATCH the check (and Edit's
+              tag editor auto-saves), so the controls must not leak to viewers. The API is the real gate; this
+              keeps the UX honest. */}
+          {canWrite && (
+            <>
+              <button onClick={togglePause} disabled={pausing} className="sw-btn">
+                {pausing ? "…" : check.enabled ? "Pause" : "Resume"}
+              </button>
+              <button onClick={() => setEditing(true)} className="sw-btn sw-btn-primary">
+                Edit
+              </button>
+            </>
+          )}
         </div>
       </header>
 
