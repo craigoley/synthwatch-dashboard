@@ -210,3 +210,39 @@ test.describe("reports — cert runway (P3)", () => {
     expect(cb!.y).toBeLessThan(nb!.y);
   });
 });
+
+// ★ Tag-scoped aggregates: the report tiles (CWV / fleet trend / verdict-breakdown) honor the SAME tag filter
+// as the monitor list (server-scoped via ?tag=), with a loud scope banner so a subset number is never read as
+// the fleet's — and honest-empty (no fake 0%) when a tag has no matching monitors.
+test.describe("reports — tag-scoped aggregates", () => {
+  test("a tag filter scopes the tiles + shows a scope banner (obvious subset)", async ({ page }) => {
+    await mockApi(page, world());
+    await page.goto("/reports?tags=team:web"); // only check 2 (browser) carries team:web
+
+    const banner = page.getByTestId("report-scope-banner");
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText("team:web");
+    await expect(banner).toContainText("1 of"); // 1 of N monitors — the subset is explicit
+    // the aggregate tiles still render, now scoped: CWV (check 2 is browser) + the verdict-breakdown card.
+    await expect(page.getByTestId("report-cwv")).toBeVisible();
+    await expect(page.getByText("Alert quality — were the reds real?")).toBeVisible();
+  });
+
+  test("a tag with no matching monitors → honest empty (no fake 0%), banner shows 0", async ({ page }) => {
+    await mockApi(page, world());
+    await page.goto("/reports?tags=team:none");
+
+    await expect(page.getByTestId("report-scope-banner")).toContainText("0 of");
+    // the aggregate tiles vanish (no data for this tag) rather than showing a fabricated number…
+    await expect(page.getByTestId("report-cwv")).toHaveCount(0);
+    await expect(page.getByTestId("report-fleet-trend")).toHaveCount(0);
+    // …and the verdict-breakdown reads "nothing to grade" (precision null), never "0% real".
+    await expect(page.getByText(/nothing to grade/i)).toBeVisible();
+  });
+
+  test("no tag filter → no scope banner (whole-fleet, unchanged)", async ({ page }) => {
+    await mockApi(page, world());
+    await page.goto("/reports");
+    await expect(page.getByTestId("report-scope-banner")).toHaveCount(0);
+  });
+});
