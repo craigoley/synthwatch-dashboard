@@ -75,7 +75,9 @@ test.describe("phase 13 — spec activation (set up monitor)", () => {
     // ★ Interval round-trips through the minutes UI: suggested 600s → shown as 10 min → sent back as 600s.
     expect(body.intervalSeconds).toBe(600);
 
-    // The catalog re-reads → the row flips Unmonitored → Active.
+    // The catalog re-reads → the spec is now MONITORED, so it leaves the default "not set up" view (#141:
+    // the catalog defaults to not-set-up). Switch to "All" to confirm the row flipped Unmonitored → Active.
+    await page.getByTestId("view-all").click();
     await expect
       .poll(() => page.getByTestId("spec-row-wegmans-search-product").getAttribute("data-coverage"))
       .toBe("active");
