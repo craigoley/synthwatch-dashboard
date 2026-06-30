@@ -144,3 +144,29 @@ test.describe("reports — per-monitor cards + tag filter", () => {
     await expect.poll(order).toEqual(["report-4", "report-3", "report-1"]);
   });
 });
+
+// ★ Tier-1 P3: cert-expiry runway — the SSL last_cert_days_remaining already on each check, dropped from
+// ReportRow until now. A badge + an "expiring soonest" sort. gaps-not-zeros: non-cert checks show nothing.
+test.describe("reports — cert runway (P3)", () => {
+  test("SSL monitor shows a cert-runway badge; non-cert monitors show none (gaps-not-zeros)", async ({ page }) => {
+    await mockApi(page, defaultWorld()); // check 3 = "TLS cert" (ssl), lastCertDaysRemaining 12
+    await page.goto("/reports");
+
+    const cert = page.getByTestId("report-3").getByTestId("cert-runway");
+    await expect(cert).toBeVisible();
+    await expect(cert).toContainText("cert 12d"); // 12 < 14 → warn tone
+    // a non-cert check (id 1, http) renders NO cert badge — absence, never a misleading "0 days"
+    await expect(page.getByTestId("report-1").getByTestId("cert-runway")).toHaveCount(0);
+  });
+
+  test("'Cert expiry' sort surfaces cert monitors soonest-first (nulls-last)", async ({ page }) => {
+    await mockApi(page, defaultWorld());
+    await page.goto("/reports");
+
+    await page.getByTestId("sort-cert_days").click();
+    // the only cert check (report-3) sorts ABOVE the non-cert (null) checks, which fall to the bottom
+    const cb = await page.getByTestId("report-3").boundingBox();
+    const nb = await page.getByTestId("report-1").boundingBox();
+    expect(cb!.y).toBeLessThan(nb!.y);
+  });
+});

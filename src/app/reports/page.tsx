@@ -11,11 +11,12 @@ import type { ReportWindow } from "@/lib/types";
 
 const WINDOWS: ReportWindow[] = ["7d", "30d", "90d"];
 
-type SortCol = "availability_pct" | "p95_ms" | "incidents" | "name";
+type SortCol = "availability_pct" | "p95_ms" | "incidents" | "cert_days" | "name";
 const SORTS: { col: SortCol; label: string }[] = [
   { col: "availability_pct", label: "Availability" },
   { col: "p95_ms", label: "p95" },
   { col: "incidents", label: "Incidents" },
+  { col: "cert_days", label: "Cert expiry" },
   { col: "name", label: "Name" },
 ];
 
@@ -26,8 +27,10 @@ function incidentsOf(r: ReportRow): number {
 function compare(a: ReportRow, b: ReportRow, col: SortCol, dir: "asc" | "desc"): number {
   const s = dir === "asc" ? 1 : -1;
   if (col === "name") return a.name.localeCompare(b.name) * s;
-  const av = col === "incidents" ? incidentsOf(a) : a[col];
-  const bv = col === "incidents" ? incidentsOf(b) : b[col];
+  // cert_days: non-cert checks are null → nulls-last (below), so "Cert expiry · asc" = expiring soonest first
+  // with non-cert monitors sorted out of the way.
+  const av = col === "incidents" ? incidentsOf(a) : col === "cert_days" ? a.last_cert_days_remaining : a[col];
+  const bv = col === "incidents" ? incidentsOf(b) : col === "cert_days" ? b.last_cert_days_remaining : b[col];
   if (av == null && bv == null) return 0;
   if (av == null) return 1; // nulls last, regardless of dir
   if (bv == null) return -1;
@@ -71,6 +74,7 @@ export default function ReportsPage() {
       const computedPct = up + down > 0 ? Math.round((10000 * up) / (up + down)) / 100 : null;
       return {
         check_id: c.id,
+        last_cert_days_remaining: c.last_cert_days_remaining,
         name: c.name,
         kind: c.kind,
         current_status: c.current_status,
@@ -160,7 +164,7 @@ export default function ReportsPage() {
                   type="button"
                   data-testid={`sort-${s.col}`}
                   onClick={() =>
-                    setSort((cur) => (cur.col === s.col ? { col: s.col, dir: cur.dir === "asc" ? "desc" : "asc" } : { col: s.col, dir: s.col === "name" ? "asc" : "desc" }))
+                    setSort((cur) => (cur.col === s.col ? { col: s.col, dir: cur.dir === "asc" ? "desc" : "asc" } : { col: s.col, dir: s.col === "name" || s.col === "cert_days" ? "asc" : "desc" }))
                   }
                   className={`rounded-md border px-2 py-0.5 transition ${
                     active
