@@ -1,0 +1,20 @@
+[
+  {
+    "name": "homepage-load",
+    "description": "Loads any page and asserts it rendered (non-empty title + body).",
+    "entryUrlHint": null,
+    "updatedAt": "2026-06-30T11:55:20.146215+00:00"
+  },
+  {
+    "name": "wegmans-homepage",
+    "description": "Wegmans homepage: header, search box, and primary nav render.",
+    "entryUrlHint": "https://www.wegmans.com/",
+    "updatedAt": "2026-06-30T11:55:20.216589+00:00"
+  },
+  {
+    "name": "wegmans-search",
+    "description": "Wegmans search funnel: homepage -> search \"milk\" -> results render.",
+    "entryUrlHint": "https://www.wegmans.com/",
+    "updatedAt": "2026-06-30T11:55:20.286606+00:00"
+  }
+]

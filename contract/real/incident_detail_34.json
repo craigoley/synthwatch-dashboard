@@ -1,0 +1,110 @@
+{
+  "id": 34,
+  "checkId": 59,
+  "checkName": "rca-demo",
+  "checkKind": "http",
+  "status": "open",
+  "severity": "critical",
+  "openedAt": "2026-06-25T02:20:20.004065+00:00",
+  "resolvedAt": null,
+  "durationSeconds": null,
+  "consecutiveFailures": 3,
+  "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
+  "rca": {
+    "classification": "real-outage",
+    "confidence": "high",
+    "observed": [
+      "HTTP status: 500",
+      "Error message: expected status eq 200, got 500",
+      "duration: 95ms",
+      "Recent run history: fail, fail",
+      "Multi-location: failing from 1 of 1 location(s)"
+    ],
+    "inferred": [
+      "The endpoint is returning 500 responses, which indicates a server-side error",
+      "Consecutive failures suggest this is not a single transient blip",
+      "Because the check is a simple HTTP check (no selectors), the problem is likely with the target service rather than the monitor",
+      "Investigate server logs, health checks, and recent deploys for the target endpoint"
+    ],
+    "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
+    "signature": "59|expected status eq 200, got 500|",
+    "model": "gpt-5-mini",
+    "cached": true,
+    "generated_at": "2026-06-25T02:20:26.693Z"
+  },
+  "perLocation": [
+    {
+      "location": "centralus",
+      "status": "error"
+    },
+    {
+      "location": "eastus2",
+      "status": "error"
+    },
+    {
+      "location": "westus2",
+      "status": "fail"
+    }
+  ],
+  "timeline": [
+    {
+      "runId": 842897,
+      "status": "fail",
+      "startedAt": "2026-06-25T02:10:21.4893+00:00",
+      "durationMs": 153,
+      "httpStatus": 500,
+      "errorMessage": "expected status eq 200, got 500",
+      "failedStep": null,
+      "screenshotUrl": null,
+      "traceUrl": null,
+      "location": "eastus2"
+    },
+    {
+      "runId": 842899,
+      "status": "fail",
+      "startedAt": "2026-06-25T02:10:22.447431+00:00",
+      "durationMs": 229,
+      "httpStatus": 500,
+      "errorMessage": "expected status eq 200, got 500",
+      "failedStep": null,
+      "screenshotUrl": null,
+      "traceUrl": null,
+      "location": "centralus"
+    },
+    {
+      "runId": 842903,
+      "status": "fail",
+      "startedAt": "2026-06-25T02:20:19.595393+00:00",
+      "durationMs": 222,
+      "httpStatus": 500,
+      "errorMessage": "expected status eq 200, got 500",
+      "failedStep": null,
+      "screenshotUrl": null,
+      "traceUrl": null,
+      "location": "centralus"
+    }
+  ],
+  "recurrence": [
+    {
+      "id": 33,
+      "openedAt": "2026-06-25T01:50:20.078332+00:00",
+      "resolvedAt": "2026-06-25T02:10:58.096995+00:00",
+      "status": "resolved",
+      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations."
+    },
+    {
+      "id": 32,
+      "openedAt": "2026-06-24T16:15:18.447229+00:00",
+      "resolvedAt": "2026-06-25T01:47:34.191971+00:00",
+      "status": "resolved",
+      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations."
+    },
+    {
+      "id": 31,
+      "openedAt": "2026-06-24T15:00:19.615821+00:00",
+      "resolvedAt": "2026-06-24T16:13:42.669019+00:00",
+      "status": "resolved",
+      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations."
+    }
+  ]
+}
