@@ -246,3 +246,66 @@ test.describe("reports — tag-scoped aggregates", () => {
     await expect(page.getByTestId("report-scope-banner")).toHaveCount(0);
   });
 });
+
+// ★ #P4: group-by a tag KEY — per-team / per-application reporting. The API groups server-side (one group per
+// tag value); the UI renders one section per value (each with its own CWV/trend + bucketed cards). URL-synced,
+// composes with the tag filter.
+test.describe("reports — group by tag key", () => {
+  function groupedWorld() {
+    const w = world(); // check 1 = env:prod, check 2 = env:prod + team:web
+    // give check 1 a team too so grouping by team yields TWO values (platform + web).
+    w.checks = w.checks.map((c) =>
+      c.id === 1 ? { ...c, tags: [{ key: "env", value: "prod" }, { key: "team", value: "platform" }] } : c,
+    );
+    w.tags = [
+      { key: "env", value: "prod", count: 2 },
+      { key: "team", value: "platform", count: 1 },
+      { key: "team", value: "web", count: 1 },
+    ];
+    return w;
+  }
+
+  test("default (no group-by) → single aggregate, no group sections", async ({ page }) => {
+    await mockApi(page, groupedWorld());
+    await page.goto("/reports");
+
+    await expect(page.getByTestId("group-by-select")).toBeVisible();
+    await expect(page.getByTestId("report-fleet-trend")).toBeVisible(); // fleet aggregate present
+    await expect(page.locator('[data-testid^="group-section-"]')).toHaveCount(0); // no grouping
+  });
+
+  test("group by team → one section per value, headers + cards bucketed; fleet aggregate hidden", async ({ page }) => {
+    await mockApi(page, groupedWorld());
+    await page.goto("/reports?groupBy=team"); // ★ URL restores the grouping
+
+    await expect(page.getByTestId("group-by-select")).toHaveValue("team");
+    const platform = page.getByTestId("group-section-platform");
+    const web = page.getByTestId("group-section-web");
+    await expect(platform).toBeVisible();
+    await expect(web).toBeVisible();
+    await expect(platform).toContainText("team"); // header shows the key…
+    await expect(platform).toContainText("platform"); // …and the value
+    // ★ cards bucketed by tag value: check 1 under platform, check 2 under web
+    await expect(platform.getByTestId("report-1")).toBeVisible();
+    await expect(web.getByTestId("report-2")).toBeVisible();
+    // ★ the top fleet aggregate is HIDDEN when grouped (groups[0] is a tag value, not the fleet)
+    await expect(page.getByTestId("report-fleet-trend")).toHaveCount(0);
+  });
+
+  test("group-by composes with a tag filter (scope banner still shows)", async ({ page }) => {
+    await mockApi(page, groupedWorld());
+    await page.goto("/reports?tags=env:prod&groupBy=team");
+
+    await expect(page.getByTestId("report-scope-banner")).toBeVisible(); // filter still scoped + loud
+    await expect(page.getByTestId("group-section-web")).toBeVisible(); // …and still bucketed by team
+  });
+
+  test("selecting a key in the dropdown URL-syncs ?groupBy=", async ({ page }) => {
+    await mockApi(page, groupedWorld());
+    await page.goto("/reports");
+
+    await page.getByTestId("group-by-select").selectOption("team");
+    await expect(page).toHaveURL(/[?&]groupBy=team/);
+    await expect(page.getByTestId("group-section-web")).toBeVisible();
+  });
+});
