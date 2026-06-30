@@ -13,6 +13,22 @@
 
 export type CheckKind = "http" | "browser" | "ssl" | "dns" | "tcp" | "ping" | "multistep";
 
+// Chat-to-prefill (POST /api/checks/parse-intent): the model's SUGGESTION for a non-browser monitor. `prefill`
+// is the parsed fields mapped to a partial Check (seeds the create modal, all editable); `fieldErrors` are the
+// validator's field-keyed errors (the same the create form renders). `redirect` is set for a browser/multistep
+// ask (no prefill). `configured` false → the feature is inert (input hides). NEVER auto-creates — the human submits.
+export interface ParseIntentResult {
+  configured: boolean;
+  note: string | null;
+  retryable: boolean;
+  redirect: string | null;
+  reason: string | null;
+  valid: boolean;
+  prefill: Partial<Check> | null;
+  fieldErrors: Record<string, string>;
+  notes: string | null;
+}
+
 export type DnsRecordType = "A" | "AAAA" | "CNAME" | "MX" | "TXT" | "NS";
 
 /**
