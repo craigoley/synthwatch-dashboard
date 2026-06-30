@@ -2,7 +2,8 @@ import { test, expect } from "@playwright/test";
 
 import { mockApi, defaultWorld } from "./mock";
 
-// Monitors-as-code drift surface (Phase 6b), atop /monitors. Read-only (reconcile runs in report mode).
+// Monitors-as-code drift surface (Phase 6b), DEMOTED below the active monitors on /monitors (the manage page
+// leads with current monitors; what differs from Git is secondary). Read-only (reconcile runs in report mode).
 // Two classes rendered apart: resolvable config drift (new/changed/missing) vs the KNOWN-GAP orphans
 // (Git defines a monitor the runner can't run yet) — orphans must read neutrally, never as an alarm.
 
@@ -40,6 +41,21 @@ function worldWithDrift() {
 }
 
 test.describe("phase 6b — reconcile drift surface", () => {
+  test("★ active monitors render ABOVE the demoted monitors-as-code (drift) section", async ({ page }) => {
+    await mockApi(page, worldWithDrift());
+    await page.goto("/monitors");
+
+    const firstMonitor = page.locator('a[href^="/checks/"]').first();
+    const driftSection = page.getByTestId("drift-section");
+    await expect(firstMonitor).toBeVisible();
+    await expect(driftSection).toBeVisible();
+    await expect(driftSection).toContainText("Monitors as code"); // the labeled section break
+    // ★ the active set leads; drift is demoted below it.
+    const mBox = await firstMonitor.boundingBox();
+    const dBox = await driftSection.boundingBox();
+    expect(mBox!.y).toBeLessThan(dBox!.y);
+  });
+
   test("renders all 4 drift types, splitting config drift from the orphan known-gap", async ({ page }) => {
     await mockApi(page, worldWithDrift());
     await page.goto("/monitors");
