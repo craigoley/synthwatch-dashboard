@@ -100,9 +100,9 @@ const keys = {
   checkTags: (id: number) => ["check-tags", id] as const,
   tags: ["tags"] as const,
   suggestedKeys: ["tags-suggested"] as const,
-  availabilityReport: (w: string, g: string) => ["report-availability", w, g] as const,
-  incidentBreakdown: (w: string) => ["report-incident-breakdown", w] as const,
-  performanceReport: (w: string, g: string) => ["report-performance", w, g] as const,
+  availabilityReport: (w: string, g: string, t: string) => ["report-availability", w, g, t] as const,
+  incidentBreakdown: (w: string, t: string) => ["report-incident-breakdown", w, t] as const,
+  performanceReport: (w: string, g: string, t: string) => ["report-performance", w, g, t] as const,
   narrative: (scope: string, w: string, key: number | null) => ["narrative", scope, w, key] as const,
   reconcileDrift: ["reconcile-drift"] as const,
   reconcilePlan: ["reconcile-plan"] as const,
@@ -456,22 +456,27 @@ export function useTags() {
 }
 
 // Reports. shouldRetryOnError:false so a pre-API 404 (→ null) shows "reports pending".
-export function useAvailabilityReport(window: ReportWindow, groupBy: string) {
-  return useSWR(keys.availabilityReport(window, groupBy), () => getAvailabilityReport(window, groupBy), {
+// The report aggregates take the SAME multi-select tag filter as the monitor list. The selected tags go into
+// the SWR key (sorted → stable regardless of selection order) so the tiles REFETCH tag-scoped when it changes;
+// empty tags → no ?tag= → whole fleet (the no-op default).
+const tagKey = (tags: Tag[]) => tags.map((t) => `${t.key}:${t.value}`).sort().join(",");
+
+export function useAvailabilityReport(window: ReportWindow, groupBy: string, tags: Tag[] = []) {
+  return useSWR(keys.availabilityReport(window, groupBy, tagKey(tags)), () => getAvailabilityReport(window, groupBy, tags), {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });
 }
 
-export function usePerformanceReport(window: ReportWindow, groupBy: string) {
-  return useSWR(keys.performanceReport(window, groupBy), () => getPerformanceReport(window, groupBy), {
+export function usePerformanceReport(window: ReportWindow, groupBy: string, tags: Tag[] = []) {
+  return useSWR(keys.performanceReport(window, groupBy, tagKey(tags)), () => getPerformanceReport(window, groupBy, tags), {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });
 }
 
-export function useIncidentBreakdown(window: ReportWindow) {
-  return useSWR(keys.incidentBreakdown(window), () => getIncidentBreakdown(window), {
+export function useIncidentBreakdown(window: ReportWindow, tags: Tag[] = []) {
+  return useSWR(keys.incidentBreakdown(window, tagKey(tags)), () => getIncidentBreakdown(window, tags), {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });

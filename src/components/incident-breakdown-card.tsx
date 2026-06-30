@@ -1,7 +1,7 @@
 "use client";
 
 import { useIncidentBreakdown } from "@/lib/client";
-import type { ReportWindow } from "@/lib/types";
+import type { ReportWindow, Tag } from "@/lib/types";
 
 // Status-color LAW (tokens, not hex): real-outage = a true red (the site genuinely broke); env/perf = genuine
 // but categorized; selector-drift = a MONITOR bug to fix (brand/attention, not red); flaky-transient +
@@ -38,8 +38,8 @@ function Shell({ window, children }: { window: ReportWindow; children: React.Rea
   );
 }
 
-export function IncidentBreakdownCard({ window }: { window: ReportWindow }) {
-  const { data, isLoading } = useIncidentBreakdown(window);
+export function IncidentBreakdownCard({ window, tags = [] }: { window: ReportWindow; tags?: Tag[] }) {
+  const { data, isLoading } = useIncidentBreakdown(window, tags);
 
   if (isLoading || !data) {
     return (

@@ -504,7 +504,16 @@ export async function mockApi(
         Array.from({ length: days }, (_, i) => ({ day: new Date(base + i * 86400000).toISOString().slice(0, 10), avgMs }));
       // Per-check rows mirror the real checks so they align with useChecks (tags) by
       // id; metrics vary by id so sorting reorders observably.
-      const checks = world.checks ?? [];
+      // ★ Tag filter (?tag=key:value, repeatable AND): scope the aggregate to checks carrying every tag — the
+      // server-side filter the real API does. No matching checks → empty groups (honest, like the real API).
+      const tagFilter = url.searchParams.getAll("tag");
+      const matchesAllTags = (c: RawObj) =>
+        tagFilter.every((t) => {
+          const i = t.indexOf(":");
+          return ((c.tags as { key: string; value: string }[]) ?? []).some((tg) => tg.key === t.slice(0, i) && tg.value === t.slice(i + 1));
+        });
+      const checks = (world.checks ?? []).filter(matchesAllTags);
+      if (checks.length === 0) return json(route, { window: win, groupBy: gb, groups: [] });
       const availPct = (id: number) => Math.round((100 - ((id * 7) % 28) * 0.9) * 10) / 10;
       const p95Of = (id: number) => 150 + ((id * 37) % 400);
       if (path === "/api/reports/availability") {
@@ -552,6 +561,29 @@ export async function mockApi(
         ? [{ ...allGroup, group: "platform" }, { ...allGroup, group: "web" }]
         : [{ ...allGroup, group: `${gb}-x` }];
       return json(route, { window: win, groupBy: gb, groups });
+    }
+    // Verdict breakdown (P6) — tag-responsive + honest-empty. Deterministic from the matching-check count so a
+    // ?tag= filter observably shifts total/precision; no matching checks → total 0 / precision null (no fake 0%).
+    if (path === "/api/reports/incident-breakdown" && method === "GET") {
+      if (world.reportsServed === false) return json(route, { error: "not_found" }, 404);
+      const win = url.searchParams.get("window") ?? "30d";
+      const tagFilter = url.searchParams.getAll("tag");
+      const matches = (c: RawObj) =>
+        tagFilter.every((t) => {
+          const i = t.indexOf(":");
+          return ((c.tags as { key: string; value: string }[]) ?? []).some((tg) => tg.key === t.slice(0, i) && tg.value === t.slice(i + 1));
+        });
+      const n = (world.checks ?? []).filter(matches).length;
+      if (n === 0)
+        return json(route, { window: win, total: 0, classified: 0, unclassified: 0, realOutages: 0, precision: null, buckets: [] });
+      const round = (x: number) => Math.round(x * 10000) / 10000;
+      return json(route, {
+        window: win, total: n + 1, classified: n + 1, unclassified: 0, realOutages: n, precision: round(n / (n + 1)),
+        buckets: [
+          { classification: "real-outage", count: n, share: round(n / (n + 1)) },
+          { classification: "flaky-transient", count: 1, share: round(1 / (n + 1)) },
+        ],
+      });
     }
     // Alerting reads (undefined → 404, exercising the "setup pending" path).
     if (path === "/api/channels" && method === "GET") {

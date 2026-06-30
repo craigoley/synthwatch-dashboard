@@ -56,8 +56,10 @@ export default function ReportsPage() {
   // windowed latency percentiles + downtime/incident counts; when empty they simply don't override.
   const { data: checks, isLoading } = useChecks();
   const { data: sla } = useSla(window);
-  const { data: avail } = useAvailabilityReport(window, "none");
-  const { data: perf } = usePerformanceReport(window, "none");
+  // ★ The aggregate tiles (CWV / trend / verdict-breakdown) take the SAME tag filter as the monitor list,
+  // server-scoped via ?tag= — so a filtered view shows the SUBSET's numbers, never the fleet's. Empty → fleet.
+  const { data: avail } = useAvailabilityReport(window, "none", selected);
+  const { data: perf } = usePerformanceReport(window, "none", selected);
   const { data: inUseTags } = useTags();
 
   const rows = useMemo<ReportRow[]>(() => {
@@ -126,11 +128,31 @@ export default function ReportsPage() {
         </div>
       </header>
 
-      {/* AI narrative summary (Layer 3) — hides entirely until the endpoint serves one (currently 7d). */}
-      <NarrativeCard scope="fleet" window={window} />
+      {/* AI narrative summary (Layer 3) — fleet-wide, runner-generated (no per-tag narrative). Hide it under an
+          active tag filter so a FLEET narrative is never read as the tagged subset's story. */}
+      {selected.length === 0 && <NarrativeCard scope="fleet" window={window} />}
+
+      {/* ★ Scope obviousness: when a tag filter is active, every aggregate BELOW is the tagged subset — say so
+          loudly so a scoped CWV/precision number is never mistaken for the fleet's. */}
+      {selected.length > 0 && (
+        <div
+          className="sw-panel flex flex-wrap items-center gap-x-2 gap-y-1 p-3 text-[12px]"
+          style={{ borderColor: "color-mix(in srgb, var(--color-brand) 40%, var(--color-border))" }}
+          data-testid="report-scope-banner"
+        >
+          <span className="sw-eyebrow" style={{ color: "var(--color-brand)" }}>Scoped</span>
+          <span className="text-[var(--color-ink-dim)]">All reports below cover only</span>
+          {selected.map((t) => (
+            <span key={`${t.key}:${t.value}`} className="sw-mono rounded bg-[var(--color-bg)] px-1.5 py-0.5 text-[var(--color-ink)]">
+              {t.key}:{t.value}
+            </span>
+          ))}
+          <span className="text-[var(--color-ink-faint)]">· {filtered.length} of {rows.length} monitors</span>
+        </div>
+      )}
 
       {/* P6 — alert-quality breakdown: how many reds were real vs monitor-bug vs transient (leads with precision). */}
-      <IncidentBreakdownCard window={window} />
+      <IncidentBreakdownCard window={window} tags={selected} />
 
       {/* ★ Fleet Core Web Vitals (p75) — the /reports/performance group web_vitals we already fetch; hides
           when there are no browser monitors / no vitals (honest absence, not a zero). */}

@@ -160,7 +160,7 @@ export class ApiRequestError extends Error {
   }
 }
 
-type QueryValue = string | number | boolean | null | undefined;
+type QueryValue = string | number | boolean | null | undefined | string[];
 
 /**
  * Resolve an origin-relative proxy path (e.g. "/api/runs/1/screenshot") to an
@@ -185,7 +185,10 @@ function buildUrl(path: string, params?: Record<string, QueryValue>): string {
   if (params) {
     const qs = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
-      if (value !== null && value !== undefined) qs.set(key, String(value));
+      if (value === null || value === undefined) continue;
+      // Arrays → repeated params (?tag=a&tag=b), for the multi-select tag filter; scalars → single value.
+      if (Array.isArray(value)) for (const v of value) qs.append(key, String(v));
+      else qs.set(key, String(value));
     }
     const query = qs.toString();
     if (query) url += `?${query}`;
@@ -1520,12 +1523,18 @@ interface RawReportSeriesPoint { day: string; availabilityPct?: number | null; a
 const mapSeries = (s?: RawReportSeriesPoint[] | null): ReportSeriesPoint[] =>
   (s ?? []).map((p) => ({ date: p.day, value: p.availabilityPct ?? p.avgMs ?? null }));
 
+// Repeatable ?tag=key:value for the report tag-filter (multi-select AND, server-side). undefined → omitted →
+// whole fleet (the no-op default), matching the API's cardinality=0 short-circuit.
+const tagParams = (tags: Tag[]): string[] | undefined =>
+  tags.length ? tags.map((t) => `${t.key}:${t.value}`) : undefined;
+
 export async function getAvailabilityReport(
   window: ReportWindow,
   groupBy: string,
+  tags: Tag[] = [],
 ): Promise<AvailabilityReport | null> {
   try {
-    const raw = await request<Record<string, unknown>>("/reports/availability", { window, groupBy });
+    const raw = await request<Record<string, unknown>>("/reports/availability", { window, groupBy, tag: tagParams(tags) });
     const groups = ((raw?.groups as Record<string, unknown>[]) ?? []).map((g) => {
       const checks = ((g.checks as Record<string, unknown>[]) ?? []).map((c) => ({
         check_id: c.checkId as number,
@@ -1613,9 +1622,10 @@ export async function getNarrative(
 export async function getPerformanceReport(
   window: ReportWindow,
   groupBy: string,
+  tags: Tag[] = [],
 ): Promise<PerformanceReport | null> {
   try {
-    const raw = await request<Record<string, unknown>>("/reports/performance", { window, groupBy });
+    const raw = await request<Record<string, unknown>>("/reports/performance", { window, groupBy, tag: tagParams(tags) });
     const groups = ((raw?.groups as Record<string, unknown>[]) ?? []).map((g) => {
       // ★ The API NESTS latency under `latency` and web-vitals (p75) under `webVitals` — they are NOT flat
       // on the group, and per-check uses `checkName` + a nested `latency`. Reading flat (g.p50Ms / wv.lcpMs
@@ -1841,9 +1851,9 @@ export async function dismissAccessRequest(email: string): Promise<void> {
 
 // Reports P6 — GET /api/reports/incident-breakdown?window= . The verdict-taxonomy breakdown +
 // alert-precision (real-outage / classified). Serves camelCase; `precision` is null when nothing's classified.
-export async function getIncidentBreakdown(window: ReportWindow): Promise<IncidentBreakdown | null> {
+export async function getIncidentBreakdown(window: ReportWindow, tags: Tag[] = []): Promise<IncidentBreakdown | null> {
   try {
-    const raw = await request<Record<string, unknown>>("/reports/incident-breakdown", { window });
+    const raw = await request<Record<string, unknown>>("/reports/incident-breakdown", { window, tag: tagParams(tags) });
     const buckets = ((raw?.buckets as Record<string, unknown>[]) ?? []).map((b) => ({
       classification: String(b.classification ?? "unclassified"),
       count: (b.count as number) ?? 0,
