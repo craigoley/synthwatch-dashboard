@@ -449,7 +449,7 @@ export function ReportSeriesArea({
             type="number"
             domain={["dataMin", "dataMax"]}
             scale="time"
-            tickFormatter={timeTick}
+            tickFormatter={dateTick}
             stroke={AXIS}
             tick={{ fontSize: 10 }}
             minTickGap={36}
