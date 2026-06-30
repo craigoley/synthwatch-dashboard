@@ -10,6 +10,7 @@ import { StatusDot } from "@/components/status-badge";
 import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";
 import { MonitorChatInput } from "@/components/monitor-chat-input";
+import { useCreateMonitor, CreateMonitorModal } from "@/components/create-monitor";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { ReconcileDriftSurface } from "@/components/reconcile-drift";
 import { RunAllControl } from "@/components/run-all";
@@ -122,8 +123,7 @@ export default function MonitorsPage() {
   const { data: drift } = useReconcileDrift();
   const { canWrite } = useAuth();
   const { selected, toggle, clear } = useTagFilter();
-  const [creating, setCreating] = useState(false);
-  const [prefill, setPrefill] = useState<{ fields: Partial<Check>; errors: Record<string, string> } | null>(null);
+  const create = useCreateMonitor();
   const [editing, setEditing] = useState<Check | null>(null);
   const [deleting, setDeleting] = useState<CheckWithStatus | null>(null);
   const [pausingId, setPausingId] = useState<number | null>(null);
@@ -151,7 +151,7 @@ export default function MonitorsPage() {
           {/* Run the CURRENT filtered set in one click — editor-only, capped fan-out, live aggregate progress. */}
           <RunAllControl allChecks={data ?? []} scope={visible} onRunningChange={setBatchRunning} />
           {canWrite && (
-            <button onClick={() => setCreating(true)} className="sw-btn sw-btn-primary">
+            <button onClick={create.openBlank} className="sw-btn sw-btn-primary">
               + New monitor
             </button>
           )}
@@ -159,14 +159,7 @@ export default function MonitorsPage() {
       </header>
 
       {/* Chat-to-prefill — describe a non-browser monitor; the parse opens the create modal prefilled (editor-only). */}
-      {canWrite && (
-        <MonitorChatInput
-          onPrefill={(fields, errors) => {
-            setPrefill({ fields, errors });
-            setCreating(true);
-          }}
-        />
-      )}
+      {canWrite && <MonitorChatInput onPrefill={create.openPrefilled} />}
 
       {/* Read-only-by-default: viewers see a sign-in prompt; write affordances are gated on canWrite. */}
       <SignInToEdit />
@@ -194,7 +187,7 @@ export default function MonitorsPage() {
           hint="Create your first HTTP or browser monitor."
           action={
             canWrite ? (
-              <button onClick={() => setCreating(true)} className="sw-btn sw-btn-primary">
+              <button onClick={create.openBlank} className="sw-btn sw-btn-primary">
                 + New monitor
               </button>
             ) : undefined
@@ -291,27 +284,7 @@ export default function MonitorsPage() {
         </section>
       )}
 
-      <Modal
-        open={creating}
-        onClose={() => {
-          setCreating(false);
-          setPrefill(null);
-        }}
-        title={prefill ? "New monitor — from your description" : "New monitor"}
-      >
-        <MonitorForm
-          prefill={prefill?.fields ?? null}
-          prefillErrors={prefill?.errors ?? null}
-          onDone={() => {
-            setCreating(false);
-            setPrefill(null);
-          }}
-          onCancel={() => {
-            setCreating(false);
-            setPrefill(null);
-          }}
-        />
-      </Modal>
+      <CreateMonitorModal {...create.modal} />
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title={`Edit · ${editing?.name ?? ""}`}>
         {editing && (

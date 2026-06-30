@@ -9,6 +9,9 @@ import { CheckCard } from "@/components/check-card";
 import { FleetSlaSummary } from "@/components/sla";
 import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
+import { MonitorChatInput } from "@/components/monitor-chat-input";
+import { useCreateMonitor, CreateMonitorModal } from "@/components/create-monitor";
+import { useAuth } from "@/components/auth-provider";
 import type { CheckWithStatus, Tag } from "@/lib/types";
 
 type StatusFilter = "all" | "attention" | "pass" | "paused";
@@ -87,6 +90,10 @@ function StatusGrid() {
   // is a no-op when it would empty the query. status/kind/q stay on useSearchParams below.
   const { selected: selectedTags, toggle: toggleTag, clear: clearTags } = useTagFilter();
   const { data: inUseTags } = useTags();
+  const { canWrite } = useAuth();
+  // Shared create surface (same hook/modal/chat-input as the Monitors page) — the chat-prefill is literally the
+  // same component here, not a copy. Editor-gated; viewers keep the link to /monitors.
+  const create = useCreateMonitor();
 
   const setParam = (key: string, value: string) => {
     // Read the LIVE url (window.location), not useSearchParams: that way a status/kind/q change preserves the
@@ -110,10 +117,20 @@ function StatusGrid() {
           <p className="sw-eyebrow">Fleet status</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Monitors</h1>
         </div>
-        <Link href="/monitors" className="sw-btn sw-btn-primary">
-          + New monitor
-        </Link>
+        {/* Editors get the in-place create surface (same as /monitors); viewers keep the link there. */}
+        {canWrite ? (
+          <button onClick={create.openBlank} className="sw-btn sw-btn-primary">
+            + New monitor
+          </button>
+        ) : (
+          <Link href="/monitors" className="sw-btn sw-btn-primary">
+            + New monitor
+          </Link>
+        )}
       </header>
+
+      {/* Chat-to-prefill — the SAME shared describe-input as /monitors; parse → seed the create modal (editor-only). */}
+      {canWrite && <MonitorChatInput onPrefill={create.openPrefilled} />}
 
       <FleetSlaSummary />
 
@@ -186,9 +203,15 @@ function StatusGrid() {
               : "Create your first monitor to start watching."
           }
           action={
-            <Link href="/monitors" className="sw-btn sw-btn-primary">
-              + New monitor
-            </Link>
+            canWrite ? (
+              <button onClick={create.openBlank} className="sw-btn sw-btn-primary">
+                + New monitor
+              </button>
+            ) : (
+              <Link href="/monitors" className="sw-btn sw-btn-primary">
+                + New monitor
+              </Link>
+            )
           }
         />
       ) : (
@@ -206,6 +229,9 @@ function StatusGrid() {
           })}
         </div>
       )}
+
+      {/* The shared create modal (blank or chat-prefilled) — same component as /monitors; opens only when creating. */}
+      <CreateMonitorModal {...create.modal} />
     </div>
   );
 }
