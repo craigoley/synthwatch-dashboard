@@ -112,7 +112,7 @@ test.describe("reports — per-monitor cards + tag filter", () => {
     await expect(page.getByTestId("vitals-2")).toContainText("LCP");
     await expect(page.getByTestId("vitals-2")).toContainText("1.80s");
     await expect(page.getByTestId("errors-2")).toBeVisible();
-    await expect(page.getByText("INP", { exact: false })).toHaveCount(0);
+    await expect(page.getByTestId("detail-2").getByText("INP", { exact: false })).toHaveCount(0);
 
     // http monitor (check 1) → NO web-vitals section
     await page.getByTestId("report-toggle-1").click();
@@ -142,6 +142,46 @@ test.describe("reports — per-monitor cards + tag filter", () => {
     // sort by Incidents (first click → desc): highest incidentsOpened first — a DIFFERENT order
     await page.getByTestId("sort-incidents").click();
     await expect.poll(order).toEqual(["report-4", "report-3", "report-1"]);
+  });
+});
+
+// ★ Tier-1 P1/P2: render the perf-report data the page already fetches but previously dropped — the FLEET
+// Core Web Vitals (p75) card + the fleet availability/avg-latency trends (groups[0].web_vitals + .series).
+test.describe("reports — fleet CWV + trend (P1/P2)", () => {
+  test("fleet Core Web Vitals (p75) card renders, threshold-colored, INP honest-placeholder (not faked)", async ({ page }) => {
+    await mockApi(page, world());
+    await page.goto("/reports");
+
+    const cwv = page.getByTestId("report-cwv");
+    await expect(cwv).toBeVisible();
+    await expect(cwv).toContainText("Core Web Vitals");
+    await expect(cwv).toContainText("LCP");
+    await expect(cwv).toContainText("CLS");
+    await expect(cwv).toContainText("FCP");
+    await expect(cwv).toContainText("TTFB");
+    // ★ INP is not aggregated yet (P9) → shown as a clear placeholder, never a fabricated value
+    await expect(cwv).toContainText("INP");
+    await expect(cwv).toContainText("not captured yet");
+  });
+
+  test("fleet trend renders from the report series (availability + avg latency)", async ({ page }) => {
+    await mockApi(page, world());
+    await page.goto("/reports");
+
+    const trend = page.getByTestId("report-fleet-trend");
+    await expect(trend).toBeVisible();
+    await expect(trend).toContainText("Fleet availability");
+    await expect(trend).toContainText("Fleet avg latency");
+  });
+
+  test("no CWV card when there are no browser monitors (honest absence, not a zero)", async ({ page }) => {
+    const w = world();
+    w.checks = w.checks.filter((c) => c.kind !== "browser"); // http-only fleet → no web vitals
+    await mockApi(page, w);
+    await page.goto("/reports");
+
+    await expect(page.getByTestId("monitor-list")).toBeVisible(); // page still renders
+    await expect(page.getByTestId("report-cwv")).toHaveCount(0); // but no vitals card (none captured)
   });
 });
 

@@ -70,14 +70,27 @@ export function availabilityTone(pct: number | null | undefined): StatusMeta["to
 }
 
 /**
- * Standard Core Web Vitals thresholds → status token. null = no reading (idle).
- *   LCP (ms): ≤2500 good · ≤4000 needs-improvement · >4000 poor
- *   CLS:      ≤0.1  good · ≤0.25 needs-improvement · >0.25 poor
- *   INP (ms): ≤200  good · ≤500  needs-improvement · >500  poor
+ * Standard Core Web Vitals (+ supporting paint/network) thresholds → status token. null = no reading (idle).
+ * Sources: web.dev Core Web Vitals (2026).
+ *   LCP  (ms): ≤2500 good · ≤4000 needs-improvement · >4000 poor   (Core Web Vital)
+ *   CLS      : ≤0.1  good · ≤0.25 needs-improvement · >0.25 poor   (Core Web Vital)
+ *   INP  (ms): ≤200  good · ≤500  needs-improvement · >500  poor   (Core Web Vital)
+ *   FCP  (ms): ≤1800 good · ≤3000 needs-improvement · >3000 poor   (supporting metric)
+ *   TTFB (ms): ≤800  good · ≤1800 needs-improvement · >1800 poor   (supporting metric)
  */
-export function cwvTone(metric: "lcp" | "cls" | "inp", value: number | null | undefined): StatusMeta["token"] {
+export function cwvTone(
+  metric: "lcp" | "cls" | "inp" | "fcp" | "ttfb",
+  value: number | null | undefined,
+): StatusMeta["token"] {
   if (value === null || value === undefined || Number.isNaN(value)) return "idle";
-  const [good, ni] = metric === "lcp" ? [2500, 4000] : metric === "cls" ? [0.1, 0.25] : [200, 500];
+  const bands: Record<typeof metric, [number, number]> = {
+    lcp: [2500, 4000],
+    cls: [0.1, 0.25],
+    inp: [200, 500],
+    fcp: [1800, 3000],
+    ttfb: [800, 1800],
+  };
+  const [good, ni] = bands[metric];
   if (value <= good) return "pass";
   if (value <= ni) return "warn";
   return "fail";
