@@ -37,6 +37,9 @@ import type {
   DriftType,
   DriftRow,
   ReconcileDrift,
+  ReconcileApplyPlan,
+  ReconcileApplyPlanItem,
+  PlanStatus,
   SpecCatalog,
   SpecCatalogEntry,
   AiInsight,
@@ -1114,6 +1117,33 @@ export async function getReconcileDrift(): Promise<ReconcileDrift | null> {
       detected_at: d.detectedAt,
     }));
     return { items, detected_at: raw?.detectedAt ?? null };
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+interface RawPlanItem {
+  sourceKey: string;
+  driftType: string;
+  status: string;
+  plan?: ReconcileApplyPlanItem["plan"] | null;
+  computedAt: string;
+}
+
+/** GET /api/reconcile/plan — the DRY-RUN apply plan per drift (reconcile-apply Phase 0). Read-only preview;
+ *  nothing is applied or approved this phase. */
+export async function getReconcilePlan(): Promise<ReconcileApplyPlan | null> {
+  try {
+    const raw = await request<{ items?: RawPlanItem[]; computedAt?: string | null }>("/reconcile/plan");
+    const items: ReconcileApplyPlanItem[] = (raw?.items ?? []).map((p) => ({
+      source_key: p.sourceKey,
+      drift_type: p.driftType as DriftType,
+      status: p.status as PlanStatus,
+      plan: p.plan ?? { summary: "", disposition: p.status, statements: [] },
+      computed_at: p.computedAt,
+    }));
+    return { items, computed_at: raw?.computedAt ?? null };
   } catch (err) {
     if (err instanceof ApiRequestError && err.status === 404) return null;
     throw err;
