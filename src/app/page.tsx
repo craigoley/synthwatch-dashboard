@@ -4,17 +4,25 @@ import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { useChecks, useSla } from "@/lib/client";
+import { useChecks, useSla, useTags } from "@/lib/client";
 import { CheckCard } from "@/components/check-card";
 import { FleetSlaSummary } from "@/components/sla";
+import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
-import type { CheckWithStatus } from "@/lib/types";
+import type { CheckWithStatus, Tag } from "@/lib/types";
 
 type StatusFilter = "all" | "attention" | "pass" | "paused";
 type KindFilter = "all" | "http" | "browser" | "ssl";
 
-function matches(check: CheckWithStatus, status: StatusFilter, kind: KindFilter, q: string): boolean {
+function matches(
+  check: CheckWithStatus,
+  status: StatusFilter,
+  kind: KindFilter,
+  q: string,
+  tags: Tag[],
+): boolean {
   if (kind !== "all" && check.kind !== kind) return false;
+  if (!matchesTags(check.tags, tags)) return false; // AND across selected tags (reuses the shared logic)
   if (q && !`${check.name} ${check.flow_name ?? ""} ${check.target_url ?? ""}`.toLowerCase().includes(q))
     return false;
   switch (status) {
@@ -74,17 +82,25 @@ function StatusGrid() {
   const status = (params.get("status") as StatusFilter) || "all";
   const kind = (params.get("kind") as KindFilter) || "all";
   const q = (params.get("q") || "").toLowerCase();
+  // Tags reuse the shared useTagFilter (useState + history.replaceState, same `?tags=env:prod` format as the
+  // /monitors + /reports filters). Its clear() resets via state — reliable, unlike router.replace("/") which
+  // is a no-op when it would empty the query. status/kind/q stay on useSearchParams below.
+  const { selected: selectedTags, toggle: toggleTag, clear: clearTags } = useTagFilter();
+  const { data: inUseTags } = useTags();
 
   const setParam = (key: string, value: string) => {
-    const next = new URLSearchParams(params.toString());
+    // Read the LIVE url (window.location), not useSearchParams: that way a status/kind/q change preserves the
+    // ?tags the useTagFilter set via history.replaceState (which useSearchParams doesn't observe).
+    const next = new URLSearchParams(window.location.search);
     if (!value || value === "all") next.delete(key);
     else next.set(key, value);
-    router.replace(next.toString() ? `/?${next.toString()}` : "/", { scroll: false });
+    const qs = next.toString();
+    router.replace(qs ? `/?${qs}` : "/", { scroll: false });
   };
 
   const filtered = useMemo(
-    () => (data ?? []).filter((c) => matches(c, status, kind, q)),
-    [data, status, kind, q],
+    () => (data ?? []).filter((c) => matches(c, status, kind, q, selectedTags)),
+    [data, status, kind, q, selectedTags],
   );
 
   return (
@@ -137,6 +153,23 @@ function StatusGrid() {
           onChange={(e) => setParam("q", e.target.value)}
         />
       </div>
+
+      {/* Tag filter — multi-select AND, URL-synced (?tags=env:prod). Reuses the shared TagFilter component
+          (rows carry {key,value} Tag[], unlike the catalog's bare strings). Renders nothing until tags exist. */}
+      <TagFilter
+        available={inUseTags ?? []}
+        selected={selectedTags}
+        onToggle={toggleTag}
+        onClear={clearTags}
+      />
+
+      {/* ★ Make an active filter OBVIOUS: a clear "showing N of M" whenever the list is a subset (any filter).
+          The fleet SLA summary above stays WHOLE-fleet on purpose (it's a fleet metric, not a filtered view). */}
+      {data && filtered.length !== data.length && (
+        <p className="text-[11px] text-[var(--color-ink-faint)]" data-testid="filter-count">
+          Showing {filtered.length} of {data.length} monitors
+        </p>
+      )}
 
       {isLoading && !data ? (
         <div className="py-16">

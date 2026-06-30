@@ -7,15 +7,18 @@ import { EmptyState, Spinner } from "@/components/states";
 import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { NarrativeCard } from "@/components/narrative-card";
 import { MonitorReportCard, type ReportRow } from "@/components/monitor-report-card";
+import { ReportWebVitals, ReportSeriesArea } from "@/components/charts";
+import { formatDuration } from "@/lib/format";
 import type { ReportWindow } from "@/lib/types";
 
 const WINDOWS: ReportWindow[] = ["7d", "30d", "90d"];
 
-type SortCol = "availability_pct" | "p95_ms" | "incidents" | "name";
+type SortCol = "availability_pct" | "p95_ms" | "incidents" | "cert_days" | "name";
 const SORTS: { col: SortCol; label: string }[] = [
   { col: "availability_pct", label: "Availability" },
   { col: "p95_ms", label: "p95" },
   { col: "incidents", label: "Incidents" },
+  { col: "cert_days", label: "Cert expiry" },
   { col: "name", label: "Name" },
 ];
 
@@ -26,8 +29,10 @@ function incidentsOf(r: ReportRow): number {
 function compare(a: ReportRow, b: ReportRow, col: SortCol, dir: "asc" | "desc"): number {
   const s = dir === "asc" ? 1 : -1;
   if (col === "name") return a.name.localeCompare(b.name) * s;
-  const av = col === "incidents" ? incidentsOf(a) : a[col];
-  const bv = col === "incidents" ? incidentsOf(b) : b[col];
+  // cert_days: non-cert checks are null → nulls-last (below), so "Cert expiry · asc" = expiring soonest first
+  // with non-cert monitors sorted out of the way.
+  const av = col === "incidents" ? incidentsOf(a) : col === "cert_days" ? a.last_cert_days_remaining : a[col];
+  const bv = col === "incidents" ? incidentsOf(b) : col === "cert_days" ? b.last_cert_days_remaining : b[col];
   if (av == null && bv == null) return 0;
   if (av == null) return 1; // nulls last, regardless of dir
   if (bv == null) return -1;
@@ -71,6 +76,7 @@ export default function ReportsPage() {
       const computedPct = up + down > 0 ? Math.round((10000 * up) / (up + down)) / 100 : null;
       return {
         check_id: c.id,
+        last_cert_days_remaining: c.last_cert_days_remaining,
         name: c.name,
         kind: c.kind,
         current_status: c.current_status,
@@ -122,6 +128,34 @@ export default function ReportsPage() {
       {/* AI narrative summary (Layer 3) — hides entirely until the endpoint serves one (currently 7d). */}
       <NarrativeCard scope="fleet" window={window} />
 
+      {/* ★ Fleet Core Web Vitals (p75) — the /reports/performance group web_vitals we already fetch; hides
+          when there are no browser monitors / no vitals (honest absence, not a zero). */}
+      <ReportWebVitals
+        vitals={perf?.groups[0]?.web_vitals ?? null}
+        browserCheckCount={perf?.groups[0]?.browser_check_count ?? 0}
+      />
+
+      {/* ★ Fleet trend over the window — the report `series` we already fetch (availability % from the
+          availability report, AVG latency from the performance report) but previously dropped. These are
+          GROUP/fleet-level (the report has no per-check series); the per-monitor drill-down keeps its raw-run
+          latency chart (which shows p95 spikiness the fleet avg would smooth away). */}
+      {((avail?.groups[0]?.series?.length ?? 0) > 0 || (perf?.groups[0]?.series?.length ?? 0) > 0) && (
+        <div className="grid gap-4 sm:grid-cols-2" data-testid="report-fleet-trend">
+          <ReportSeriesArea
+            title="Fleet availability"
+            unit="% per day"
+            points={avail?.groups[0]?.series ?? []}
+            fmt={(v) => (v == null ? "—" : `${v.toFixed(1)}%`)}
+          />
+          <ReportSeriesArea
+            title="Fleet avg latency"
+            unit="avg ms per day"
+            points={perf?.groups[0]?.series ?? []}
+            fmt={formatDuration}
+          />
+        </div>
+      )}
+
       {/* Tags FILTER the list (multi-tag AND); only real in-use tags are offered. */}
       {(inUseTags?.length ?? 0) > 0 && (
         <TagFilter
@@ -160,7 +194,7 @@ export default function ReportsPage() {
                   type="button"
                   data-testid={`sort-${s.col}`}
                   onClick={() =>
-                    setSort((cur) => (cur.col === s.col ? { col: s.col, dir: cur.dir === "asc" ? "desc" : "asc" } : { col: s.col, dir: s.col === "name" ? "asc" : "desc" }))
+                    setSort((cur) => (cur.col === s.col ? { col: s.col, dir: cur.dir === "asc" ? "desc" : "asc" } : { col: s.col, dir: s.col === "name" || s.col === "cert_days" ? "asc" : "desc" }))
                   }
                   className={`rounded-md border px-2 py-0.5 transition ${
                     active

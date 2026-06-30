@@ -47,7 +47,11 @@ import {
   getPerformanceReport,
   getNarrative,
   getReconcileDrift,
+  getReconcilePlan,
   triggerReconcile,
+  approveReconcilePlan,
+  rejectReconcilePlan,
+  applyReconcilePlans,
   getSpecCatalog,
   listEditors,
   addEditor as apiAddEditor,
@@ -99,6 +103,7 @@ const keys = {
   performanceReport: (w: string, g: string) => ["report-performance", w, g] as const,
   narrative: (scope: string, w: string, key: number | null) => ["narrative", scope, w, key] as const,
   reconcileDrift: ["reconcile-drift"] as const,
+  reconcilePlan: ["reconcile-plan"] as const,
   specCatalog: ["spec-catalog"] as const,
   editors: ["editors"] as const,
   accessRequests: ["access-requests"] as const,
@@ -413,7 +418,7 @@ export { sendChannelTest, getChannelTestStatus };
 export { runCheckNow };
 
 // "Reconcile now": POST → 202 { triggered }; the off-cron job re-syncs the drift snapshot (detected_at advances).
-export { triggerReconcile };
+export { triggerReconcile, approveReconcilePlan, rejectReconcilePlan, applyReconcilePlans };
 
 /** Revalidate a check's run-history (all date-range pages) — call after triggering an on-demand run
  *  so the new run shows up live. Matches the useRunHistory cache key ["run-history", checkId, …]. */
@@ -484,6 +489,16 @@ export function useReconcileDrift(opts: { reconciling?: boolean } = {}) {
     // While a manual "Reconcile now" is in flight, fast-poll so the off-cron job's fresh snapshot (detected_at
     // advanced) is caught within seconds — the same scoped-fast-poll idea as useCheck's expectRun. Idle (no
     // auto-poll) otherwise: reconcile is hourly, the read is cheap-but-not-free, and the surface is read-only.
+    refreshInterval: opts.reconciling ? 3000 : 0,
+  });
+}
+
+// The DRY-RUN apply plan per drift (reconcile-apply Phase 0). Read-only preview alongside the drift list —
+// nothing is applied or approved this phase. Same poll cadence as the drift hook (fresh after a reconcile).
+export function useReconcilePlan(opts: { reconciling?: boolean } = {}) {
+  return useSWR(keys.reconcilePlan, () => getReconcilePlan(), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
     refreshInterval: opts.reconciling ? 3000 : 0,
   });
 }

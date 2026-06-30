@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-import { mockApi } from "./mock";
+import { mockApi, defaultWorld } from "./mock";
 
 test.describe("status grid", () => {
   test("renders a card for every kind", async ({ page }) => {
@@ -73,5 +73,65 @@ test.describe("status grid", () => {
     await expect(page.locator('a[href="/checks/7"]')).toContainText(/2 steps/);
     await expect(page.locator('a[href="/checks/3"]')).toContainText(/12d/);
     await expect(page.locator('a[href="/checks/4"]')).toContainText(/A example\.com/);
+  });
+});
+
+// ★ Tag filtering on the fleet/home page (/) — rows carry {key,value} Tag[], so it reuses the shared
+// TagFilter component; multi-select AND, URL-synced, with a "showing N of M" indicator so the subset is obvious.
+test.describe("status grid — tag filter", () => {
+  function taggedWorld() {
+    const w = defaultWorld();
+    // check 1 = "API health" → env:prod ; check 2 = "Homepage flow" → env:prod + team:web
+    w.checks = w.checks.map((c) =>
+      c.id === 1
+        ? { ...c, tags: [{ key: "env", value: "prod" }] }
+        : c.id === 2
+          ? { ...c, tags: [{ key: "env", value: "prod" }, { key: "team", value: "web" }] }
+          : { ...c, tags: [] },
+    );
+    w.tags = [
+      { key: "env", value: "prod", count: 2 },
+      { key: "team", value: "web", count: 1 },
+    ];
+    return w;
+  }
+
+  test("filters the fleet by tag (AND), shows a count, and URL-syncs", async ({ page }) => {
+    await mockApi(page, taggedWorld());
+    await page.goto("/");
+    await expect(page.getByTestId("tag-filter")).toBeVisible();
+
+    const total = await page.locator('a[href^="/checks/"]').count();
+    expect(total).toBeGreaterThan(2);
+
+    await page.getByRole("checkbox", { name: "filter env:prod" }).click();
+    await expect(page.locator('a[href="/checks/1"]')).toBeVisible();
+    await expect(page.locator('a[href="/checks/2"]')).toBeVisible();
+    await expect(page.getByTestId("filter-count")).toContainText("Showing 2 of");
+    await expect(page).toHaveURL(/tags=env/);
+
+    await page.getByRole("checkbox", { name: "filter team:web" }).click();
+    await expect(page.locator('a[href="/checks/2"]')).toBeVisible();
+    await expect(page.locator('a[href="/checks/1"]')).toHaveCount(0);
+    await expect(page.getByTestId("filter-count")).toContainText("Showing 1 of");
+  });
+
+  test("a shared ?tags= URL restores the filtered fleet", async ({ page }) => {
+    await mockApi(page, taggedWorld());
+    await page.goto("/?tags=team:web");
+
+    await expect(page.locator('a[href="/checks/2"]')).toBeVisible();
+    await expect(page.locator('a[href="/checks/1"]')).toHaveCount(0);
+    await expect(page.getByRole("checkbox", { name: "filter team:web" })).toHaveAttribute("aria-checked", "true");
+  });
+
+  test("clearing the tag filter restores the whole fleet (no count badge)", async ({ page }) => {
+    await mockApi(page, taggedWorld());
+    await page.goto("/?tags=env:prod");
+    await expect(page.getByTestId("filter-count")).toBeVisible();
+
+    await page.getByTestId("clear-tag-filter").click();
+    await expect(page.getByTestId("filter-count")).toHaveCount(0); // full fleet → no subset indicator
+    await expect(page.locator('a[href="/checks/1"]')).toBeVisible();
   });
 });

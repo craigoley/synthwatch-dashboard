@@ -37,6 +37,9 @@ import type {
   DriftType,
   DriftRow,
   ReconcileDrift,
+  ReconcileApplyPlan,
+  ReconcileApplyPlanItem,
+  PlanStatus,
   SpecCatalog,
   SpecCatalogEntry,
   AiInsight,
@@ -1120,6 +1123,33 @@ export async function getReconcileDrift(): Promise<ReconcileDrift | null> {
   }
 }
 
+interface RawPlanItem {
+  sourceKey: string;
+  driftType: string;
+  status: string;
+  plan?: ReconcileApplyPlanItem["plan"] | null;
+  computedAt: string;
+}
+
+/** GET /api/reconcile/plan — the DRY-RUN apply plan per drift (reconcile-apply Phase 0). Read-only preview;
+ *  nothing is applied or approved this phase. */
+export async function getReconcilePlan(): Promise<ReconcileApplyPlan | null> {
+  try {
+    const raw = await request<{ items?: RawPlanItem[]; computedAt?: string | null }>("/reconcile/plan");
+    const items: ReconcileApplyPlanItem[] = (raw?.items ?? []).map((p) => ({
+      source_key: p.sourceKey,
+      drift_type: p.driftType as DriftType,
+      status: p.status as PlanStatus,
+      plan: p.plan ?? { summary: "", disposition: p.status, statements: [] },
+      computed_at: p.computedAt,
+    }));
+    return { items, computed_at: raw?.computedAt ?? null };
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null;
+    throw err;
+  }
+}
+
 /**
  * POST /api/reconcile/trigger — ARM-start the reconcile job NOW (off-cron), the #115-proven path. Editor/
  * admin-gated by the API (write verb). 202 { triggered: true } on success; 503 if the ACA job-start failed.
@@ -1128,6 +1158,33 @@ export async function getReconcileDrift(): Promise<ReconcileDrift | null> {
  */
 export async function triggerReconcile(): Promise<{ triggered: boolean }> {
   return request<{ triggered: boolean }>("/reconcile/trigger", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+  });
+}
+
+// ─── reconcile-apply Phase 1 (approve / reject / APPLY — editor-only; the API gates + audits) ──────
+/** POST /api/reconcile/approve — pending → approved. A blocked plan returns 4xx (can't be approved). */
+export async function approveReconcilePlan(sourceKey: string, driftType: string): Promise<void> {
+  await request<unknown>("/reconcile/approve", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sourceKey, driftType }),
+  });
+}
+
+/** POST /api/reconcile/reject — pending → rejected. */
+export async function rejectReconcilePlan(sourceKey: string, driftType: string): Promise<void> {
+  await request<unknown>("/reconcile/reject", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sourceKey, driftType }),
+  });
+}
+
+/** POST /api/reconcile/apply — execute the approved plans (the API caps at 5/call). */
+export async function applyReconcilePlans(): Promise<{ applied: string[]; failed: string[]; cap: number }> {
+  return request<{ applied: string[]; failed: string[]; cap: number }>("/reconcile/apply", undefined, {
     method: "POST",
     headers: { "content-type": "application/json" },
   });

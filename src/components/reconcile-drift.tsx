@@ -20,10 +20,44 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
-import { useReconcileDrift, triggerReconcile } from "@/lib/client";
+import { mutate } from "swr";
+
+import {
+  useReconcileDrift,
+  useReconcilePlan,
+  triggerReconcile,
+  approveReconcilePlan,
+  rejectReconcilePlan,
+  applyReconcilePlans,
+} from "@/lib/client";
 import { useAuth } from "@/components/auth-provider";
 import { formatRelative } from "@/lib/format";
-import type { DriftRow, DriftType } from "@/lib/types";
+import type { DriftRow, DriftType, ReconcileApplyPlanItem } from "@/lib/types";
+
+// ── Reconcile-apply Phase 0 (DRY-RUN): the read-only "what apply WOULD do" preview per drift row. status
+//    pending = needs a future human approval; auto = already auto-applied (#144); blocked = a forbidden
+//    redaction-strip (rendered loudly); noop = nothing to apply. NO approve/reject controls this phase.
+function PlanPreview({ plan }: { plan: ReconcileApplyPlanItem }) {
+  const blocked = plan.status === "blocked";
+  const badge =
+    blocked ? "🚫 BLOCKED" : plan.status === "auto" ? "auto (#144)" : plan.status === "noop" ? "no-op" : "would apply (needs approval)";
+  return (
+    <div
+      className={`mt-1.5 rounded border px-2 py-1.5 text-[12px] ${
+        blocked
+          ? "border-[var(--color-danger)] bg-[var(--color-danger-bg,rgba(220,38,38,0.06))] text-[var(--color-danger)]"
+          : "border-[var(--color-border)] text-[var(--color-ink-dim)]"
+      }`}
+      data-testid="apply-plan"
+      data-plan-status={plan.status}
+    >
+      <span className="font-medium">{badge}:</span> {plan.plan.summary}
+      {blocked && plan.plan.blockedReason ? (
+        <span className="mt-0.5 block text-[11px]">{plan.plan.blockedReason}</span>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * Cross-link to the spec catalog (Phase 13) — the browse home for ALL specs, where this focused drift
@@ -107,8 +141,25 @@ function DriftPill({ type }: { type: DriftType }) {
   );
 }
 
-function DriftRowItem({ row }: { row: DriftRow }) {
+function DriftRowItem({
+  row,
+  plan,
+  canWrite,
+  busy,
+  onApprove,
+  onReject,
+}: {
+  row: DriftRow;
+  plan?: ReconcileApplyPlanItem;
+  canWrite?: boolean;
+  busy?: boolean;
+  onApprove?: (sourceKey: string, driftType: string) => void;
+  onReject?: (sourceKey: string, driftType: string) => void;
+}) {
   const fields = row.drift_type === "changed" ? changedFields(row) : [];
+  // ★ Phase 1: a PENDING plan gets per-row Approve/Reject (editor-only). A blocked/auto/noop/approved/applied
+  //    plan shows NO approve control (blocked can never be approved — the B10 fail-safe).
+  const canDecide = canWrite && plan?.status === "pending";
   return (
     <div
       className="flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:items-start sm:gap-3"
@@ -122,6 +173,27 @@ function DriftRowItem({ row }: { row: DriftRow }) {
           {row.source_key}
         </span>
         <p className="mt-0.5 text-[13px] text-[var(--color-ink-dim)]">{summarize(row)}</p>
+        {plan ? <PlanPreview plan={plan} /> : null}
+        {canDecide && (
+          <div className="mt-1.5 flex gap-2" data-testid="plan-decide">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onApprove?.(row.source_key, row.drift_type)}
+              className="rounded border border-[var(--color-brand)] px-2 py-0.5 text-[12px] font-medium text-[var(--color-brand)] hover:bg-[color-mix(in_srgb,var(--color-brand)_10%,transparent)] disabled:opacity-50"
+            >
+              Approve
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onReject?.(row.source_key, row.drift_type)}
+              className="rounded border border-[var(--color-border)] px-2 py-0.5 text-[12px] text-[var(--color-ink-dim)] hover:bg-[var(--color-surface-2)] disabled:opacity-50"
+            >
+              Reject
+            </button>
+          </div>
+        )}
         {fields.length > 0 && (
           <ul className="mt-1.5 space-y-1">
             {fields.map((f) => (
@@ -148,6 +220,9 @@ export function ReconcileDriftSurface() {
   const [reconciling, setReconciling] = useState(false);
   const [triggerError, setTriggerError] = useState<string | null>(null);
   const { data } = useReconcileDrift({ reconciling });
+  // The DRY-RUN apply plan (Phase 0), keyed by `${drift_type}:${source_key}` to attach to each drift row.
+  const { data: planData } = useReconcilePlan({ reconciling });
+  const planByKey = new Map((planData?.items ?? []).map((p) => [`${p.drift_type}:${p.source_key}`, p]));
   const baseline = useRef<string | null>(null); // detected_at captured at trigger time
   const detectedAt = data?.detected_at ?? null;
 
@@ -176,12 +251,57 @@ export function ReconcileDriftSurface() {
     }
   }
 
+  // ── Phase 1: approve / reject (per row) + APPLY approved. `busy` serializes the buttons; after any
+  //    mutation we revalidate the plan + drift snapshots so the UI reflects the new status.
+  const [busy, setBusy] = useState(false);
+  const approvedCount = (planData?.items ?? []).filter((p) => p.status === "approved").length;
+  const refreshReconcile = () =>
+    Promise.all([mutate(["reconcile-plan"]), mutate(["reconcile-drift"])]);
+
+  async function handleDecide(action: "approve" | "reject", sourceKey: string, driftType: string) {
+    setTriggerError(null);
+    setBusy(true);
+    try {
+      await (action === "approve" ? approveReconcilePlan : rejectReconcilePlan)(sourceKey, driftType);
+      await refreshReconcile();
+    } catch {
+      setTriggerError(`Couldn't ${action} ${sourceKey} — try again.`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleApply() {
+    setTriggerError(null);
+    setBusy(true);
+    try {
+      const res = await applyReconcilePlans(); // the API caps at 5/call; safe to repeat for more
+      await refreshReconcile();
+      if (res.failed.length > 0) setTriggerError(`${res.failed.length} plan(s) failed to apply — left approved for retry.`);
+    } catch {
+      setTriggerError("Couldn't apply the approved plans — try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const reconcileControl = canWrite ? (
     <div className="flex items-center gap-2">
       {triggerError && (
         <span data-testid="reconcile-error" className="text-[12px]" style={{ color: "var(--color-fail)" }}>
           {triggerError}
         </span>
+      )}
+      {approvedCount > 0 && (
+        <button
+          type="button"
+          onClick={handleApply}
+          disabled={busy}
+          data-testid="reconcile-apply"
+          className="rounded-md border border-[var(--color-brand)] bg-[var(--color-brand)] px-2.5 py-1 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-60"
+        >
+          {busy ? "Applying…" : `Apply approved (${approvedCount})`}
+        </button>
       )}
       <button
         type="button"
@@ -262,7 +382,15 @@ export function ReconcileDriftSurface() {
           </p>
           <div className="mt-1 divide-y divide-[var(--color-border)]">
             {config.map((r) => (
-              <DriftRowItem key={`${r.drift_type}:${r.source_key}`} row={r} />
+              <DriftRowItem
+                key={`${r.drift_type}:${r.source_key}`}
+                row={r}
+                plan={planByKey.get(`${r.drift_type}:${r.source_key}`)}
+                canWrite={canWrite}
+                busy={busy}
+                onApprove={(sk, dt) => handleDecide("approve", sk, dt)}
+                onReject={(sk, dt) => handleDecide("reject", sk, dt)}
+              />
             ))}
           </div>
         </div>

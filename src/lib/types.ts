@@ -655,6 +655,30 @@ export interface ReconcileDrift {
   detected_at: string | null;
 }
 
+// ─── reconcile apply plan (GET /api/reconcile/plan — reconcile-apply Phase 0, DRY-RUN) ────────────
+/** Disposition of a planned change. pending = needs a Phase-1 human approval; auto = already auto-applied
+ *  (#144); blocked = a forbidden redaction-strip; noop = nothing to apply (orphan). */
+export type PlanStatus = "pending" | "auto" | "blocked" | "noop" | "approved" | "rejected" | "applied";
+
+/** One drift's dry-run apply plan (read-only preview — nothing is applied this phase). */
+export interface ReconcileApplyPlanItem {
+  source_key: string;
+  drift_type: DriftType;
+  status: PlanStatus;
+  plan: {
+    summary: string;
+    disposition: string;
+    statements: { purpose: string; text: string; values?: unknown[]; regions?: string[] }[];
+    blockedReason?: string;
+  };
+  computed_at: string;
+}
+
+export interface ReconcileApplyPlan {
+  items: ReconcileApplyPlanItem[];
+  computed_at: string | null;
+}
+
 // ─── spec catalog (GET /api/specs, Phase 13 — read-only inventory) ────────────
 /**
  * Coverage state of a spec, derived from whether a check is bound to it (by source_key):
