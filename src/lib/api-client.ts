@@ -1163,6 +1163,33 @@ export async function triggerReconcile(): Promise<{ triggered: boolean }> {
   });
 }
 
+// ─── reconcile-apply Phase 1 (approve / reject / APPLY — editor-only; the API gates + audits) ──────
+/** POST /api/reconcile/approve — pending → approved. A blocked plan returns 4xx (can't be approved). */
+export async function approveReconcilePlan(sourceKey: string, driftType: string): Promise<void> {
+  await request<unknown>("/reconcile/approve", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sourceKey, driftType }),
+  });
+}
+
+/** POST /api/reconcile/reject — pending → rejected. */
+export async function rejectReconcilePlan(sourceKey: string, driftType: string): Promise<void> {
+  await request<unknown>("/reconcile/reject", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sourceKey, driftType }),
+  });
+}
+
+/** POST /api/reconcile/apply — execute the approved plans (the API caps at 5/call). */
+export async function applyReconcilePlans(): Promise<{ applied: string[]; failed: string[]; cap: number }> {
+  return request<{ applied: string[]; failed: string[]; cap: number }>("/reconcile/apply", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+  });
+}
+
 // ─── spec catalog (Phase 13 — read-only inventory) ───────────────────────────
 // GET /api/specs serves the runner-owned spec_catalog snapshot LEFT JOINed to checks (coverage + health),
 // mirroring the reconcile read path. FLAGGED DEP: a 404 (endpoint not deployed yet) → null, so the catalog

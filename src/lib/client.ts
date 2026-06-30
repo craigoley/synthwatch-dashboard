@@ -49,6 +49,9 @@ import {
   getReconcileDrift,
   getReconcilePlan,
   triggerReconcile,
+  approveReconcilePlan,
+  rejectReconcilePlan,
+  applyReconcilePlans,
   getSpecCatalog,
   listEditors,
   addEditor as apiAddEditor,
@@ -415,7 +418,7 @@ export { sendChannelTest, getChannelTestStatus };
 export { runCheckNow };
 
 // "Reconcile now": POST → 202 { triggered }; the off-cron job re-syncs the drift snapshot (detected_at advances).
-export { triggerReconcile };
+export { triggerReconcile, approveReconcilePlan, rejectReconcilePlan, applyReconcilePlans };
 
 /** Revalidate a check's run-history (all date-range pages) — call after triggering an on-demand run
  *  so the new run shows up live. Matches the useRunHistory cache key ["run-history", checkId, …]. */
