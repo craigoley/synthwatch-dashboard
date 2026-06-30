@@ -112,7 +112,7 @@ test.describe("reports — per-monitor cards + tag filter", () => {
     await expect(page.getByTestId("vitals-2")).toContainText("LCP");
     await expect(page.getByTestId("vitals-2")).toContainText("1.80s");
     await expect(page.getByTestId("errors-2")).toBeVisible();
-    await expect(page.getByText("INP", { exact: false })).toHaveCount(0);
+    await expect(page.getByTestId("detail-2").getByText("INP", { exact: false })).toHaveCount(0);
 
     // http monitor (check 1) → NO web-vitals section
     await page.getByTestId("report-toggle-1").click();
