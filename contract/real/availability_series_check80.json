@@ -1,0 +1,180 @@
+{
+  "window": "7d",
+  "bucket": "6h",
+  "points": [
+    {
+      "ts": "2026-06-23T11:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-23T17:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-23T23:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-24T05:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-24T11:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-24T17:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-24T23:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-25T05:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-25T11:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-25T17:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-25T23:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-26T05:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-26T11:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-26T17:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-26T23:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-27T05:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-27T11:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-27T17:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-27T23:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-28T05:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-28T11:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-28T17:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-28T23:59:44.397879+00:00",
+      "availabilityPct": 0.0,
+      "upRuns": 0,
+      "downRuns": 31
+    },
+    {
+      "ts": "2026-06-29T05:59:44.397879+00:00",
+      "availabilityPct": 0.0,
+      "upRuns": 0,
+      "downRuns": 38
+    },
+    {
+      "ts": "2026-06-29T11:59:44.397879+00:00",
+      "availabilityPct": 0.0,
+      "upRuns": 0,
+      "downRuns": 43
+    },
+    {
+      "ts": "2026-06-29T17:59:44.397879+00:00",
+      "availabilityPct": 50.0,
+      "upRuns": 18,
+      "downRuns": 18
+    },
+    {
+      "ts": "2026-06-29T23:59:44.397879+00:00",
+      "availabilityPct": 100.0,
+      "upRuns": 51,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-30T05:59:44.397879+00:00",
+      "availabilityPct": 100.0,
+      "upRuns": 57,
+      "downRuns": 0
+    },
+    {
+      "ts": "2026-06-30T11:59:44.397879+00:00",
+      "availabilityPct": null,
+      "upRuns": 0,
+      "downRuns": 0
+    }
+  ]
+}

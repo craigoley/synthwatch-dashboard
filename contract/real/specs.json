@@ -1,6 +1,35 @@
 {
   "items": [
     {
+      "sourceKey": "meals2go-cheese-pizza-cart",
+      "name": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
+      "specPath": "monitors/wegmans/meals2go-cheese-pizza-cart.spec.ts",
+      "kind": "browser",
+      "target": "https://www.meals2go.com",
+      "suggestedIntervalSeconds": 1800,
+      "tags": [
+        "meals2go",
+        "ecommerce",
+        "cart",
+        "carryout",
+        "journey"
+      ],
+      "description": "Recon-first carry-out cheese-pizza flow: establish CARRY OUT fulfillment (Buffalo, NY \u2192 McKinley store), open the takeout Pizza menu, add a cheese pizza to the cart, assert the line item via the cart-items API, then self-clean by removing it. Cart-mutating + store-session bearing; enabledByDefault:false. B10-compliant (sensitive + redact_patterns) but NOT yet enabled (no check_locations row).",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": true,
+      "checkId": 80,
+      "checkName": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
+      "enabled": true,
+      "health": {
+        "currentStatus": "pass",
+        "p95Ms": 52150.7,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-06-30T11:56:03.015405+00:00"
+      }
+    },
+    {
       "sourceKey": "synthwatch-self-homepage",
       "name": "SynthWatch dashboard homepage",
       "specPath": "monitors/synthwatch/dashboard-homepage.spec.ts",
@@ -23,6 +52,56 @@
       "health": null
     },
     {
+      "sourceKey": "wegmans-homepage-load",
+      "name": "Wegmans: homepage load",
+      "specPath": "monitors/wegmans/homepage-load.spec.ts",
+      "kind": "browser",
+      "target": "https://www.wegmans.com",
+      "suggestedIntervalSeconds": 900,
+      "tags": [
+        "wegmans",
+        "smoke",
+        "homepage"
+      ],
+      "description": "Load wegmans.com and assert the homepage renders with core navigation and shopping content.",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": false,
+      "checkId": null,
+      "checkName": null,
+      "enabled": null,
+      "health": null
+    },
+    {
+      "sourceKey": "wegmans-meals2go-homepage",
+      "name": "Meals 2 Go: homepage load",
+      "specPath": "monitors/wegmans/meals2go-homepage.spec.ts",
+      "kind": "browser",
+      "target": "https://www.meals2go.com",
+      "suggestedIntervalSeconds": 900,
+      "tags": [
+        "wegmans",
+        "meals2go",
+        "smoke",
+        "homepage"
+      ],
+      "description": "Load meals2go.com and assert the Meals 2 Go homepage renders with ordering UI.",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": true,
+      "checkId": 81,
+      "checkName": "Meals 2 Go: homepage load",
+      "enabled": true,
+      "health": {
+        "currentStatus": "pass",
+        "p95Ms": 10639,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-06-30T11:55:21.016865+00:00"
+      }
+    },
+    {
       "sourceKey": "wegmans-recipe-nav",
       "name": "Wegmans: recipe navigation",
       "specPath": "monitors/wegmans/recipe-nav.spec.ts",
@@ -36,6 +115,34 @@
         "journey"
       ],
       "description": "Navigate Meals & Recipes \u2192 Courses \u2192 Dinner \u2192 the cauliflower-crust pesto pizza recipe, assert the recipe loads.",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": true,
+      "checkId": 77,
+      "checkName": "Wegmans: recipe navigation",
+      "enabled": true,
+      "health": {
+        "currentStatus": "pass",
+        "p95Ms": 39028.7,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-06-30T11:55:29.631773+00:00"
+      }
+    },
+    {
+      "sourceKey": "wegmans-recipe-search",
+      "name": "Wegmans: recipe search",
+      "specPath": "monitors/wegmans/recipe-search.spec.ts",
+      "kind": "browser",
+      "target": "https://www.wegmans.com",
+      "suggestedIntervalSeconds": 1800,
+      "tags": [
+        "wegmans",
+        "recipes",
+        "search",
+        "journey"
+      ],
+      "description": "Search for chicken recipes, open the first result, assert the recipe detail page loads.",
       "enabledByDefault": false,
       "runnable": true,
       "notRunnableReason": null,
@@ -67,12 +174,58 @@
       "checkName": "Wegmans: search \u2192 product page",
       "enabled": true,
       "health": {
-        "currentStatus": "error",
-        "p95Ms": 1172.35,
-        "openIncidentCount": 1,
-        "lastRunAt": "2026-06-26T01:40:19.545673+00:00"
+        "currentStatus": "pass",
+        "p95Ms": 23102.6,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-06-30T11:56:22.892559+00:00"
       }
+    },
+    {
+      "sourceKey": "wegmans-shop-category-browse",
+      "name": "Wegmans: shop category browse",
+      "specPath": "monitors/wegmans/shop-category-browse.spec.ts",
+      "kind": "browser",
+      "target": "https://www.wegmans.com",
+      "suggestedIntervalSeconds": 1800,
+      "tags": [
+        "wegmans",
+        "ecommerce",
+        "browse",
+        "journey"
+      ],
+      "description": "Browse the Beverages department, open the first product, assert the product detail loads.",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": false,
+      "checkId": null,
+      "checkName": null,
+      "enabled": null,
+      "health": null
+    },
+    {
+      "sourceKey": "wegmans-store-locator",
+      "name": "Wegmans: store locator",
+      "specPath": "monitors/wegmans/store-locator.spec.ts",
+      "kind": "browser",
+      "target": "https://www.wegmans.com",
+      "suggestedIntervalSeconds": 1800,
+      "tags": [
+        "wegmans",
+        "stores",
+        "locator",
+        "journey"
+      ],
+      "description": "Open the store locator, search for Buffalo NY, assert at least one store result appears.",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": false,
+      "checkId": null,
+      "checkName": null,
+      "enabled": null,
+      "health": null
     }
   ],
-  "probedAt": "2026-06-26T01:00:18.265247+00:00"
+  "probedAt": "2026-06-30T11:00:18.700819+00:00"
 }
