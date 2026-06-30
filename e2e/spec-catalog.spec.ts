@@ -99,7 +99,7 @@ function worldWithCatalog() {
 test.describe("phase 13 — spec catalog (read-only)", () => {
   test("renders BOTH status dimensions: coverage and runnable, independently", async ({ page }) => {
     await mockApi(page, worldWithCatalog());
-    await page.goto("/specs");
+    await page.goto("/specs?view=all"); // active/paused rows are hidden by the default "not set up" view
 
     const catalog = page.getByTestId("spec-catalog");
     await expect(catalog).toBeVisible();
@@ -133,7 +133,7 @@ test.describe("phase 13 — spec catalog (read-only)", () => {
 
   test("Active row: health (status dot + p95) and a link to the live monitor", async ({ page }) => {
     await mockApi(page, worldWithCatalog());
-    await page.goto("/specs");
+    await page.goto("/specs?view=all"); // the active row is hidden by the default "not set up" view
 
     const active = page.getByTestId("spec-row-active-spec");
     await expect(active).toContainText("4.20s"); // p95 health
@@ -178,5 +178,66 @@ test.describe("phase 13 — spec catalog (read-only)", () => {
     await expect(link).toBeVisible();
     await expect(link).toContainText("2 specs unmonitored");
     await expect(link).toHaveAttribute("href", "/specs");
+  });
+});
+
+// ★ Catalog filtering/sorting: DEFAULT = not-set-up; toggle = all; sort + bare-string tag filter; URL-sync.
+test.describe("phase 13 — spec catalog filters", () => {
+  test("defaults to the not-set-up specs with a clear count; active/paused hidden", async ({ page }) => {
+    await mockApi(page, worldWithCatalog());
+    await page.goto("/specs");
+
+    // Fixture: 5 specs, 2 unmonitored (unmon-spec, orphan-spec), 3 monitored.
+    await expect(page.getByTestId("spec-count")).toContainText("Showing 2 not set up of 5");
+    await expect(page.getByTestId("view-unmonitored")).toContainText("Not set up (2)");
+    await expect(page.getByTestId("view-all")).toContainText("All (5)");
+    // only the unmonitored rows render
+    await expect(page.getByTestId("spec-row-unmon-spec")).toBeVisible();
+    await expect(page.getByTestId("spec-row-orphan-spec")).toBeVisible();
+    await expect(page.getByTestId("spec-row-active-spec")).toHaveCount(0);
+    await expect(page.getByTestId("spec-row-paused-spec")).toHaveCount(0);
+    // sort/tag controls are hidden in the focused not-set-up view
+    await expect(page.getByTestId("spec-tag-filter")).toHaveCount(0);
+  });
+
+  test("the 'All' toggle reveals every spec; the tag filter (bare-string AND) narrows it", async ({ page }) => {
+    await mockApi(page, worldWithCatalog());
+    await page.goto("/specs");
+
+    await page.getByTestId("view-all").click();
+    await expect(page.getByTestId("spec-row-active-spec")).toBeVisible();
+    await expect(page.getByTestId("spec-row-paused-spec")).toBeVisible();
+    await expect(page.getByTestId("spec-count")).toContainText("of 5");
+
+    // active-spec carries tags ["a","journey"]; the others carry none → filtering "journey" leaves only it
+    await page.getByTestId("spec-tag-journey").click();
+    await expect(page.getByTestId("spec-row-active-spec")).toBeVisible();
+    await expect(page.getByTestId("spec-row-paused-spec")).toHaveCount(0);
+    await expect(page.getByTestId("spec-row-unmon-spec")).toHaveCount(0);
+    // ★ URL reflects the shareable state
+    await expect(page).toHaveURL(/[?&]view=all/);
+    await expect(page).toHaveURL(/[?&]tags=journey/);
+  });
+
+  test("a shared ?view=all&tags=journey URL restores the filtered view", async ({ page }) => {
+    await mockApi(page, worldWithCatalog());
+    await page.goto("/specs?view=all&tags=journey");
+
+    await expect(page.getByTestId("spec-row-active-spec")).toBeVisible();
+    await expect(page.getByTestId("spec-row-paused-spec")).toHaveCount(0);
+    // the tag chip shows as selected
+    await expect(page.getByTestId("spec-tag-journey")).toHaveAttribute("aria-checked", "true");
+  });
+
+  test("empty not-set-up → clean 'all monitors are set up' (not a blank list)", async ({ page }) => {
+    const w = worldWithCatalog();
+    // make every spec monitored → nothing is "not set up"
+    w.specCatalog!.items = w.specCatalog!.items.map((it) => ({ ...it, monitored: true, checkId: 9, enabled: true }));
+    await mockApi(page, w);
+    await page.goto("/specs");
+
+    await expect(page.getByText("All monitors are set up.")).toBeVisible();
+    await expect(page.getByTestId("spec-catalog")).toHaveCount(0); // no table, but the toggle/count still show
+    await expect(page.getByTestId("view-all")).toBeVisible();
   });
 });
