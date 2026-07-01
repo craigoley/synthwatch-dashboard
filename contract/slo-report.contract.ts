@@ -27,7 +27,8 @@ async function withResponse<T>(body: unknown, status: number, fn: () => Promise<
 const BODY = {
   window: "30d",
   items: [
-    { checkId: 1, checkName: "API health", kind: "http", target: 0.99, budget: 100, consumed: 90, remaining: 10, remainingPct: 0.1, burnRate: 1.4, completedRuns: 500, insufficientData: false },
+    { checkId: 1, checkName: "API health", kind: "http", target: 0.99, budget: 100, consumed: 90, remaining: 10, remainingPct: 0.1, burnRate: 1.4, burnState: "fast", reportedBurn: 20, completedRuns: 500, insufficientData: false },
+    // ★ item WITHOUT burnState/reportedBurn (older API / thin row) → the mapper must null-safe default to none/0.
     { checkId: 3, checkName: "TLS cert", kind: "ssl", target: 0.999, budget: 50, consumed: 0, remaining: 50, remainingPct: null, burnRate: null, completedRuns: 3, insufficientData: true },
   ],
   fleet: { budget: 150, consumed: 90, remaining: 60, remainingPct: 0.4, insufficientData: false },
@@ -62,6 +63,11 @@ test.describe("API contract — fleet SLO report (/reports/slo)", () => {
     expect(r.items[1]!.burn_rate).toBeNull();
     expect(r.fleet!.remaining_pct).toBe(0.4);
     expect(r.fleet!.consumed).toBe(90);
+    // ★ P5 PR2 — the location-aware burn STATE maps through; a row missing the fields null-safe-defaults.
+    expect(r.items[0]!.burn_state).toBe("fast");
+    expect(r.items[0]!.reported_burn).toBe(20);
+    expect(r.items[1]!.burn_state).toBe("none"); // absent burnState → 'none', never undefined/crash
+    expect(r.items[1]!.reported_burn).toBe(0);
   });
 
   test("★ 404 (endpoint not deployed yet) → null, never throws — the section hides gracefully", async () => {

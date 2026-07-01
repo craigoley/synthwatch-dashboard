@@ -1708,6 +1708,9 @@ export async function getSloReport(window: ReportWindow, tags: Tag[] = []): Prom
     remaining: num(r.remaining),
     remaining_pct: nullable(r.remainingPct),
     burn_rate: nullable(r.burnRate),
+    // ★ P5 PR2 — null-safe: default to 'none'/0 if the field is absent (older API / the .tone-crash lesson).
+    burn_state: (r.burnState === "fast" || r.burnState === "slow" ? r.burnState : "none") as SloReport["items"][number]["burn_state"],
+    reported_burn: num(r.reportedBurn),
     completed_runs: num(r.completedRuns),
     insufficient_data: Boolean(r.insufficientData),
   }));
