@@ -19,7 +19,36 @@ import type { MetricPoint, Run, SlaWindow, WebVitals, ReportSeriesPoint } from "
 import { formatBytes, formatCount, formatDuration } from "@/lib/format";
 import { TONE_VAR } from "@/components/status-badge";
 import { cwvTone } from "@/lib/status";
-import { useAvailabilitySeries, useIncidents } from "@/lib/client";
+import { useAvailabilitySeries, useIncidents, useDeploys } from "@/lib/client";
+
+// ★ Deploy-marker overlay (deploy-markers v1). A custom hook (always called — never conditionally) → the
+// deploys within the chart's [tsMin,tsMax]. Null-safe: no host / endpoint-absent (null) / no deploys → [].
+interface DeployMark { ts: number; label: string; source: string }
+function useDeployMarks(host: string | undefined, tsMin: number | undefined, tsMax: number | undefined): DeployMark[] {
+  const { data } = useDeploys(host ?? null, "90d"); // widest window; filtered to the chart range below
+  if (!host || tsMin == null || tsMax == null) return [];
+  return (data?.deploys ?? [])
+    .map((d) => ({
+      ts: new Date(d.deployed_at).getTime(),
+      // is_sha → the short commit; a non-commit marker (etag) is labelled "deploy", never a fake sha.
+      label: d.is_sha && d.sha ? d.sha.slice(0, 7) : "deploy",
+      source: d.source,
+    }))
+    .filter((m) => Number.isFinite(m.ts) && m.ts >= tsMin && m.ts <= tsMax);
+}
+
+// recharts needs ReferenceLines as direct children → a render helper returning the array (not a component).
+function deployRefLines(marks: DeployMark[]) {
+  return marks.map((m, i) => (
+    <ReferenceLine
+      key={`deploy-${m.ts}-${i}`}
+      x={m.ts}
+      stroke="var(--color-brand)"
+      strokeDasharray="2 2"
+      label={{ value: m.label, fontSize: 9, fill: "var(--color-brand)", position: "insideBottomLeft" }}
+    />
+  ));
+}
 
 const AXIS = "#5d6b77";
 const GRID = "rgba(255,255,255,0.05)";
@@ -93,11 +122,13 @@ function ChartCard({
 }
 
 /** Latency-over-time area chart from run durations. */
-export function LatencyChart({ runs }: { runs: Run[] }) {
+export function LatencyChart({ runs, host }: { runs: Run[]; host?: string }) {
   const data = runs
     .filter((r) => r.duration_ms !== null)
     .map((r) => ({ ts: new Date(r.started_at).getTime(), duration: r.duration_ms as number }))
     .sort((a, b) => a.ts - b.ts);
+  // Hook called unconditionally (before the empty-data return) — deploy verticals within the chart's range.
+  const deployMarks = useDeployMarks(host, data[0]?.ts, data[data.length - 1]?.ts);
 
   if (data.length === 0) {
     return (
@@ -132,6 +163,7 @@ export function LatencyChart({ runs }: { runs: Run[] }) {
           />
           <YAxis stroke={AXIS} tick={{ fontSize: 10 }} tickFormatter={(v) => formatDuration(v)} width={56} />
           <Tooltip content={<ChartTooltip fmt={formatDuration} />} />
+          {deployRefLines(deployMarks)}
           <Area
             type="monotone"
             dataKey="duration"
@@ -160,7 +192,7 @@ const pctTip = (v: number | null) => (v == null ? "no data" : `${v.toFixed(2)}%`
  *  • null buckets are a GAP in the line (connectNulls=false), not a 0% drop.
  *  • the check's incidents are overlaid as red markers at their open time.
  */
-export function AvailabilityChart({ checkId }: { checkId: number }) {
+export function AvailabilityChart({ checkId, host }: { checkId: number; host?: string }) {
   const [win, setWin] = useState<SlaWindow>("24h");
   const { data, isLoading } = useAvailabilitySeries(checkId, win);
   const { data: incidents } = useIncidents();
@@ -181,6 +213,7 @@ export function AvailabilityChart({ checkId }: { checkId: number }) {
           .map((i) => ({ id: i.id, ts: new Date(i.opened_at).getTime() }))
           .filter((m) => m.ts >= tsMin && m.ts <= tsMax)
       : [];
+  const deployMarks = useDeployMarks(host, tsMin, tsMax);
 
   const toggle = (
     <div className="inline-flex rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5">
@@ -232,6 +265,7 @@ export function AvailabilityChart({ checkId }: { checkId: number }) {
                 label={{ value: `#${m.id}`, fontSize: 9, fill: "var(--color-fail)", position: "insideTopRight" }}
               />
             ))}
+            {deployRefLines(deployMarks)}
             <Line
               type="monotone"
               dataKey="pct"

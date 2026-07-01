@@ -82,6 +82,8 @@ export interface World {
   tags?: RawObj[];
   /** Reports served? false → /reports/* 404 (endpoint not deployed). Default true. */
   reportsServed?: boolean;
+  /** Deploy markers (deploy-markers v1) returned by GET /reports/deploys. Default: none. */
+  deploys?: RawObj[];
   /** Chat-to-prefill: set false to make /checks/parse-intent report unconfigured (the input hides). */
   parseIntentConfigured?: boolean;
   /** Fleet SLO report: which check ids have an SLO target (default [1,3]); which are "building baseline". */
@@ -609,6 +611,14 @@ export async function mockApi(
     }
     // Fleet SLO / error-budget (P5 v1) — per-check budget rows + a fleet rollup, tag-responsive. sloCheckIds =
     // which checks have an SLO target; sloBuildingIds = insufficient_data ("building baseline", null remaining).
+    // Deploy markers (deploy-markers v1) — GET /reports/deploys?host=&window=. Echoes the host; serves
+    // world.deploys (default none). reportsServed=false → 404 (endpoint/table not present → no overlay).
+    if (path === "/api/reports/deploys" && method === "GET") {
+      if (world.reportsServed === false) return json(route, { error: "not_found" }, 404);
+      const host = url.searchParams.get("host") ?? "";
+      return json(route, { host, window: url.searchParams.get("window") ?? "30d", deploys: world.deploys ?? [] });
+    }
+
     if (path === "/api/reports/slo" && method === "GET") {
       if (world.reportsServed === false) return json(route, { error: "not_found" }, 404);
       const win = url.searchParams.get("window") ?? "30d";

@@ -60,6 +60,7 @@ import type {
   CheckDetail,
   CheckKind,
   SloReport,
+  DeploysReport,
   MttrReport,
   DnsRecordType,
   ParseIntentResult,
@@ -1690,6 +1691,25 @@ export async function getSla(window: SlaWindow = "24h"): Promise<SlaResponse> {
 // GET /api/reports/slo?window=&tag= (P5 v1, companion API PR). Fleet error-budget — per-check budget rows +
 // a fleet rollup, mirroring /sla (items + fleet + insufficient_data). Budget accounting only; burn_rate is
 // informational. ★ Maps ALL rows (the map-all lesson) + composes with the ?tag= filter (undefined when empty).
+// GET /api/reports/deploys?host=&window= (deploy-markers v1). Auto-detected deploy markers for a host, for the
+// chart overlay. ★ null-safe: no host → null; maps ALL rows; sha stays null for a non-commit marker (honest).
+export async function getDeploys(host: string, window: ReportWindow = "30d"): Promise<DeploysReport | null> {
+  if (!host) return null;
+  let raw: Record<string, unknown>;
+  try {
+    raw = await request<Record<string, unknown>>("/reports/deploys", { host, window });
+  } catch {
+    return null; // endpoint not deployed / deploys table not migrated yet → no overlay
+  }
+  const deploys = ((raw?.deploys as Record<string, unknown>[]) ?? []).map((d) => ({
+    sha: d.sha == null ? null : String(d.sha),
+    is_sha: Boolean(d.isSha),
+    source: String(d.source ?? ""),
+    deployed_at: String(d.deployedAt ?? ""),
+  }));
+  return { host: String(raw?.host ?? host), window: String(raw?.window ?? window), deploys };
+}
+
 export async function getSloReport(window: ReportWindow, tags: Tag[] = []): Promise<SloReport | null> {
   let raw: Record<string, unknown>;
   try {

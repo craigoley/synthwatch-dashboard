@@ -487,6 +487,23 @@ export interface SloReport {
 }
 
 /**
+ * Auto-detected deploy markers (GET /reports/deploys, deploy-markers v1) — overlaid as ReferenceLines on the
+ * time-series charts. sha is null for a non-commit marker (etag/build-id): the UI labels it "deploy" honestly,
+ * never a fake sha (is_sha drives that).
+ */
+export interface DeployMarker {
+  sha: string | null;
+  is_sha: boolean;
+  source: string;
+  deployed_at: string;
+}
+export interface DeploysReport {
+  host: string;
+  window: string;
+  deploys: DeployMarker[];
+}
+
+/**
  * Fleet MTTR / incident analytics (GET /reports/mttr, §A5). MTTR = time-to-resolve over RESOLVED incidents;
  * open incidents are EXCLUDED from the mean/median but COUNTED (open_count). mean_seconds/median_seconds are
  * null on insufficient data — never 0 (0 would read as "instant recovery"). mttd_proxy_seconds is a
