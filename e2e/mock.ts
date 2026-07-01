@@ -84,6 +84,9 @@ export interface World {
   reportsServed?: boolean;
   /** Chat-to-prefill: set false to make /checks/parse-intent report unconfigured (the input hides). */
   parseIntentConfigured?: boolean;
+  /** Fleet SLO report: which check ids have an SLO target (default [1,3]); which are "building baseline". */
+  sloCheckIds?: number[];
+  sloBuildingIds?: number[];
   /** Successive GET /checks/{id} bodies for live-run polling tests: each poll advances; the last repeats.
    *  e.g. [runningDetail, passDetail] → the page shows 'running', then 'pass', via polling (no reload). */
   detailSequence?: Record<number, RawObj[]>;
@@ -601,6 +604,43 @@ export async function mockApi(
           { classification: "flaky-transient", count: 1, share: round(1 / (n + 1)) },
         ],
       });
+    }
+    // Fleet SLO / error-budget (P5 v1) — per-check budget rows + a fleet rollup, tag-responsive. sloCheckIds =
+    // which checks have an SLO target; sloBuildingIds = insufficient_data ("building baseline", null remaining).
+    if (path === "/api/reports/slo" && method === "GET") {
+      if (world.reportsServed === false) return json(route, { error: "not_found" }, 404);
+      const win = url.searchParams.get("window") ?? "30d";
+      const tagFilter = url.searchParams.getAll("tag");
+      const matches = (c: RawObj) =>
+        tagFilter.every((t) => {
+          const i = t.indexOf(":");
+          return ((c.tags as { key: string; value: string }[]) ?? []).some((tg) => tg.key === t.slice(0, i) && tg.value === t.slice(i + 1));
+        });
+      const sloIds = world.sloCheckIds ?? [1, 3];
+      const buildingIds = world.sloBuildingIds ?? [3];
+      const items = (world.checks ?? [])
+        .filter((c) => sloIds.includes(Number(c.id)) && matches(c))
+        .map((c) => {
+          const id = Number(c.id);
+          const insufficient = buildingIds.includes(id);
+          const budget = 100;
+          const consumed = insufficient ? 0 : (id * 17) % 95; // deterministic; varies remaining_pct so sort reorders
+          const remaining = budget - consumed;
+          return {
+            checkId: id, checkName: c.name, kind: c.kind, target: 0.99, budget, consumed, remaining,
+            remainingPct: insufficient ? null : remaining / budget,
+            burnRate: insufficient ? null : 1.2, // informational, fixed
+            completedRuns: insufficient ? 3 : 500,
+            insufficientData: insufficient,
+          };
+        });
+      const active = items.filter((i) => !i.insufficientData);
+      const fbudget = active.reduce((s, i) => s + i.budget, 0);
+      const fcons = active.reduce((s, i) => s + i.consumed, 0);
+      const fleet = items.length
+        ? { budget: fbudget, consumed: fcons, remaining: fbudget - fcons, remainingPct: fbudget > 0 ? (fbudget - fcons) / fbudget : null, insufficientData: active.length === 0 }
+        : null;
+      return json(route, { window: win, items, fleet });
     }
     // Alerting reads (undefined → 404, exercising the "setup pending" path).
     if (path === "/api/channels" && method === "GET") {
