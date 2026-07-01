@@ -26,6 +26,10 @@ CREATE TABLE reconcile_drift (
     id BIGINT PRIMARY KEY,
     drift_type TEXT NOT NULL CHECK (drift_type IN ('new', 'changed', 'missing', 'orphan', 'redaction_mismatch'))
 );
+CREATE TABLE run_steps (
+    id BIGINT PRIMARY KEY,
+    status TEXT NOT NULL CHECK (status IN ('pass', 'fail', 'error', 'running'))
+);
 `;
 
 function run(schema: string): { code: number; out: string } {
@@ -75,5 +79,18 @@ test.describe("enum-coverage CLI", () => {
     for (const v of ["pass", "warn", "fail", "error", "infra_error", "running"]) {
       expect(runStatusDecl, `RunStatus must cover runs.status '${v}'`).toContain(`"${v}"`);
     }
+  });
+
+  test("RunStepStatus covers run_steps.status (pass/fail/error/running) — the drift-prone RowStatus dup is gone", () => {
+    const types = readFileSync(join(ROOT, "src/lib/types.ts"), "utf8");
+    const stepDecl = types.match(/type RunStepStatus =[^;]*/)?.[0] ?? "";
+    for (const v of ["pass", "fail", "error", "running"]) {
+      expect(stepDecl, `RunStepStatus must cover run_steps.status '${v}'`).toContain(`"${v}"`);
+    }
+    // RowStatus now DERIVES from RunStepStatus (+ UI-only "pending"), so it can't drift from the real statuses.
+    const live = readFileSync(join(ROOT, "src/components/live-steps.tsx"), "utf8");
+    expect(live, "RowStatus derives from RunStepStatus (no independent hardcoded copy)").toMatch(
+      /type RowStatus = RunStepStatus \| "pending"/,
+    );
   });
 });
