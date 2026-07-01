@@ -60,6 +60,7 @@ import type {
   CheckDetail,
   CheckKind,
   SloReport,
+  MttrReport,
   DnsRecordType,
   ParseIntentResult,
   Flow,
@@ -1725,6 +1726,54 @@ export async function getSloReport(window: ReportWindow, tags: Tag[] = []): Prom
       }
     : null;
   return { window, items, fleet };
+}
+
+// GET /api/reports/mttr?window=&tag= (§A5, companion API PR). Fleet incident analytics — MTTR (mean+median
+// over RESOLVED incidents), classification breakdown, trend. ★ Maps ALL rows/buckets (the map-all lesson) +
+// null-safe (mean/median stay null on insufficient data; missing arrays → []). ?tag= composes (undefined when empty).
+export async function getMttrReport(window: ReportWindow, tags: Tag[] = []): Promise<MttrReport | null> {
+  let raw: Record<string, unknown>;
+  try {
+    raw = await request<Record<string, unknown>>("/reports/mttr", { window, tag: tagParams(tags) });
+  } catch {
+    return null; // endpoint not deployed yet (companion API PR) → the section hides gracefully
+  }
+  const num = (v: unknown) => Number(v ?? 0);
+  const nullable = (v: unknown) => (v == null ? null : Number(v));
+  const items = ((raw?.items as Record<string, unknown>[]) ?? []).map((r) => ({
+    check_id: Number(r.checkId),
+    check_name: String(r.checkName ?? ""),
+    kind: (r.kind as MttrReport["items"][number]["kind"]) ?? "http",
+    resolved_count: num(r.resolvedCount),
+    open_count: num(r.openCount),
+    mean_seconds: nullable(r.meanSeconds),
+    median_seconds: nullable(r.medianSeconds),
+    mttd_proxy_seconds: nullable(r.mttdProxySeconds),
+    insufficient_data: Boolean(r.insufficientData),
+  }));
+  const f = raw?.fleet as Record<string, unknown> | null | undefined;
+  const fleet = f
+    ? {
+        resolved_count: num(f.resolvedCount),
+        open_count: num(f.openCount),
+        total_incidents: num(f.totalIncidents),
+        mean_seconds: nullable(f.meanSeconds),
+        median_seconds: nullable(f.medianSeconds),
+        mttd_proxy_seconds: nullable(f.mttdProxySeconds),
+        insufficient_data: Boolean(f.insufficientData),
+      }
+    : null;
+  const classification = ((raw?.classification as Record<string, unknown>[]) ?? []).map((c) => ({
+    classification: String(c.classification ?? "unclassified"),
+    count: num(c.count),
+    pct_of_total: num(c.pctOfTotal),
+  }));
+  const trend = ((raw?.trend as Record<string, unknown>[]) ?? []).map((t) => ({
+    bucket_start: String(t.bucketStart ?? ""),
+    resolved_count: num(t.resolvedCount),
+    mean_seconds: nullable(t.meanSeconds),
+  }));
+  return { window, fleet, items, classification, trend };
 }
 
 interface RawAvailabilityPoint {
