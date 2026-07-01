@@ -3,6 +3,7 @@ import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 
 import { AppShell } from "@/components/app-shell";
 import { AuthProvider } from "@/components/auth-provider";
+import { DebugBreadcrumbs } from "@/components/debug-breadcrumbs";
 import "./globals.css";
 
 const plexSans = IBM_Plex_Sans({
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           <AppShell>{children}</AppShell>
         </AuthProvider>
+        <DebugBreadcrumbs />
       </body>
     </html>
   );

@@ -1,0 +1,56 @@
+import { test, expect } from "@playwright/test";
+
+import { mockApi } from "./mock";
+
+/**
+ * Client breadcrumb panel — the DEBUG-GATED, in-memory error trail. Verifies the two things only a real
+ * browser can: the debug.ts gate hides/shows the panel, and live window errors + unhandled rejections land in
+ * it. (Ring eviction + capture-mapping logic is pinned in the pure-Node contract, breadcrumbs.contract.ts.)
+ */
+test.describe("debug breadcrumbs", () => {
+  test("panel is HIDDEN for normal users (no debug flag)", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/");
+    await expect(page.getByTestId("debug-breadcrumbs")).toHaveCount(0);
+  });
+
+  test("panel SHOWS when gated via ?debug=errors", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/?debug=errors");
+    await expect(page.getByTestId("debug-breadcrumbs")).toBeVisible();
+    await expect(page.getByTestId("debug-breadcrumbs")).toContainText("BREADCRUMBS");
+  });
+
+  test("captures a live window error and an unhandled rejection", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/?debug=errors");
+    await expect(page.getByTestId("debug-breadcrumbs")).toBeVisible();
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new ErrorEvent("error", { message: "boom", error: new Error("live boom") }));
+      window.dispatchEvent(
+        new PromiseRejectionEvent("unhandledrejection", {
+          promise: Promise.resolve(), // resolved: we only read `reason`, avoids a real rejection
+          reason: new Error("live reject"),
+        }),
+      );
+    });
+
+    const log = page.getByTestId("debug-breadcrumbs-log");
+    await expect(log).toContainText("onerror");
+    await expect(log).toContainText("live boom");
+    await expect(log).toContainText("unhandledrejection");
+    await expect(log).toContainText("live reject");
+  });
+
+  test("Clear empties the captured trail", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/?debug=errors");
+    await page.evaluate(() => {
+      window.dispatchEvent(new ErrorEvent("error", { message: "x", error: new Error("to clear") }));
+    });
+    await expect(page.getByTestId("debug-breadcrumbs-log")).toContainText("to clear");
+    await page.getByTestId("debug-breadcrumbs-clear").click();
+    await expect(page.getByText("No client errors captured this session.")).toBeVisible();
+  });
+});
