@@ -59,6 +59,7 @@ import type {
   CheckAuth,
   CheckDetail,
   CheckKind,
+  SloReport,
   DnsRecordType,
   ParseIntentResult,
   Flow,
@@ -1683,6 +1684,44 @@ export async function getSla(window: SlaWindow = "24h"): Promise<SlaResponse> {
     items: (raw.items ?? []).map(mapSla),
     fleet: mapFleet(raw.fleet),
   };
+}
+
+// GET /api/reports/slo?window=&tag= (P5 v1, companion API PR). Fleet error-budget — per-check budget rows +
+// a fleet rollup, mirroring /sla (items + fleet + insufficient_data). Budget accounting only; burn_rate is
+// informational. ★ Maps ALL rows (the map-all lesson) + composes with the ?tag= filter (undefined when empty).
+export async function getSloReport(window: ReportWindow, tags: Tag[] = []): Promise<SloReport | null> {
+  let raw: Record<string, unknown>;
+  try {
+    raw = await request<Record<string, unknown>>("/reports/slo", { window, tag: tagParams(tags) });
+  } catch {
+    return null; // endpoint not deployed yet (companion API PR) → the section hides gracefully
+  }
+  const num = (v: unknown) => Number(v ?? 0);
+  const nullable = (v: unknown) => (v == null ? null : Number(v));
+  const items = ((raw?.items as Record<string, unknown>[]) ?? []).map((r) => ({
+    check_id: Number(r.checkId),
+    check_name: String(r.checkName ?? ""),
+    kind: (r.kind as SloReport["items"][number]["kind"]) ?? "http",
+    target: num(r.target),
+    budget: num(r.budget),
+    consumed: num(r.consumed),
+    remaining: num(r.remaining),
+    remaining_pct: nullable(r.remainingPct),
+    burn_rate: nullable(r.burnRate),
+    completed_runs: num(r.completedRuns),
+    insufficient_data: Boolean(r.insufficientData),
+  }));
+  const f = raw?.fleet as Record<string, unknown> | null | undefined;
+  const fleet = f
+    ? {
+        budget: num(f.budget),
+        consumed: num(f.consumed),
+        remaining: num(f.remaining),
+        remaining_pct: nullable(f.remainingPct),
+        insufficient_data: Boolean(f.insufficientData),
+      }
+    : null;
+  return { window, items, fleet };
 }
 
 interface RawAvailabilityPoint {

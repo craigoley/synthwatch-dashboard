@@ -451,6 +451,38 @@ export interface SlaResponse {
   fleet: SlaFleet | null;
 }
 
+/**
+ * Fleet SLO / error-budget report (GET /reports/slo, P5 v1). Budget ACCOUNTING only — mirrors the SLA report
+ * shape (per-check items + fleet rollup + insufficient_data → "building baseline"). `burn_rate` is INFORMATIONAL
+ * (pooled), never a page-grade signal at fleet scope; the fast/slow-burn pills stay on the check-detail SloPanel
+ * (they need location-aware burn — the follow-up PR).
+ */
+export interface SloReportRow {
+  check_id: number;
+  check_name: string;
+  kind: CheckKind;
+  target: number; // e.g. 0.99
+  budget: number; // allowed down-runs over the window = (1 - target) * completed
+  consumed: number; // down-runs
+  remaining: number; // budget - consumed (can go negative = blown)
+  remaining_pct: number | null; // remaining/budget; null when insufficient_data
+  burn_rate: number | null; // (down/total)/(1-target) — informational
+  completed_runs: number;
+  insufficient_data: boolean; // too few completed runs → "building baseline", never a fake %
+}
+export interface SloReportFleet {
+  budget: number;
+  consumed: number;
+  remaining: number;
+  remaining_pct: number | null;
+  insufficient_data: boolean;
+}
+export interface SloReport {
+  window: ReportWindow;
+  items: SloReportRow[];
+  fleet: SloReportFleet | null;
+}
+
 /** One bucket of the availability-over-time series. `availability_pct` null = no
  *  completed runs in that bucket (a GAP in the line, NOT a 0% dip). */
 export interface AvailabilityPoint {
