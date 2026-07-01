@@ -115,7 +115,10 @@ export interface TagInUse extends Tag {
   count: number;
 }
 
-export type RunStatus = "running" | "pass" | "warn" | "fail" | "error";
+// ★ Mirrors the runner's runs.status CHECK (db/schema.sql, since 0035_infra_error_status.sql). Enforced by
+// scripts/check-enum-coverage.mjs so a new runner status can't drift past this union unhandled. 'infra_error'
+// = the runner couldn't fetch a check's spec — NEITHER up nor down, excluded from SLA + paging (see status.ts).
+export type RunStatus = "running" | "pass" | "warn" | "fail" | "error" | "infra_error";
 export type RunStepStatus = "pass" | "fail" | "error" | "running" | "skip";
 export type IncidentSeverity = "warning" | "critical";
 export type IncidentStatus = "open" | "resolved";

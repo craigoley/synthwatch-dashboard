@@ -1,0 +1,45 @@
+name: Enum coverage
+
+# Fail-closed static check for the ENUM-DRIFT class: a runner-owned schema enum CHECK grows a value, the
+# consumer's hardcoded TS union stays stale, and a blind `as X` cast launders the new value past tsc so it
+# breaks/mis-renders only in prod (seen 3×: redaction_mismatch/#154, grant gaps, spec_path; live: infra_error).
+#
+# The ENUM sibling of synthwatch-api's pg-grant-coverage — same cross-repo harness, same gate:
+#   • RUNNER (truth) = `CHECK (<col> IN (...))` parsed from craigoley/synthwatch's db/schema.sql (single
+#     current-state file — enum CHECKs are redefined per column, so the current CHECK is the clean truth).
+#   • CONSUMER = the mapped TS string-union in this repo (per enum-coverage.json).
+#   Every runner CHECK value must appear in its union, else FAIL naming the value + table.column + union.
+#
+# A TS never-exhaustiveness check CANNOT catch this — the blind cast satisfies the compiler over the STALE
+# union; it's a cross-repo contract gap. A failure fails ci-gate (this job is in ci-gate's REQUIRED wait-set),
+# which holds the merge. Pure sub-second static parse — no live DB, runs on every PR (no path filter).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  enum-coverage:
+    name: Enum coverage (runner schema vs consumer unions)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (dashboard — the consumer unions + manifest)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # The enum CHECK constraints live in the RUNNER repo's schema (it owns the schema). Both repos are
+      # public, so the default token reads it. persist-credentials:false — we only read files.
+      - name: Checkout runner repo (the schema CHECKs = the source of truth)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: craigoley/synthwatch
+          path: runner-repo
+          persist-credentials: false
+
+      - name: Assert every runner enum CHECK value is covered by its consumer union
+        run: node scripts/check-enum-coverage.mjs   # auto-resolves ./runner-repo/db/schema.sql

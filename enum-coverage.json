@@ -1,0 +1,5 @@
+{
+  "$comment": "Runner schema enum CHECK -> consumer TS union coverage. Mirrors required-grants.json (synthwatch-api). Every value in a runner `CHECK (<col> IN (...))` MUST appear in its mapped consumer union; otherwise a runner enum grows, the union stays stale, and a blind `as X` cast launders the new value past tsc so it mis-renders only in prod (the redaction_mismatch/#154 / infra_error class). Adding a mapping is one line. Direction: the runner (craigoley/synthwatch) owns db/schema.sql; consumers READ it, never the reverse. Keys are `table.column`; skip keys starting with `$`.",
+  "reconcile_drift.drift_type": { "union": "DriftType", "file": "src/lib/types.ts" },
+  "runs.status": { "union": "RunStatus", "file": "src/lib/types.ts" }
+}

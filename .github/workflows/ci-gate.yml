@@ -51,10 +51,12 @@ jobs:
       # Check-run names that ALWAYS appear on a PR — the gate waits for these to be terminal
       # before deciding (so a slow-to-register check can't let it pass prematurely). "Claude
       # review" reports a SKIPPED run on Dependabot PRs (still present); "Playwright (hermetic)"
-      # always runs. (The reusable osv-scanner-pr is NOT in the wait-set — its name varies by PR
-      # type — but the failure-check below still fails ci-gate if an osv run is present + failed.)
+      # always runs. "Enum coverage (…)" is a fast static parse that always runs (no path filter) —
+      # in the wait-set so ci-gate can't conclude before it registers (else the enum gate is only
+      # advisory). (The reusable osv-scanner-pr is NOT in the wait-set — its name varies by PR type
+      # — but the failure-check below still fails ci-gate if an osv run is present + failed.)
       REQUIRED: >-
-        ["Playwright (hermetic)","Claude review"]
+        ["Playwright (hermetic)","Claude review","Enum coverage (runner schema vs consumer unions)"]
       # Not quality gates — never wait on or fail for these (ci-gate is self; the auto-merge job
       # FAILS on a draft PR, which is benign).
       IGNORE: >-
