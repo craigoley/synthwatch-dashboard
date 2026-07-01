@@ -33,43 +33,31 @@ export default tseslint.config(
   ...nextCoreWebVitals,
 
   {
-    // `--max-warnings 0` is the gate, so a stale inline disable directive would
-    // fail CI. One such directive remains in MVP app code; reporting is turned
-    // off here as a legacy carve-out.
-    // TODO(eslint-findings PR): re-enable, then remove the stale
-    // `eslint-disable-next-line` in src/app/checks/[id]/page.tsx.
+    // Flag stale inline disable directives as errors so dead carve-outs can't
+    // accumulate — a disable for a rule that no longer fires is pure noise, and
+    // `--max-warnings 0` makes it a hard block. (Re-enabled from a legacy
+    // carve-out; the stale `no-console` directives it surfaced were removed.)
     linterOptions: {
-      reportUnusedDisableDirectives: "off",
+      reportUnusedDisableDirectives: "error",
     },
     rules: {
-      // ── Legacy / baseline carve-outs ──────────────────────────────────────
-      // These rules fire on existing MVP code. Per the security-stack rollout
-      // they are turned OFF here (never downgraded to "warn") so the gate is
-      // green for new code; re-enabling each and fixing the findings is a
-      // SEPARATE follow-up PR. Each carries a TODO so the debt stays visible.
-
+      // ── Kept OFF by documented design (NOT a TODO) ────────────────────────
       // Noisy, high false-positive rule: flags every computed member access
-      // (e.g. TONE_VAR[token], lookup tables keyed by validated unions). All
-      // current sinks are internal constant-keyed lookups, not user input.
-      // Kept OFF intentionally rather than annotating each safe access.
+      // (e.g. TONE_VAR[token], lookup tables keyed by validated unions). Every
+      // one of the ~71 current hits is an internal, constant-keyed lookup — none
+      // are user-controlled, so none are defects. Re-enabling would mean ~71
+      // inline disables for zero safety gain, so this stays OFF as a deliberate
+      // decision. Revisit ONLY if a real injection pattern (a user-controlled
+      // key reaching a sink) actually emerges.
       "security/detect-object-injection": "off",
 
-      // Deliberate <img> usage: failure-artifact screenshots come from
-      // arbitrary runner/blob hosts, so next/image optimization doesn't apply.
-      // TODO(eslint-findings PR): migrate to next/image w/ a custom loader, or
-      // confirm this stays off by design.
-      "@next/next/no-img-element": "off",
-
-      // One dead import in src/components/app-shell.tsx (statusRank).
-      // TODO(eslint-findings PR): re-enable and remove unused symbols.
-      "@typescript-eslint/no-unused-vars": "off",
-
-      // New rule introduced by eslint-plugin-react-hooks (via eslint-config-next
-      // 16). Fires on the "default-expand the latest run once" effect in
-      // src/app/checks/[id]/page.tsx. That is a legacy MVP pattern, not a
-      // regression from this deps bump.
-      // TODO(eslint-findings PR): re-enable and derive the initial expanded run
-      // at render time (expandedRun ?? recent_runs[0]?.id) instead of in effect.
+      // eslint-plugin-react-hooks (via eslint-config-next 16). Fires on the
+      // "default-expand the latest run once" effect in src/app/checks/[id]/page.tsx.
+      // Each hit is a real effect→state anti-pattern needing case-by-case
+      // judgment, not a mechanical fix, so it is handled in its OWN follow-up PR
+      // rather than bundled with the mechanical cleanup. Left OFF here on purpose.
+      // TODO(eslint-hooks PR): re-enable and derive the initial expanded run at
+      // render time (expandedRun ?? recent_runs[0]?.id) instead of in an effect.
       "react-hooks/set-state-in-effect": "off",
     },
   },

@@ -750,7 +750,6 @@ function logAiTransportFailure(runId: number, err: unknown): "timeout" | "http_e
   const gotResponse = err instanceof ApiRequestError; // ApiRequestError ⇒ the API responded (non-2xx)
   const reason = timedOut ? "timeout" : gotResponse ? "http_error" : "network";
   const status = err instanceof ApiRequestError ? err.status : "none";
-  // eslint-disable-next-line no-console
   console.warn(
     `[ai-insights] transport failure run=${runId} reason=${reason} gotResponse=${gotResponse} httpStatus=${status}`,
   );
