@@ -27,6 +27,14 @@ const SEAMS = {
   sla_7d: "/sla?window=7d",
   reports_availability_7d: "/reports/availability?window=7d&groupBy=none",
   reports_performance_7d: "/reports/performance?window=7d&groupBy=none",
+  // ★ deploy-markers v1 + SLO v1: both were as-built HAND-MOCKS ("companion API PR"), never in this capture,
+  // so capture:contracts never validated them against the live API (the frozen-snapshot-vs-real drift class).
+  // Both are open GETs (no token). deploys is captured for a host WITH a real row (wegmans sentry-release SHA);
+  // window=90d so the marker is in-range. SLO is fleet-wide (may be empty-but-live — the real shape is the point).
+  reports_deploys_wegmans: "/reports/deploys?host=www.wegmans.com&window=90d",
+  // etag-only host: the honest "deploy detected, no commit id" branch (sha=null, isSha=false) — real data.
+  reports_deploys_meals2go: "/reports/deploys?host=www.meals2go.com&window=90d",
+  reports_slo_30d: "/reports/slo?window=30d",
   specs: "/specs",
   reconcile_drift: "/reconcile/drift",
   // Rich/nested seams anchored later (priority by prior-bug + complexity). Use IDs with full data so the
