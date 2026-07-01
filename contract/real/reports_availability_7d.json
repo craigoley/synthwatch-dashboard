@@ -4,18 +4,81 @@
   "groups": [
     {
       "group": null,
-      "availabilityPct": 72.8699,
-      "upCount": 2369,
-      "downCount": 882,
-      "totalCount": 3251,
-      "downtimeMinutes": 5054.3,
-      "incidentsOpened": 15,
+      "availabilityPct": 77.92,
+      "upCount": 7852,
+      "downCount": 2225,
+      "totalCount": 10077,
+      "downtimeMinutes": 3844.99,
+      "incidentsOpened": 8,
       "checks": [
         {
           "checkId": 33,
           "checkName": "API CORS preflight",
           "availabilityPct": 100,
-          "upCount": 909,
+          "upCount": 1990,
+          "downCount": 0,
+          "downtimeMinutes": 0,
+          "incidentsOpened": 0
+        },
+        {
+          "checkId": 192,
+          "checkName": "Amore: menu page exposes a downloadable menu",
+          "availabilityPct": 100,
+          "upCount": 73,
+          "downCount": 0,
+          "downtimeMinutes": 0,
+          "incidentsOpened": 0
+        },
+        {
+          "checkId": 193,
+          "checkName": "Amore: reservations OpenTable widget loads",
+          "availabilityPct": 100,
+          "upCount": 40,
+          "downCount": 0,
+          "downtimeMinutes": 0,
+          "incidentsOpened": 0
+        },
+        {
+          "checkId": 221,
+          "checkName": "Meals 2 Go: browse a cuisine menu (anon)",
+          "availabilityPct": 50,
+          "upCount": 12,
+          "downCount": 12,
+          "downtimeMinutes": 140.1,
+          "incidentsOpened": 1
+        },
+        {
+          "checkId": 81,
+          "checkName": "Meals 2 Go: homepage load",
+          "availabilityPct": 100,
+          "upCount": 739,
+          "downCount": 0,
+          "downtimeMinutes": 0,
+          "incidentsOpened": 0
+        },
+        {
+          "checkId": 80,
+          "checkName": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
+          "availabilityPct": 64.4809,
+          "upCount": 236,
+          "downCount": 130,
+          "downtimeMinutes": 1118.7,
+          "incidentsOpened": 2
+        },
+        {
+          "checkId": 194,
+          "checkName": "Next Door: homepage location picker",
+          "availabilityPct": 100,
+          "upCount": 92,
+          "downCount": 0,
+          "downtimeMinutes": 0,
+          "incidentsOpened": 0
+        },
+        {
+          "checkId": 195,
+          "checkName": "Next Door: reservations OpenTable widget loads",
+          "availabilityPct": 100,
+          "upCount": 70,
           "downCount": 0,
           "downtimeMinutes": 0,
           "incidentsOpened": 0
@@ -23,36 +86,72 @@
         {
           "checkId": 4,
           "checkName": "SynthWatch API health",
-          "availabilityPct": 99.3314,
-          "upCount": 1040,
-          "downCount": 7,
-          "downtimeMinutes": 29.79,
-          "incidentsOpened": 2
-        },
-        {
-          "checkId": 2,
-          "checkName": "Wegmans homepage",
-          "availabilityPct": 88.3281,
-          "upCount": 280,
-          "downCount": 37,
-          "downtimeMinutes": 930.33,
-          "incidentsOpened": 2
-        },
-        {
-          "checkId": 10,
-          "checkName": "Wegmans.com cert",
           "availabilityPct": 100,
-          "upCount": 140,
+          "upCount": 2029,
           "downCount": 0,
           "downtimeMinutes": 0,
           "incidentsOpened": 0
         },
         {
-          "checkId": 74,
-          "checkName": "Wegmans: search \u2192 product page",
+          "checkId": 2,
+          "checkName": "Wegmans homepage",
+          "availabilityPct": 100,
+          "upCount": 550,
+          "downCount": 0,
+          "downtimeMinutes": 0,
+          "incidentsOpened": 0
+        },
+        {
+          "checkId": 10,
+          "checkName": "Wegmans.com cert",
+          "availabilityPct": 100,
+          "upCount": 292,
+          "downCount": 0,
+          "downtimeMinutes": 0,
+          "incidentsOpened": 0
+        },
+        {
+          "checkId": 77,
+          "checkName": "Wegmans: recipe navigation",
+          "availabilityPct": 96.5287,
+          "upCount": 723,
+          "downCount": 26,
+          "downtimeMinutes": 199.38,
+          "incidentsOpened": 1
+        },
+        {
+          "checkId": 220,
+          "checkName": "Wegmans: recipe search",
           "availabilityPct": 0,
           "upCount": 0,
-          "downCount": 5,
+          "downCount": 6,
+          "downtimeMinutes": 343.86,
+          "incidentsOpened": 1
+        },
+        {
+          "checkId": 74,
+          "checkName": "Wegmans: search → product page",
+          "availabilityPct": 91.5233,
+          "upCount": 745,
+          "downCount": 69,
+          "downtimeMinutes": 715.35,
+          "incidentsOpened": 1
+        },
+        {
+          "checkId": 197,
+          "checkName": "Wegmans: shop category browse",
+          "availabilityPct": 100,
+          "upCount": 110,
+          "downCount": 0,
+          "downtimeMinutes": 0,
+          "incidentsOpened": 0
+        },
+        {
+          "checkId": 196,
+          "checkName": "Wegmans: store locator",
+          "availabilityPct": 100,
+          "upCount": 151,
+          "downCount": 0,
           "downtimeMinutes": 0,
           "incidentsOpened": 0
         },
@@ -61,47 +160,47 @@
           "checkName": "rca-demo",
           "availabilityPct": 0,
           "upCount": 0,
-          "downCount": 833,
-          "downtimeMinutes": 4094.18,
-          "incidentsOpened": 11
+          "downCount": 1982,
+          "downtimeMinutes": 1327.6,
+          "incidentsOpened": 2
         }
       ],
       "series": [
-        {
-          "day": "2026-06-20",
-          "availabilityPct": 0,
-          "upCount": 0,
-          "downCount": 5
-        },
-        {
-          "day": "2026-06-21",
-          "availabilityPct": 56.7568,
-          "upCount": 42,
-          "downCount": 32
-        },
-        {
-          "day": "2026-06-22",
-          "availabilityPct": 98.9691,
-          "upCount": 288,
-          "downCount": 3
-        },
-        {
-          "day": "2026-06-23",
-          "availabilityPct": 71.145,
-          "upCount": 466,
-          "downCount": 189
-        },
-        {
-          "day": "2026-06-24",
-          "availabilityPct": 70.6093,
-          "upCount": 788,
-          "downCount": 328
-        },
         {
           "day": "2026-06-25",
           "availabilityPct": 70.7207,
           "upCount": 785,
           "downCount": 325
+        },
+        {
+          "day": "2026-06-26",
+          "availabilityPct": 68.4084,
+          "upCount": 851,
+          "downCount": 393
+        },
+        {
+          "day": "2026-06-27",
+          "availabilityPct": 75.019,
+          "upCount": 985,
+          "downCount": 328
+        },
+        {
+          "day": "2026-06-28",
+          "availabilityPct": 77.2526,
+          "upCount": 1046,
+          "downCount": 308
+        },
+        {
+          "day": "2026-06-29",
+          "availabilityPct": 76.6703,
+          "upCount": 1423,
+          "downCount": 433
+        },
+        {
+          "day": "2026-06-30",
+          "availabilityPct": 86.3125,
+          "upCount": 2762,
+          "downCount": 438
         }
       ]
     }

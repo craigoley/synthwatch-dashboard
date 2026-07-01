@@ -37,6 +37,9 @@ const SEAMS = {
   reports_slo_30d: "/reports/slo?window=30d",
   specs: "/specs",
   reconcile_drift: "/reconcile/drift",
+  // ★ Previously ORPHANED: flows.json is consumed by high-risk-seams.contract.ts (pins /flows is a BARE ARRAY)
+  // but was missing here, so capture:contracts never refreshed it — the frozen-snapshot risk. Open GET, wired in.
+  flows: "/flows",
   // Rich/nested seams anchored later (priority by prior-bug + complexity). Use IDs with full data so the
   // fixture exercises the whole shape: narrative factPack (#82), the runs cursor envelope, an SSL check
   // detail (cert + recentRuns with certDaysRemaining). Adjust the IDs to live data when re-capturing.

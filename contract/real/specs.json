@@ -1,6 +1,89 @@
 {
   "items": [
     {
+      "sourceKey": "amore-menu",
+      "name": "Amore: menu page exposes a downloadable menu",
+      "specPath": "monitors/amore/amore-menu.spec.ts",
+      "kind": "browser",
+      "target": "https://wegmansamore.com",
+      "suggestedIntervalSeconds": 1800,
+      "tags": [
+        "amore",
+        "restaurant",
+        "menu"
+      ],
+      "description": "Load wegmansamore.com/menus and assert a downloadable menu link (PDF) is present -- the 'view the menu' affordance, resilient to dish/price changes.",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": true,
+      "checkId": 192,
+      "checkName": "Amore: menu page exposes a downloadable menu",
+      "enabled": true,
+      "health": {
+        "currentStatus": "pass",
+        "p95Ms": 7672.3,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-07-01T19:25:49.020141+00:00"
+      }
+    },
+    {
+      "sourceKey": "amore-reservations",
+      "name": "Amore: reservations OpenTable widget loads",
+      "specPath": "monitors/amore/amore-reservations.spec.ts",
+      "kind": "browser",
+      "target": "https://wegmansamore.com",
+      "suggestedIntervalSeconds": 1800,
+      "tags": [
+        "amore",
+        "restaurant",
+        "reservations",
+        "opentable"
+      ],
+      "description": "Load wegmansamore.com/reservations and verify the embedded OpenTable booking widget loader fires (network), plus the RESERVE YOUR TABLE heading. Never books. Capability check; sensitive=false.",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": true,
+      "checkId": 193,
+      "checkName": "Amore: reservations OpenTable widget loads",
+      "enabled": true,
+      "health": {
+        "currentStatus": "pass",
+        "p95Ms": 7397.95,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-07-01T19:32:15.930805+00:00"
+      }
+    },
+    {
+      "sourceKey": "meals2go-browse-menu",
+      "name": "Meals 2 Go: browse a cuisine menu (anon)",
+      "specPath": "monitors/wegmans/meals2go-browse-menu.spec.ts",
+      "kind": "browser",
+      "target": "https://www.meals2go.com",
+      "suggestedIntervalSeconds": 1800,
+      "tags": [
+        "meals2go",
+        "browse",
+        "menu",
+        "journey"
+      ],
+      "description": "Anonymous discovery journey: load meals2go.com/browse-menu/pizza-wings and assert the kitting menus API returns 200 + item cards render. NEVER carts. Anonymous/accountless against a public page (no login, payment, or PII). Non-sensitive by decision: the guest session token is short-lived and protects nothing.",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": true,
+      "checkId": 221,
+      "checkName": "Meals 2 Go: browse a cuisine menu (anon)",
+      "enabled": true,
+      "health": {
+        "currentStatus": "pass",
+        "p95Ms": 11794.099999999997,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-07-01T19:21:59.598057+00:00"
+      }
+    },
+    {
       "sourceKey": "meals2go-cheese-pizza-cart",
       "name": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
       "specPath": "monitors/wegmans/meals2go-cheese-pizza-cart.spec.ts",
@@ -14,7 +97,7 @@
         "carryout",
         "journey"
       ],
-      "description": "Recon-first carry-out cheese-pizza flow: establish CARRY OUT fulfillment (Buffalo, NY \u2192 McKinley store), open the takeout Pizza menu, add a cheese pizza to the cart, assert the line item via the cart-items API, then self-clean by removing it. Cart-mutating + store-session bearing; enabledByDefault:false. B10-compliant (sensitive + redact_patterns) but NOT yet enabled (no check_locations row).",
+      "description": "Recon-first carry-out cheese-pizza flow: establish CARRY OUT fulfillment (Buffalo, NY → McKinley store), open the takeout Pizza menu, add a cheese pizza to the cart, assert the line item via the cart-items API, then self-clean by removing it. Cart-mutating but anonymous/accountless (no login, payment, or PII); self-cleans the added item. Non-sensitive by decision: the guest session token is short-lived and protects nothing.",
       "enabledByDefault": false,
       "runnable": true,
       "notRunnableReason": null,
@@ -24,9 +107,65 @@
       "enabled": true,
       "health": {
         "currentStatus": "pass",
-        "p95Ms": 52150.7,
+        "p95Ms": 34522,
         "openIncidentCount": 0,
-        "lastRunAt": "2026-06-30T11:56:03.015405+00:00"
+        "lastRunAt": "2026-07-01T19:31:53.571714+00:00"
+      }
+    },
+    {
+      "sourceKey": "nextdoor-homepage",
+      "name": "Next Door: homepage location picker",
+      "specPath": "monitors/nextdoor/nextdoor-homepage.spec.ts",
+      "kind": "browser",
+      "target": "https://www.wegmansnextdoor.com",
+      "suggestedIntervalSeconds": 1800,
+      "tags": [
+        "nextdoor",
+        "restaurant",
+        "homepage",
+        "location"
+      ],
+      "description": "Load wegmansnextdoor.com and assert both server-rendered location links (Rochester + Astor Place) render -- the homepage's location-picker capability.",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": true,
+      "checkId": 194,
+      "checkName": "Next Door: homepage location picker",
+      "enabled": true,
+      "health": {
+        "currentStatus": "pass",
+        "p95Ms": 4631.35,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-07-01T19:31:27.171365+00:00"
+      }
+    },
+    {
+      "sourceKey": "nextdoor-reservations",
+      "name": "Next Door: reservations OpenTable widget loads",
+      "specPath": "monitors/nextdoor/nextdoor-reservations.spec.ts",
+      "kind": "browser",
+      "target": "https://www.wegmansnextdoor.com",
+      "suggestedIntervalSeconds": 1800,
+      "tags": [
+        "nextdoor",
+        "restaurant",
+        "reservations",
+        "opentable"
+      ],
+      "description": "Load wegmansnextdoor.com/rochester-new-york/reservations and verify the embedded OpenTable booking widget loader request fires (rid=2407), plus the Reserve Your Table heading. Mirrors amore-reservations. Never books. Capability check; sensitive=false.",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": true,
+      "checkId": 195,
+      "checkName": "Next Door: reservations OpenTable widget loads",
+      "enabled": true,
+      "health": {
+        "currentStatus": "pass",
+        "p95Ms": 3417.6999999999994,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-07-01T19:30:41.421878+00:00"
       }
     },
     {
@@ -45,11 +184,16 @@
       "enabledByDefault": false,
       "runnable": true,
       "notRunnableReason": null,
-      "monitored": false,
-      "checkId": null,
-      "checkName": null,
-      "enabled": null,
-      "health": null
+      "monitored": true,
+      "checkId": 222,
+      "checkName": "SynthWatch dashboard homepage",
+      "enabled": true,
+      "health": {
+        "currentStatus": "pass",
+        "p95Ms": 3585.2999999999997,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-07-01T19:25:55.602421+00:00"
+      }
     },
     {
       "sourceKey": "wegmans-homepage-load",
@@ -67,11 +211,16 @@
       "enabledByDefault": false,
       "runnable": true,
       "notRunnableReason": null,
-      "monitored": false,
-      "checkId": null,
-      "checkName": null,
-      "enabled": null,
-      "health": null
+      "monitored": true,
+      "checkId": 223,
+      "checkName": "Wegmans: homepage load",
+      "enabled": true,
+      "health": {
+        "currentStatus": "pass",
+        "p95Ms": 26446.35,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-07-01T19:21:34.967639+00:00"
+      }
     },
     {
       "sourceKey": "wegmans-meals2go-homepage",
@@ -96,9 +245,9 @@
       "enabled": true,
       "health": {
         "currentStatus": "pass",
-        "p95Ms": 10639,
+        "p95Ms": 10860,
         "openIncidentCount": 0,
-        "lastRunAt": "2026-06-30T11:55:21.016865+00:00"
+        "lastRunAt": "2026-07-01T19:35:32.390012+00:00"
       }
     },
     {
@@ -114,7 +263,7 @@
         "navigation",
         "journey"
       ],
-      "description": "Navigate Meals & Recipes \u2192 Courses \u2192 Dinner \u2192 the cauliflower-crust pesto pizza recipe, assert the recipe loads.",
+      "description": "Navigate Meals & Recipes → Courses → Dinner → the cauliflower-crust pesto pizza recipe, assert the recipe loads.",
       "enabledByDefault": false,
       "runnable": true,
       "notRunnableReason": null,
@@ -123,10 +272,10 @@
       "checkName": "Wegmans: recipe navigation",
       "enabled": true,
       "health": {
-        "currentStatus": "pass",
-        "p95Ms": 39028.7,
+        "currentStatus": "running",
+        "p95Ms": 38919.5,
         "openIncidentCount": 0,
-        "lastRunAt": "2026-06-30T11:55:29.631773+00:00"
+        "lastRunAt": "2026-07-01T19:35:32.116541+00:00"
       }
     },
     {
@@ -146,15 +295,48 @@
       "enabledByDefault": false,
       "runnable": true,
       "notRunnableReason": null,
-      "monitored": false,
-      "checkId": null,
-      "checkName": null,
-      "enabled": null,
-      "health": null
+      "monitored": true,
+      "checkId": 220,
+      "checkName": "Wegmans: recipe search",
+      "enabled": true,
+      "health": {
+        "currentStatus": "pass",
+        "p95Ms": 29691.1,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-07-01T19:20:33.414534+00:00"
+      }
+    },
+    {
+      "sourceKey": "wegmans-search-autocomplete",
+      "name": "Wegmans: search autocomplete suggestions",
+      "specPath": "monitors/wegmans/search-autocomplete.spec.ts",
+      "kind": "browser",
+      "target": "https://www.wegmans.com",
+      "suggestedIntervalSeconds": 1800,
+      "tags": [
+        "wegmans",
+        "search",
+        "autocomplete",
+        "algolia"
+      ],
+      "description": "Type a partial query in the header search and assert the Algolia search-as-you-type query returns 200 + a suggestion option renders. NEVER submits (no Enter -- avoids the waterloo race). sensitive=false (public Algolia search key).",
+      "enabledByDefault": false,
+      "runnable": true,
+      "notRunnableReason": null,
+      "monitored": true,
+      "checkId": 224,
+      "checkName": "Wegmans: search autocomplete suggestions",
+      "enabled": true,
+      "health": {
+        "currentStatus": "pass",
+        "p95Ms": 26833.65,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-07-01T19:30:19.586288+00:00"
+      }
     },
     {
       "sourceKey": "wegmans-search-product",
-      "name": "Wegmans: search \u2192 product page",
+      "name": "Wegmans: search → product page",
       "specPath": "monitors/wegmans/search-product.spec.ts",
       "kind": "browser",
       "target": "https://www.wegmans.com",
@@ -171,13 +353,13 @@
       "notRunnableReason": null,
       "monitored": true,
       "checkId": 74,
-      "checkName": "Wegmans: search \u2192 product page",
+      "checkName": "Wegmans: search → product page",
       "enabled": true,
       "health": {
         "currentStatus": "pass",
-        "p95Ms": 23102.6,
+        "p95Ms": 22816,
         "openIncidentCount": 0,
-        "lastRunAt": "2026-06-30T11:56:22.892559+00:00"
+        "lastRunAt": "2026-07-01T19:31:32.369852+00:00"
       }
     },
     {
@@ -197,11 +379,16 @@
       "enabledByDefault": false,
       "runnable": true,
       "notRunnableReason": null,
-      "monitored": false,
-      "checkId": null,
-      "checkName": null,
-      "enabled": null,
-      "health": null
+      "monitored": true,
+      "checkId": 197,
+      "checkName": "Wegmans: shop category browse",
+      "enabled": true,
+      "health": {
+        "currentStatus": "running",
+        "p95Ms": 26822,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-07-01T19:35:58.268922+00:00"
+      }
     },
     {
       "sourceKey": "wegmans-store-locator",
@@ -220,12 +407,17 @@
       "enabledByDefault": false,
       "runnable": true,
       "notRunnableReason": null,
-      "monitored": false,
-      "checkId": null,
-      "checkName": null,
-      "enabled": null,
-      "health": null
+      "monitored": true,
+      "checkId": 196,
+      "checkName": "Wegmans: store locator",
+      "enabled": true,
+      "health": {
+        "currentStatus": "pass",
+        "p95Ms": 18403.45,
+        "openIncidentCount": 0,
+        "lastRunAt": "2026-07-01T19:35:43.458861+00:00"
+      }
     }
   ],
-  "probedAt": "2026-06-30T11:00:18.700819+00:00"
+  "probedAt": "2026-07-01T19:00:17.988663+00:00"
 }

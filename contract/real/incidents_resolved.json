@@ -1,6 +1,222 @@
 {
   "items": [
     {
+      "id": 131,
+      "checkId": 221,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-30T19:31:02.349268+00:00",
+      "resolvedAt": "2026-06-30T21:51:08.362058+00:00",
+      "openedRunId": 852426,
+      "resolvedRunId": 852851,
+      "consecutiveFailures": 2,
+      "summary": "Check \"Meals 2 Go: browse a cuisine menu (anon)\" down (error) 1 consecutive times.",
+      "checkName": "Meals 2 Go: browse a cuisine menu (anon)",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "flaky-transient",
+        "confidence": "low",
+        "observed": [
+          "Run status: error",
+          "HTTP status: n/a",
+          "Error message: error — error details redacted (sensitive monitor)",
+          "Failed step: n/a",
+          "Multi-location: failing from 1 of 1 location(s)"
+        ],
+        "inferred": [
+          "The monitoring agent did not receive an HTTP response (network/agent issue or target not responding).",
+          "This may be a transient/one-off failure from the single monitoring location rather than a global outage.",
+          "A browser or monitor runtime error (script crash) could have aborted the check before steps completed.",
+          "Monitor could be new/misconfigured (no recent run history) causing the failure independent of the site"
+        ],
+        "summary": "The check failed without an HTTP response and the error details are redacted, but there is no run history and only a single monitoring location impacted — this looks like a likely transient or agent-side issue; investigate the monitor logs/error payload and run a manual test or re-run from additional locations to narrow down whether the site or the monitor/region is at fault.",
+        "signature": "221|error — error details redacted (sensitive monitor)|",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-06-30T19:31:30.589Z"
+      }
+    },
+    {
+      "id": 130,
+      "checkId": 220,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-30T18:23:26.271894+00:00",
+      "resolvedAt": "2026-07-01T00:43:45.470021+00:00",
+      "openedRunId": 852248,
+      "resolvedRunId": 853352,
+      "consecutiveFailures": 3,
+      "summary": "Check \"Wegmans: recipe search\" down (error) 1 consecutive times.",
+      "checkName": "Wegmans: recipe search",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "flaky-transient",
+        "confidence": "low",
+        "observed": [
+          "Run status: error",
+          "Error message: Cannot find module '/app/dist/checks/recipe-search.js' imported from /app/dist/checks/index.js",
+          "HTTP status: n/a",
+          "duration: 1086ms",
+          "Multi-location: failing from 1 of 1 location(s)"
+        ],
+        "inferred": [
+          "The synthetic runner failed to load the check file — likely a missing or misbuilt artifact in the monitor runtime, not the target site",
+          "Possible causes include the check file being deleted/renamed, a build/packaging step not producing /app/dist/checks/recipe-search.js, or a changed import/path",
+          "Because the error is an import failure (not an HTTP error), the website itself may be fine and this is an internal monitoring deployment issue",
+          "If other checks show the same 'Cannot find module' error, this points to a wider deployment/packaging regression in the synthetic runner"
+        ],
+        "summary": "The synthetic monitor process could not import /app/dist/checks/recipe-search.js, causing the check to error before contacting the target; this appears to be a monitoring build/deploy issue rather than the Wegmans site being down — verify the check artifact, build/packaging step, and recent deploys.",
+        "signature": "220|Cannot find module '/app/dist/checks/recipe-search.js' imported from /app/dist/checks/index.js|",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-06-30T18:24:01.939Z"
+      }
+    },
+    {
+      "id": 80,
+      "checkId": 80,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-29T18:58:02.359144+00:00",
+      "resolvedAt": "2026-06-29T21:22:29.208734+00:00",
+      "openedRunId": 849441,
+      "resolvedRunId": 849642,
+      "consecutiveFailures": 2,
+      "summary": "Check \"Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)\" down (error) from 2 of 2 locations (died at step: add cheese pizza to cart).",
+      "checkName": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "selector-drift",
+        "confidence": "medium",
+        "observed": [
+          "Error: Cannot read properties of undefined (reading 'toBeNull')",
+          "Failed step: add cheese pizza to cart",
+          "Run steps 0-3 passed; step 4 errored; step 5 passed",
+          "Multi-location: failing from 2 of 2 location(s)",
+          "Failure screenshot shows pizza listing (Thin Crust Cheese Pizza - 8 Slices); baseline screenshot shows a 'How do you want to get your order?' modal"
+        ],
+        "inferred": [
+          "The test tried to call an assertion/matcher on an undefined value, implying the script's expected element or value was not found",
+          "The page still renders product listings, so the site is not completely down; likely the selector or dialog the check expects moved/changed",
+          "Failure from all locations and a mix of recent passes suggests a UI change or A/B rollout causing the monitor to fail intermittently",
+          "This is likely a monitor/script update (selector/assertion) requirement rather than a backend outage"
+        ],
+        "summary": "The browser check errored with a JS assertion ('toBeNull' on undefined) while adding the pizza. The site content renders but the element the test expects appears missing or altered (selector drift); inspect and update the monitor's selector/assertion or handle the dialog variant that appeared in the baseline screenshot.",
+        "signature": "80|Cannot read properties of undefined (reading 'toBeNull')|add cheese pizza to cart",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-06-29T18:58:41.326Z"
+      }
+    },
+    {
+      "id": 37,
+      "checkId": 80,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-29T02:06:40.362225+00:00",
+      "resolvedAt": "2026-06-29T18:20:55.643654+00:00",
+      "openedRunId": 847989,
+      "resolvedRunId": 849368,
+      "consecutiveFailures": 2,
+      "summary": "Check \"Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)\" down (fail) from 2 of 2 locations (died at step: establish fulfillment: CARRY OUT -> Buffalo, NY -> McKinley).",
+      "checkName": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "selector-drift",
+        "confidence": "high",
+        "observed": [
+          "Failed step: establish fulfillment: CARRY OUT -> Buffalo, NY -> McKinley",
+          "Error message: expected element to be visible within 20000ms",
+          "Step 0 'open meals2go.com homepage' passed",
+          "Recent run history (newest first): fail, fail, fail, fail, fail",
+          "Failure screenshot shows page content and header text 'Menu for Fairfax'"
+        ],
+        "inferred": [
+          "The site page is loading correctly (menu visible) so the site itself is not fully down",
+          "The fulfillment UI element the check expects is missing, moved, or renamed (selector no longer matches)",
+          "The site may be defaulting to an existing location ('Menu for Fairfax'), removing or changing the selector the test tries to interact with",
+          "Persistent failures across locations indicate a durable page change rather than a transient blip"
+        ],
+        "summary": "The homepage loads but the monitor timed out waiting for the fulfillment element used to set carry-out Buffalo/McKinley; failures are consistent across locations and runs, pointing to a page/selector change (update the monitor's selector or workflow to match the new UI).",
+        "signature": "80|expected element to be visible within 20000ms|establish fulfillment: CARRY OUT -> Buffalo, NY -> McKinley",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-06-29T02:07:04.266Z"
+      }
+    },
+    {
+      "id": 36,
+      "checkId": 77,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-26T13:41:29.379947+00:00",
+      "resolvedAt": "2026-06-26T17:00:51.886173+00:00",
+      "openedRunId": 844597,
+      "resolvedRunId": 844781,
+      "consecutiveFailures": 2,
+      "summary": "Check \"Wegmans: recipe navigation\" down (fail) from 2 of 2 locations (died at step: navigate Courses -> Dinner).",
+      "checkName": "Wegmans: recipe navigation",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "selector-drift",
+        "confidence": "high",
+        "observed": [
+          "failed step: navigate Courses -> Dinner",
+          "error message: expected element to be visible within 15000ms",
+          "run_steps: step 0 \"open wegmans.com\" [pass], step 1 \"open Meals & Recipes\" [pass], step 2 \"navigate Courses -> Dinner\" [fail]",
+          "recent run history (newest first): fail, fail, fail, fail, fail",
+          "multi-location: failing from 2 of 2 location(s)"
+        ],
+        "inferred": [
+          "The page content is loading (prior steps passed and screenshot shows the Meals & Recipes page), so the site is not fully down",
+          "The monitor's target element for the 'Dinner' item is not becoming visible — likely renamed, moved, or its selector no longer matches",
+          "The problem is persistent across locations and repeated runs, making a flaky/transient cause unlikely",
+          "This is likely a monitor maintenance issue (update selector/assertion) rather than an infrastructure outage"
+        ],
+        "summary": "The check consistently fails because the expected 'Dinner' element never becomes visible even though the Meals & Recipes page loads. Update the monitor's selector or adjust the step to match the page's current DOM (the site appears up, not down).",
+        "signature": "77|expected element to be visible within 15000ms|navigate Courses -> Dinner",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-06-26T13:41:50.055Z"
+      }
+    },
+    {
+      "id": 35,
+      "checkId": 74,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-06-26T00:00:26.415975+00:00",
+      "resolvedAt": "2026-06-26T11:55:47.661661+00:00",
+      "openedRunId": 843925,
+      "resolvedRunId": 844505,
+      "consecutiveFailures": 2,
+      "summary": "Check \"Wegmans: search → product page\" down (error) from 2 of 2 locations.",
+      "checkName": "Wegmans: search → product page",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "environment-regional",
+        "confidence": "high",
+        "observed": [
+          "Error: Cannot find module '/Users/craigoleyagent/Developer/synthwatch/runner/dist/specfetch/specShim.js' imported from /tmp/sw-specfetch-XGWWP8/spec.mjs",
+          "Run status: error",
+          "HTTP status: n/a",
+          "Recent run history: error, error, error, error, error",
+          "Multi-location: failing from 2 of 2 location(s)"
+        ],
+        "inferred": [
+          "The synthetic runner/agent process cannot load a local module (specShim.js), indicating a problem in the monitoring runtime rather than the target site.",
+          "The check fails before producing any HTTP response (HTTP status n/a), so this is not showing a site 5xx or network-level error.",
+          "Consistent errors across recent runs and across both locations point to a systemic issue (e.g., broken deploy, missing file, or corrupted install) on the collectors/agents.",
+          "Likely causes to investigate: missing/renamed file, bad agent deployment or update, or file permission/path issues on the runner hosts."
+        ],
+        "summary": "The synthetic runner cannot find a required module (specShim.js), causing the check to error out before contacting the site; this appears to be a monitoring/runtime deployment issue affecting collectors rather than a Wegmans outage. Investigate the runner/agent installation, recent deploys, and file paths/permissions on the collectors.",
+        "signature": "74|Cannot find module '/Users/craigoleyagent/Developer/synthwatch/runner/dist/specfetch/specShim.js' imported from /tmp/sw-specfetch-XGWWP8/spec.mjs|",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-06-26T00:00:47.710Z"
+      }
+    },
+    {
       "id": 33,
       "checkId": 59,
       "status": "resolved",
