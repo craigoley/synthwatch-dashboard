@@ -70,4 +70,15 @@ export default tseslint.config(
       "security/detect-non-literal-fs-filename": "off",
     },
   },
+
+  {
+    // CI static-parse tooling (check-*-coverage): reads REPO files by computed path and builds regexes from
+    // our OWN manifest (table/column/union names), never user input — both `security/detect-non-literal-*`
+    // rules are pure false positives here, same carve-out as contract/** above.
+    files: ["scripts/**"],
+    rules: {
+      "security/detect-non-literal-fs-filename": "off",
+      "security/detect-non-literal-regexp": "off",
+    },
+  },
 );

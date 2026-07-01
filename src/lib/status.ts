@@ -18,6 +18,10 @@ const RUN_STATUS: Record<RunStatus, StatusMeta> = {
   warn: { label: "Warn", token: "warn", dotClass: "sw-dot-warn" },
   fail: { label: "Fail", token: "fail", dotClass: "sw-dot-fail" },
   error: { label: "Error", token: "fail", dotClass: "sw-dot-fail" },
+  // ★ infra_error (runner couldn't fetch the spec): distinct from a check 'error' and, per the runner, NEITHER
+  // up nor down — excluded from SLA + never pages. So amber (warn), not red (fail): rendering it as a red
+  // failure would misread an infra hiccup as a monitored-target outage. Distinguishable label + tone, adjacent.
+  infra_error: { label: "Infra error", token: "warn", dotClass: "sw-dot-warn" },
   running: { label: "Running", token: "running", dotClass: "sw-dot-running" },
 };
 
@@ -157,6 +161,7 @@ export function statusRank(status: RunStatus | null): number {
     case "fail":
       return 0;
     case "warn":
+    case "infra_error": // non-paging, SLA-excluded → warn tier, not worst
       return 1;
     case "running":
       return 2;

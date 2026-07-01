@@ -1,4 +1,3 @@
-/* eslint-disable security/detect-non-literal-fs-filename -- build script; paths come from require.resolve, not user input */
 // Re-vendor the Playwright trace viewer into public/trace-viewer/.
 //
 // WHY VENDORED (committed), not build-copied: the trace viewer is a static SPA we
