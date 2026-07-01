@@ -84,7 +84,13 @@ const TYPE_META: Record<DriftType, { label: string; tone: string }> = {
   changed: { label: "Changed", tone: "var(--color-warn)" },
   missing: { label: "Missing", tone: "var(--color-warn)" },
   orphan: { label: "Orphan", tone: "var(--color-idle)" },
+  redaction_mismatch: { label: "Redaction", tone: "var(--color-warn)" },
 };
+// The API mapper blind-casts driftType→DriftType, and the runner can add drift types (e.g. 0049's
+// redaction_mismatch) ahead of the dashboard knowing them. Fall back to a neutral pill for any unmapped type
+// so a new drift type NEVER crashes the surface (reading .tone off undefined) — the /monitors-crash root cause.
+const metaFor = (type: string): { label: string; tone: string } =>
+  TYPE_META[type as DriftType] ?? { label: type, tone: "var(--color-ink-faint)" };
 
 const asStr = (v: unknown): string | null =>
   typeof v === "string" && v.trim() !== "" ? v : null;
@@ -108,6 +114,10 @@ function summarize(row: DriftRow): string {
         ? `Bound flow "${flow}" has no compiled runner module yet — can't be run.`
         : "No compiled runner module yet — can't be run.";
     }
+    case "redaction_mismatch": {
+      const name = asStr(d.name) ?? row.source_key;
+      return `Redaction config differs from Git — ${name}. A sensitive monitor isn't redacting as declared; apply would realign it.`;
+    }
     case "changed":
     default:
       return "Git-managed fields differ from the live monitor.";
@@ -126,7 +136,7 @@ function changedFields(row: DriftRow): { field: string; git: string; live: strin
 }
 
 function DriftPill({ type }: { type: DriftType }) {
-  const meta = TYPE_META[type];
+  const meta = metaFor(type);
   return (
     <span
       className="sw-mono shrink-0 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider"
