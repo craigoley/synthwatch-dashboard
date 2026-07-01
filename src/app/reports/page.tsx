@@ -11,10 +11,21 @@ import { MonitorReportList } from "@/components/monitor-report-list";
 import { ReportWebVitals, ReportSeriesArea } from "@/components/charts";
 import { FleetSloReport } from "@/components/fleet-slo";
 import { FleetMttrReport } from "@/components/fleet-mttr";
+import { TabBar, useTab, type TabDef } from "@/components/tabs";
 import { formatDuration } from "@/lib/format";
 import type { ReportWindow } from "@/lib/types";
 
 const WINDOWS: ReportWindow[] = ["7d", "30d", "90d"];
+
+// Sub-tabs organize the ~9 stacked report sections. Performance is the default (no ?tab= param). The
+// self-fetching Reliability cards mount ONLY when that tab is active (lazy) — avail/perf stay page-level (below)
+// and feed both Performance and Monitors, so switching between them never re-fetches.
+const TABS: TabDef[] = [
+  { id: "performance", label: "Performance" },
+  { id: "reliability", label: "Reliability" },
+  { id: "monitors", label: "Monitors" },
+];
+const TAB_IDS = TABS.map((t) => t.id);
 
 /** URL-synced group-by tag KEY (?groupBy=team). "none" = no grouping (the no-querystring default). Mirrors the
  *  tag filter's history.replaceState approach (shareable/restorable, no Suspense needed). */
@@ -41,6 +52,7 @@ export default function ReportsPage() {
   const [window, setWindow] = useState<ReportWindow>("7d");
   const { selected, toggle, clear } = useTagFilter();
   const { groupBy, setGroupBy } = useGroupBy();
+  const { tab, setTab } = useTab(TAB_IDS, "performance");
 
   // ★ The monitor SET comes from the live checks list — the proven, always-populated source (the same one
   // the status/monitors pages use). The old reports list bound only to /reports/availability, which returns
@@ -114,24 +126,8 @@ export default function ReportsPage() {
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Reports</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {/* ★ Group-by a tag KEY (per-team / per-application reporting) — one section per tag value. */}
-          {groupKeys.length > 0 && (
-            <label className="flex items-center gap-1.5 text-xs text-[var(--color-ink-dim)]">
-              <span className="uppercase tracking-wider text-[var(--color-ink-faint)]">Group by</span>
-              <select
-                value={groupBy}
-                onChange={(e) => setGroupBy(e.target.value)}
-                aria-label="Group reports by tag key"
-                data-testid="group-by-select"
-                className="sw-input py-1 text-xs"
-              >
-                <option value="none">None</option>
-                {groupKeys.map((k) => (
-                  <option key={k} value={k}>{k}</option>
-                ))}
-              </select>
-            </label>
-          )}
+          {/* Window is a GLOBAL control — it scopes every tab's reports (stays above the tabs). Group-by moved
+              into the Monitors tab (it only reshapes the monitor list + suppresses fleet CWV/trend). */}
           <div className="inline-flex rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5" role="group" aria-label="window">
             {WINDOWS.map((w) => (
               <button
@@ -173,46 +169,8 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* P6 — alert-quality breakdown: how many reds were real vs monitor-bug vs transient (leads with precision). */}
-      <IncidentBreakdownCard window={window} tags={selected} />
-
-      {/* ★ Fleet Core Web Vitals (p75) + fleet trend — ONLY when ungrouped. When grouped, groups[0] is the first
-          tag VALUE (not the fleet), so a fleet-labelled tile would mislead; the per-group sections below render
-          each group's own CWV + trend instead. Both hide on honest-empty (no browser monitors / no series). */}
-      {!grouped && (
-        <>
-          <ReportWebVitals
-            vitals={perf?.groups[0]?.web_vitals ?? null}
-            browserCheckCount={perf?.groups[0]?.browser_check_count ?? 0}
-          />
-          {((avail?.groups[0]?.series?.length ?? 0) > 0 || (perf?.groups[0]?.series?.length ?? 0) > 0) && (
-            <div className="grid gap-4 sm:grid-cols-2" data-testid="report-fleet-trend">
-              <ReportSeriesArea
-                title="Fleet availability"
-                unit="% per day"
-                points={avail?.groups[0]?.series ?? []}
-                fmt={(v) => (v == null ? "—" : `${v.toFixed(1)}%`)}
-              />
-              <ReportSeriesArea
-                title="Fleet avg latency"
-                unit="avg ms per day"
-                points={perf?.groups[0]?.series ?? []}
-                fmt={formatDuration}
-              />
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ★ Fleet error budget (P5 v1) — per-check budget rows + a fleet rollup, tag-scoped like the tiles above.
-          Budget accounting only (no fast/slow-burn pills at fleet scope). Hides when no SLO targets are set. */}
-      <FleetSloReport window={window} tags={selected} />
-
-      {/* ★ Fleet MTTR / incident analytics (§A5) — mean+median time-to-resolve over RESOLVED incidents,
-          classification breakdown, and trend. Tag-scoped. Hides when the endpoint/incidents are absent. */}
-      <FleetMttrReport window={window} tags={selected} />
-
-      {/* Tags FILTER the list (multi-tag AND); only real in-use tags are offered. */}
+      {/* Tags FILTER the monitor list + scope every aggregate (multi-tag AND) — a GLOBAL control, above the
+          tabs. Only real in-use tags are offered. */}
       {(inUseTags?.length ?? 0) > 0 && (
         <TagFilter
           available={inUseTags ?? []}
@@ -223,17 +181,90 @@ export default function ReportsPage() {
         />
       )}
 
-      <MonitorReportList
-        filtered={filtered}
-        checks={checks}
-        isLoading={isLoading}
-        window={window}
-        selected={selected}
-        clear={clear}
-        avail={avail}
-        perf={perf}
-        groupBy={groupBy}
-      />
+      {/* Sub-tabs: only the ACTIVE tab's cards mount → the self-fetching Reliability cards (breakdown/SLO/MTTR)
+          fire their hooks only when Reliability is opened, not on page load. */}
+      <TabBar tabs={TABS} active={tab} onSelect={setTab} label="Report sections" />
+
+      {tab === "performance" && (
+        /* ★ Fleet Core Web Vitals (p75) + fleet trend — ONLY when ungrouped. When grouped, groups[0] is the
+           first tag VALUE (not the fleet), so a fleet-labelled tile would mislead — the per-group tiles live in
+           the Monitors tab instead. Both hide on honest-empty (no browser monitors / no series). */
+        !grouped ? (
+          <div className="space-y-5" data-testid="reports-panel-performance">
+            <ReportWebVitals
+              vitals={perf?.groups[0]?.web_vitals ?? null}
+              browserCheckCount={perf?.groups[0]?.browser_check_count ?? 0}
+            />
+            {((avail?.groups[0]?.series?.length ?? 0) > 0 || (perf?.groups[0]?.series?.length ?? 0) > 0) && (
+              <div className="grid gap-4 sm:grid-cols-2" data-testid="report-fleet-trend">
+                <ReportSeriesArea
+                  title="Fleet availability"
+                  unit="% per day"
+                  points={avail?.groups[0]?.series ?? []}
+                  fmt={(v) => (v == null ? "—" : `${v.toFixed(1)}%`)}
+                />
+                <ReportSeriesArea
+                  title="Fleet avg latency"
+                  unit="avg ms per day"
+                  points={perf?.groups[0]?.series ?? []}
+                  fmt={formatDuration}
+                />
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="sw-panel p-4 text-sm text-[var(--color-ink-dim)]" data-testid="reports-panel-performance">
+            Fleet Core Web Vitals + trend are hidden while grouped by <span className="sw-mono">{groupBy}</span> —
+            see per-group tiles in the Monitors tab. Set Group by → None to show the fleet aggregate.
+          </p>
+        )
+      )}
+
+      {tab === "reliability" && (
+        <div className="space-y-5" data-testid="reports-panel-reliability">
+          {/* P6 — alert-quality breakdown: how many reds were real vs monitor-bug vs transient. */}
+          <IncidentBreakdownCard window={window} tags={selected} />
+          {/* ★ Fleet error budget (P5 v1) — per-check budget rows + a fleet rollup, tag-scoped. */}
+          <FleetSloReport window={window} tags={selected} />
+          {/* ★ Fleet MTTR / incident analytics (§A5) — mean+median time-to-resolve, classification, trend. */}
+          <FleetMttrReport window={window} tags={selected} />
+        </div>
+      )}
+
+      {tab === "monitors" && (
+        <div className="space-y-4" data-testid="reports-panel-monitors">
+          {/* ★ Group-by a tag KEY (per-team / per-application reporting) — a Monitors-tab control: it buckets the
+              list into one section per tag value and suppresses the fleet CWV/trend on the Performance tab. */}
+          {groupKeys.length > 0 && (
+            <label className="flex items-center gap-1.5 text-xs text-[var(--color-ink-dim)]">
+              <span className="uppercase tracking-wider text-[var(--color-ink-faint)]">Group by</span>
+              <select
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value)}
+                aria-label="Group reports by tag key"
+                data-testid="group-by-select"
+                className="sw-input py-1 text-xs"
+              >
+                <option value="none">None</option>
+                {groupKeys.map((k) => (
+                  <option key={k} value={k}>{k}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          <MonitorReportList
+            filtered={filtered}
+            checks={checks}
+            isLoading={isLoading}
+            window={window}
+            selected={selected}
+            clear={clear}
+            avail={avail}
+            perf={perf}
+            groupBy={groupBy}
+          />
+        </div>
+      )}
     </div>
   );
 }

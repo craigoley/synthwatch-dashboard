@@ -72,13 +72,13 @@ test.describe("reporting layer 3 — narrative card", () => {
     await mockApi(page, defaultWorld()); // no narratives → /reports/narrative 404s
     await page.goto("/reports");
 
-    await expect(page.getByTestId("monitor-list")).toBeVisible(); // page itself fine
+    await expect(page.getByTestId("reports-panel-performance")).toBeVisible(); // page/tab itself fine
     await expect(page.getByTestId("narrative-card")).toHaveCount(0); // card hidden
   });
 
   test("compact per-monitor narrative shows directly on the monitor's report card", async ({ page }) => {
     await mockApi(page, worldWithNarrative());
-    await page.goto("/reports");
+    await page.goto("/reports?tab=monitors"); // the per-monitor card lives in the Monitors tab
 
     // Redesign: the per-monitor narrative is surfaced ON the card (not hidden behind the drill-down).
     const monitorCard = page.getByTestId("report-1").locator('[data-testid="narrative-card"][data-scope="monitor"]');

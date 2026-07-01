@@ -11,7 +11,7 @@ test.describe("reports — fleet MTTR / incident analytics", () => {
     const w = defaultWorld();
     w.mttrCheckIds = [1, 2];
     await mockApi(page, w);
-    await page.goto("/reports");
+    await page.goto("/reports?tab=reliability");
 
     await expect(page.getByTestId("fleet-mttr")).toBeVisible();
     await expect(page.getByTestId("fleet-mttr-rollup")).toBeVisible();
@@ -33,7 +33,7 @@ test.describe("reports — fleet MTTR / incident analytics", () => {
     w.tags = [{ key: "team", value: "web", count: 1 }];
     w.mttrCheckIds = [2]; // check 2 does not carry team:web → scope is empty
     await mockApi(page, w);
-    await page.goto("/reports?tags=team:web");
+    await page.goto("/reports?tags=team:web&tab=reliability");
 
     await expect(page.getByTestId("fleet-mttr")).toContainText("No incidents match this filter");
     await expect(page.getByTestId("fleet-mttr-rollup")).toHaveCount(0); // no fabricated rollup
@@ -43,7 +43,7 @@ test.describe("reports — fleet MTTR / incident analytics", () => {
     const w = defaultWorld();
     w.reportsServed = false; // /reports/mttr 404s
     await mockApi(page, w);
-    await page.goto("/reports");
+    await page.goto("/reports?tab=reliability");
 
     await expect(page.getByRole("heading", { name: "Reports" })).toBeVisible(); // page still renders
     await expect(page.getByTestId("fleet-mttr")).toHaveCount(0);
