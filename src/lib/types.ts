@@ -695,6 +695,53 @@ export interface EgressReport {
   regions: EgressRegion[];
 }
 
+// ─── §D1 monitor-trust scorecard (GET /reports/trust, /reports/trust/{id}) — the "every green with its proof"
+// artifact. NO composite score: measured facts + an auditable, rule-derived chip (the rule is a named constant,
+// rendered as a legend). redTest is an explicit "not captured" gap. ──────────────────────────────────────────
+export type TrustChip = "proven-live" | "flaky" | "nominal" | "unverified";
+export interface TrustIncidents {
+  total: number;
+  real_outage: number;
+  flaky_transient: number;
+  selector_drift: number;
+  environment_regional: number;
+  perf_regression: number;
+  unclassified: number;
+}
+export interface TrustSpecProvenance {
+  executed_sha256: string | null; // the committed assertion code that ran — an INTEGRITY fact, not a red-test
+  spec_path: string | null;
+}
+export interface TrustRow {
+  check_id: number;
+  check_name: string;
+  sensitive: boolean;
+  last_green_at: string | null; // null = NEVER verified green (a first-class state, not an error)
+  last_run_at: string | null;
+  run_count: number;
+  retry_count: number;
+  retry_rate: number | null; // null = no runs → "—", never 0%
+  incidents: TrustIncidents;
+  red_test_captured: boolean; // v1: always false → rendered "✗ not captured", never a pass
+  spec_provenance: TrustSpecProvenance;
+  trust: TrustChip; // API-derived from the named-constant rule (rendered verbatim in the legend)
+}
+export interface TrustReport {
+  window: string;
+  monitors: TrustRow[];
+}
+export interface TrustRetryPoint {
+  day: string;
+  run_count: number;
+  retry_count: number;
+  retry_rate: number | null; // null when run_count 0 — a GAP in the sparkline, never 0
+}
+export interface TrustDetail {
+  window: string;
+  monitor: TrustRow;
+  retry_series: TrustRetryPoint[];
+}
+
 // Reports P6 — the verdict-taxonomy breakdown (incidents.rca.classification). `precision` = real-outage /
 // classified (the fraction of JUDGED reds that were genuine outages); null when classified === 0 (honest empty,
 // not a fake 0%). `unclassified` is an explicit bucket — incidents with no RCA yet are never dropped.

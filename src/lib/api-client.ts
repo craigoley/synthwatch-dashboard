@@ -64,6 +64,10 @@ import type {
   EgressReport,
   EgressWindow,
   EgressIp,
+  TrustReport,
+  TrustDetail,
+  TrustRow,
+  TrustChip,
   StatusPage,
   StatusProperty,
   MttrReport,
@@ -1751,6 +1755,75 @@ export async function getEgressReport(window: EgressWindow = "all"): Promise<Egr
     ips: ((r.ips as Record<string, unknown>[]) ?? []).map(mapIp),
   }));
   return { window: str(raw?.window ?? window), regions };
+}
+
+// GET /api/reports/trust?window= (§D1 fleet scorecard) + /reports/trust/{id}?window= (detail + daily retry
+// series). ★ null-safe (mirrors getSloReport/getEgressReport): 404 → null → the page/card self-hides. Renders
+// the API's rule-derived `trust` chip verbatim (no client-side re-derivation); redTest is an explicit gap.
+const TRUST_CHIPS = ["proven-live", "flaky", "nominal", "unverified"] as const;
+
+function mapTrustRow(r: Record<string, unknown>): TrustRow {
+  const num = (v: unknown) => Number(v ?? 0);
+  const nul = (v: unknown) => (v == null ? null : Number(v));
+  const inc = (r.incidents ?? {}) as Record<string, unknown>;
+  const sp = (r.specProvenance ?? {}) as Record<string, unknown>;
+  const rt = (r.redTest ?? {}) as Record<string, unknown>;
+  return {
+    check_id: num(r.checkId),
+    check_name: String(r.checkName ?? ""),
+    sensitive: Boolean(r.sensitive),
+    last_green_at: r.lastGreenAt == null ? null : String(r.lastGreenAt),
+    last_run_at: r.lastRunAt == null ? null : String(r.lastRunAt),
+    run_count: num(r.runCount),
+    retry_count: num(r.retryCount),
+    retry_rate: nul(r.retryRate), // null preserved → "—", never a fake 0%
+    incidents: {
+      total: num(inc.total),
+      real_outage: num(inc.realOutage),
+      flaky_transient: num(inc.flakyTransient),
+      selector_drift: num(inc.selectorDrift),
+      environment_regional: num(inc.environmentRegional),
+      perf_regression: num(inc.perfRegression),
+      unclassified: num(inc.unclassified),
+    },
+    red_test_captured: Boolean(rt.captured), // API sends {captured:false} in v1 → false → "not captured"
+    spec_provenance: {
+      executed_sha256: sp.executedSha256 == null ? null : String(sp.executedSha256),
+      spec_path: sp.specPath == null ? null : String(sp.specPath),
+    },
+    // Coerce to a known chip; an unknown/absent value → "unverified" (null-safe, never crashes the table).
+    trust: (TRUST_CHIPS as readonly string[]).includes(String(r.trust)) ? (r.trust as TrustChip) : "unverified",
+  };
+}
+
+export async function getTrustReport(window: ReportWindow = "30d"): Promise<TrustReport | null> {
+  let raw: Record<string, unknown>;
+  try {
+    raw = await request<Record<string, unknown>>("/reports/trust", { window });
+  } catch {
+    return null; // endpoint not deployed yet → the /trust page self-hides its table
+  }
+  const monitors = ((raw?.monitors as Record<string, unknown>[]) ?? []).map(mapTrustRow);
+  return { window: String(raw?.window ?? window), monitors };
+}
+
+export async function getTrustDetail(checkId: number, window: ReportWindow = "30d"): Promise<TrustDetail | null> {
+  let raw: Record<string, unknown>;
+  try {
+    raw = await request<Record<string, unknown>>(`/reports/trust/${checkId}`, { window });
+  } catch {
+    return null; // endpoint absent / check has no trust data → the detail card self-hides
+  }
+  const m = raw?.monitor as Record<string, unknown> | null | undefined;
+  if (!m) return null;
+  const nul = (v: unknown) => (v == null ? null : Number(v));
+  const retry_series = ((raw?.retrySeries as Record<string, unknown>[]) ?? []).map((p) => ({
+    day: String(p.day ?? ""),
+    run_count: Number(p.runCount ?? 0),
+    retry_count: Number(p.retryCount ?? 0),
+    retry_rate: nul(p.retryRate), // null when run_count 0 → a gap, never 0
+  }));
+  return { window: String(raw?.window ?? window), monitor: mapTrustRow(m), retry_series };
 }
 
 // GET /api/status (§A3) — the internal/stakeholder status page: per-PROPERTY current state + uptime + recent

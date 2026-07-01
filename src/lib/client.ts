@@ -49,6 +49,8 @@ import {
   getSloReport,
   getDeploys,
   getEgressReport,
+  getTrustReport,
+  getTrustDetail,
   getStatus,
   getMttrReport,
   getNarrative,
@@ -110,6 +112,8 @@ const keys = {
   sloReport: (w: string, t: string) => ["report-slo", w, t] as const,
   deploys: (h: string, w: string) => ["deploys", h, w] as const,
   egress: (w: string) => ["report-egress", w] as const,
+  trust: (w: string) => ["report-trust", w] as const,
+  trustDetail: (id: number, w: string) => ["report-trust", id, w] as const,
   status: () => ["status-page"] as const,
   mttrReport: (w: string, t: string) => ["report-mttr", w, t] as const,
   performanceReport: (w: string, g: string, t: string) => ["report-performance", w, g, t] as const,
@@ -514,6 +518,22 @@ export function useEgress(window: EgressWindow = "all") {
     shouldRetryOnError: false,
     refreshInterval: 60000,
   });
+}
+
+// §D1 monitor-trust scorecard. 404 → null (self-hide). No poll — trust is a slow-moving audit view.
+export function useTrustReport(window: ReportWindow = "30d") {
+  return useSWR(keys.trust(window), () => getTrustReport(window), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+}
+
+export function useTrustDetail(checkId: number | null, window: ReportWindow = "30d") {
+  return useSWR(
+    checkId ? keys.trustDetail(checkId, window) : null,
+    () => getTrustDetail(checkId as number, window),
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
 }
 
 export function useStatus() {

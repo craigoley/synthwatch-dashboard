@@ -87,6 +87,11 @@ export interface World {
   /** Egress regions (GET /reports/egress, raw camelCase DTO). Unset → DEFAULT_EGRESS (3 regions, 1 IP each =
    *  stable). Override with a region carrying distinctCount≥2 + multiple ips to exercise the rotation warning. */
   egressRegions?: RawObj[];
+  /** §D1 trust rows (GET /reports/trust, raw camelCase). Unset → DEFAULT_TRUST (covers every chip + honest
+   *  states). Detail (/reports/trust/{id}) resolves the row by id + serves trustSeries. */
+  trustMonitors?: RawObj[];
+  /** Daily retry series for the trust detail card (raw camelCase). Unset → DEFAULT_TRUST_SERIES (incl. a null day). */
+  trustSeries?: RawObj[];
   /** Status summary (§A3) served? false → GET /status 404 (the By-property section hides). Default true. */
   statusServed?: boolean;
   /** Chat-to-prefill: set false to make /checks/parse-intent report unconfigured (the input hides). */
@@ -198,6 +203,34 @@ const DEFAULT_EGRESS: RawObj[] = [
   egressStable("centralus", "172.169.169.109", 1200),
   egressStable("eastus2", "20.85.72.149", 1249),
   egressStable("westus2", "20.80.135.196", 1004),
+];
+
+// §D1 trust rows (raw camelCase DTO). Covers every honest-render state: proven-live, flaky, never-green +
+// null-retryRate unverified, and a nominal row with a perfRegression incident (to prove it's NOT folded into
+// real-outage). redTest.captured is always false (v1) → "not captured", never a pass.
+const trustInc = (o: Partial<Record<string, number>> = {}) => ({
+  total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0, ...o,
+});
+const DEFAULT_TRUST: RawObj[] = [
+  { checkId: 1, checkName: "API health", sensitive: false, lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
+    runCount: 500, retryCount: 6, retryRate: 0.012, incidents: trustInc(), redTest: { captured: false },
+    specProvenance: { executedSha256: "abc123def456", specPath: "monitors/api/health.spec.ts" }, trust: "proven-live" },
+  { checkId: 2, checkName: "Homepage flow", sensitive: false, lastGreenAt: "2026-07-01T19:00:00Z", lastRunAt: "2026-07-01T20:00:00Z",
+    runCount: 400, retryCount: 240, retryRate: 0.6, incidents: trustInc({ total: 3, flakyTransient: 3 }), redTest: { captured: false },
+    specProvenance: { executedSha256: "beef0001", specPath: "monitors/home/flow.spec.ts" }, trust: "flaky" },
+  { checkId: 3, checkName: "Checkout (nominal + perf)", sensitive: false, lastGreenAt: "2026-07-01T18:00:00Z", lastRunAt: "2026-07-01T20:00:00Z",
+    runCount: 300, retryCount: 60, retryRate: 0.2, incidents: trustInc({ total: 3, realOutage: 1, perfRegression: 1, unclassified: 1 }),
+    redTest: { captured: false }, specProvenance: { executedSha256: "cafe0002", specPath: "monitors/shop/checkout.spec.ts" }, trust: "nominal" },
+  { checkId: 4, checkName: "New monitor (never run)", sensitive: false, lastGreenAt: null, lastRunAt: null,
+    runCount: 0, retryCount: 0, retryRate: null, incidents: trustInc(), redTest: { captured: false },
+    specProvenance: { executedSha256: null, specPath: null }, trust: "unverified" },
+];
+// Detail retry series: 4 days, incl. a NULL day (no runs) → a gap in the sparkline, never a 0.
+const DEFAULT_TRUST_SERIES: RawObj[] = [
+  { day: "2026-06-28", runCount: 0, retryCount: 0, retryRate: null },
+  { day: "2026-06-29", runCount: 100, retryCount: 2, retryRate: 0.02 },
+  { day: "2026-06-30", runCount: 100, retryCount: 5, retryRate: 0.05 },
+  { day: "2026-07-01", runCount: 100, retryCount: 60, retryRate: 0.6 },
 ];
 
 /**
@@ -670,6 +703,20 @@ export async function mockApi(
     if (path === "/api/reports/egress" && method === "GET") {
       if (world.reportsServed === false) return json(route, { error: "not_found" }, 404); // endpoint not deployed → section self-hides
       return json(route, { window: url.searchParams.get("window") ?? "all", regions: world.egressRegions ?? DEFAULT_EGRESS });
+    }
+
+    // §D1 trust — fleet scorecard + per-check detail (with daily retry series).
+    if (path === "/api/reports/trust" && method === "GET") {
+      if (world.reportsServed === false) return json(route, { error: "not_found" }, 404); // self-hides the page table
+      return json(route, { window: url.searchParams.get("window") ?? "30d", monitors: world.trustMonitors ?? DEFAULT_TRUST });
+    }
+    const trustDetail = path.match(/^\/api\/reports\/trust\/(\d+)$/);
+    if (trustDetail && method === "GET") {
+      if (world.reportsServed === false) return json(route, { error: "not_found" }, 404); // self-hides the detail card
+      const id = Number(trustDetail[1]);
+      const monitor = (world.trustMonitors ?? DEFAULT_TRUST).find((m) => Number(m.id ?? (m as RawObj).checkId) === id);
+      if (!monitor) return json(route, { error: "not_found" }, 404);
+      return json(route, { window: url.searchParams.get("window") ?? "30d", monitor, retrySeries: world.trustSeries ?? DEFAULT_TRUST_SERIES });
     }
 
     if (path === "/api/reports/slo" && method === "GET") {
