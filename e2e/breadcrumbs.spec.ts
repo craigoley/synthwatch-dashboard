@@ -14,11 +14,28 @@ test.describe("debug breadcrumbs", () => {
     await expect(page.getByTestId("debug-breadcrumbs")).toHaveCount(0);
   });
 
+  // ★ MUST-GO-RED regression for the leak: SYNTHWATCH_DEBUG=1 is the sticky, general-purpose switch for the
+  // INVISIBLE console debug channels (e.g. runsDebug). It must NOT force the VISIBLE breadcrumb panel on. Before
+  // the fix the panel rode this global flag, so anyone who ever debugged the runs funnel got it permanently.
+  test("panel stays HIDDEN when only the global SYNTHWATCH_DEBUG console flag is set (no ?debug=errors)", async ({ page }) => {
+    await mockApi(page);
+    await page.addInitScript(() => window.localStorage.setItem("SYNTHWATCH_DEBUG", "1"));
+    await page.goto("/"); // a normal navigation — no ?debug=errors
+    await expect(page.getByTestId("debug-breadcrumbs")).toHaveCount(0);
+  });
+
   test("panel SHOWS when gated via ?debug=errors", async ({ page }) => {
     await mockApi(page);
     await page.goto("/?debug=errors");
     await expect(page.getByTestId("debug-breadcrumbs")).toBeVisible();
     await expect(page.getByTestId("debug-breadcrumbs")).toContainText("BREADCRUMBS");
+  });
+
+  test("panel SHOWS via its dedicated sticky key (SYNTHWATCH_DEBUG_ERRORS=1), not the global flag", async ({ page }) => {
+    await mockApi(page);
+    await page.addInitScript(() => window.localStorage.setItem("SYNTHWATCH_DEBUG_ERRORS", "1"));
+    await page.goto("/"); // no ?debug param — the panel's OWN sticky opt-in, distinct from the console flag
+    await expect(page.getByTestId("debug-breadcrumbs")).toBeVisible();
   });
 
   test("captures a live window error and an unhandled rejection", async ({ page }) => {

@@ -2,15 +2,16 @@
 
 /**
  * Debug-only breadcrumb panel. Renders the in-memory error ring ({@link src/lib/breadcrumbs}) as a
- * copy-pasteable timeline, GATED by the existing debug.ts mechanism — it is invisible to normal users and
- * only appears when `?debug=errors` (or `?debug=all`) is present or `SYNTHWATCH_DEBUG=1` is set. It also
- * installs the global error/rejection capture once per tab (harmless, in-memory only) so a trail exists to
- * read even if the panel is opened after the fact.
+ * copy-pasteable timeline, GATED by {@link isDebugPanelOn} — invisible to normal users, appearing ONLY on an
+ * explicit per-channel opt-in: `?debug=errors` (or `?debug=all`), or the sticky key `SYNTHWATCH_DEBUG_ERRORS=1`.
+ * It deliberately does NOT ride the blanket `SYNTHWATCH_DEBUG=1` console flag (that leaked the panel on for
+ * anyone debugging the runs funnel — #159). It also installs the global error/rejection capture once per tab
+ * (harmless, in-memory only) so a trail exists to read even if the panel is opened after the fact.
  */
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-import { isDebugOn } from "@/lib/debug";
+import { isDebugPanelOn } from "@/lib/debug";
 import {
   clearBreadcrumbs,
   getBreadcrumbs,
@@ -33,10 +34,11 @@ export function DebugBreadcrumbs() {
     installErrorCapture();
   }, []);
 
-  // isDebugOn reads window — resolve after mount to avoid any hydration mismatch (server + first render null).
+  // isDebugPanelOn reads window — resolve after mount to avoid any hydration mismatch (server + first render
+  // null). Stricter than isDebugOn: the panel never rides the blanket SYNTHWATCH_DEBUG console flag (#159 leak).
   const [gated, setGated] = useState(false);
   useEffect(() => {
-    setGated(isDebugOn("errors"));
+    setGated(isDebugPanelOn("errors"));
   }, []);
 
   const entries = useSyncExternalStore(subscribe, getBreadcrumbs, getServerBreadcrumbs);
