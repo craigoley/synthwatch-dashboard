@@ -8,6 +8,7 @@ import { useCheck, useMetrics, updateCheck, revalidateChecks, runCheckNow, reval
 import { useAuth } from "@/components/auth-provider";
 import { AvailabilityChart, LatencyChart, MetricsCharts } from "@/components/charts";
 import { CheckSlaPanel, SloPanel } from "@/components/sla";
+import { TrustCard } from "@/components/trust";
 import { RunHistory } from "@/components/run-history";
 import { LiveStepsChecklist } from "@/components/live-steps";
 import { TraceViewer } from "@/components/trace-viewer";
@@ -506,6 +507,10 @@ export default function CheckDetailPage() {
       <PerLocationPanel runs={recent_runs} />
 
       <CheckSlaPanel checkId={check.id} />
+
+      {/* §D1 Trust drill-down — chip + honest red-test gap, retry sparkline, incident breakdown, spec
+          integrity hash. Self-hides (404 → null) until GET /reports/trust/{id} is reachable. */}
+      <TrustCard checkId={check.id} />
 
       {/* ★ ONE "Metrics" disclosure over the WHOLE tall chart stack (availability + latency + web vitals),
           so collapsing actually shrinks the page (the old toggle only hid the small Telemetry block below
