@@ -86,10 +86,10 @@ test.describe("API contract — extended seams", () => {
   });
 
   // ★ P9 Stage 3 contract — the field names the mapper reads for INP + resource_count (the anchor
-  // feat/vitals-report-inp-resource must satisfy so INP can't be silently re-dropped), plus null-safety so it
-  // self-degrades to null (never a fake 0) if the endpoint ships before Stage 2. Synthetic body: the captured
-  // fixture predates Stage 2.
-  test("★ /reports/performance — INP + resource_count map from inpP75Ms/inpCount/resourceCountP75/sampleCount", async () => {
+  // feat/vitals-report-inp-resource #147 satisfied so INP can't be silently re-dropped), plus null-safety so
+  // it self-degrades to null (never a fake 0) if a field is absent. Synthetic body: the captured fixture
+  // predates Stage 2. resourceCount is the live field (the earlier resourceCountP75 hedge was removed in #168).
+  test("★ /reports/performance — INP + resource_count map from inpP75Ms/inpCount/resourceCount/sampleCount", async () => {
     const body = {
       groupBy: "none",
       groups: [
@@ -97,7 +97,7 @@ test.describe("API contract — extended seams", () => {
           group: "all",
           latency: { avgMs: 200, p50Ms: 180, p95Ms: 400, p99Ms: 600 },
           series: [],
-          webVitals: { sampleCount: 200, lcpP75Ms: 1800, fcpP75Ms: 900, ttfbP75Ms: 200, clsP75: 0.05, inpP75Ms: 150, inpCount: 104, resourceCountP75: 48 },
+          webVitals: { sampleCount: 200, lcpP75Ms: 1800, fcpP75Ms: 900, ttfbP75Ms: 200, clsP75: 0.05, inpP75Ms: 150, inpCount: 104, resourceCount: 48 },
           checks: [],
         },
       ],
