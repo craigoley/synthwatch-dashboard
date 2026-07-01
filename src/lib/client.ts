@@ -47,6 +47,7 @@ import {
   getPerformanceReport,
   getIncidentBreakdown,
   getSloReport,
+  getStatus,
   getMttrReport,
   getNarrative,
   getReconcileDrift,
@@ -105,6 +106,7 @@ const keys = {
   availabilityReport: (w: string, g: string, t: string) => ["report-availability", w, g, t] as const,
   incidentBreakdown: (w: string, t: string) => ["report-incident-breakdown", w, t] as const,
   sloReport: (w: string, t: string) => ["report-slo", w, t] as const,
+  status: () => ["status-page"] as const,
   mttrReport: (w: string, t: string) => ["report-mttr", w, t] as const,
   performanceReport: (w: string, g: string, t: string) => ["report-performance", w, g, t] as const,
   narrative: (scope: string, w: string, key: number | null) => ["narrative", scope, w, key] as const,
@@ -490,6 +492,14 @@ export function useSloReport(window: ReportWindow, tags: Tag[] = []) {
   return useSWR(keys.sloReport(window, tagKey(tags)), () => getSloReport(window, tags), {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
+  });
+}
+
+export function useStatus() {
+  return useSWR(keys.status(), () => getStatus(), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+    refreshInterval: 15000, // current state moves run-to-run — a gentle poll like the status grid
   });
 }
 
