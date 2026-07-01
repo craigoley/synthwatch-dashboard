@@ -12,7 +12,7 @@ test.describe("reports — fleet SLO / error budget", () => {
     w.sloCheckIds = [1, 2]; // both SLO-enabled, both have enough data
     w.sloBuildingIds = [];
     await mockApi(page, w);
-    await page.goto("/reports");
+    await page.goto("/reports?tab=reliability");
 
     await expect(page.getByTestId("fleet-slo")).toBeVisible();
     await expect(page.getByTestId("fleet-slo-rollup")).toBeVisible();
@@ -29,7 +29,7 @@ test.describe("reports — fleet SLO / error budget", () => {
     w.sloCheckIds = [1, 3];
     w.sloBuildingIds = [3]; // check 3 has too few runs
     await mockApi(page, w);
-    await page.goto("/reports");
+    await page.goto("/reports?tab=reliability");
 
     await expect(page.getByTestId("slo-row-3").getByTestId("slo-building")).toContainText("building baseline");
     await expect(page.getByTestId("slo-row-1")).not.toContainText("building"); // check 1 shows a real %
@@ -43,7 +43,7 @@ test.describe("reports — fleet SLO / error budget", () => {
     w.sloCheckIds = [1, 2];
     w.sloBuildingIds = [];
     await mockApi(page, w);
-    await page.goto("/reports?tags=team:web");
+    await page.goto("/reports?tags=team:web&tab=reliability");
 
     await expect(page.getByTestId("report-scope-banner")).toBeVisible(); // filter still loud
     await expect(page.getByTestId("slo-row-1")).toBeVisible();
@@ -56,7 +56,7 @@ test.describe("reports — fleet SLO / error budget", () => {
     w.tags = [{ key: "team", value: "web", count: 1 }];
     w.sloCheckIds = [2, 3]; // neither carries team:web
     await mockApi(page, w);
-    await page.goto("/reports?tags=team:web");
+    await page.goto("/reports?tags=team:web&tab=reliability");
 
     await expect(page.getByTestId("fleet-slo")).toContainText("No SLO monitors match this filter");
     await expect(page.getByTestId("fleet-slo-rollup")).toHaveCount(0); // no fake rollup
@@ -66,7 +66,7 @@ test.describe("reports — fleet SLO / error budget", () => {
     const w = defaultWorld();
     w.reportsServed = false; // /reports/slo 404s
     await mockApi(page, w);
-    await page.goto("/reports");
+    await page.goto("/reports?tab=reliability");
 
     await expect(page.getByRole("heading", { name: "Reports" })).toBeVisible(); // page still renders
     await expect(page.getByTestId("fleet-slo")).toHaveCount(0);

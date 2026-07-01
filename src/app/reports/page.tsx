@@ -3,44 +3,29 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { useAvailabilityReport, usePerformanceReport, useChecks, useSla, useTags } from "@/lib/client";
-import { EmptyState, Spinner } from "@/components/states";
 import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { NarrativeCard } from "@/components/narrative-card";
 import { IncidentBreakdownCard } from "@/components/incident-breakdown-card";
-import { MonitorReportCard, type ReportRow } from "@/components/monitor-report-card";
+import { type ReportRow } from "@/components/monitor-report-card";
+import { MonitorReportList } from "@/components/monitor-report-list";
 import { ReportWebVitals, ReportSeriesArea } from "@/components/charts";
 import { FleetSloReport } from "@/components/fleet-slo";
 import { FleetMttrReport } from "@/components/fleet-mttr";
+import { TabBar, useTab, type TabDef } from "@/components/tabs";
 import { formatDuration } from "@/lib/format";
 import type { ReportWindow } from "@/lib/types";
 
 const WINDOWS: ReportWindow[] = ["7d", "30d", "90d"];
 
-type SortCol = "availability_pct" | "p95_ms" | "incidents" | "cert_days" | "name";
-const SORTS: { col: SortCol; label: string }[] = [
-  { col: "availability_pct", label: "Availability" },
-  { col: "p95_ms", label: "p95" },
-  { col: "incidents", label: "Incidents" },
-  { col: "cert_days", label: "Cert expiry" },
-  { col: "name", label: "Name" },
+// Sub-tabs organize the ~9 stacked report sections. Performance is the default (no ?tab= param). The
+// self-fetching Reliability cards mount ONLY when that tab is active (lazy) — avail/perf stay page-level (below)
+// and feed both Performance and Monitors, so switching between them never re-fetches.
+const TABS: TabDef[] = [
+  { id: "performance", label: "Performance" },
+  { id: "reliability", label: "Reliability" },
+  { id: "monitors", label: "Monitors" },
 ];
-
-function incidentsOf(r: ReportRow): number {
-  return r.incident_window_count ?? r.open_incident_count;
-}
-
-function compare(a: ReportRow, b: ReportRow, col: SortCol, dir: "asc" | "desc"): number {
-  const s = dir === "asc" ? 1 : -1;
-  if (col === "name") return a.name.localeCompare(b.name) * s;
-  // cert_days: non-cert checks are null → nulls-last (below), so "Cert expiry · asc" = expiring soonest first
-  // with non-cert monitors sorted out of the way.
-  const av = col === "incidents" ? incidentsOf(a) : col === "cert_days" ? a.last_cert_days_remaining : a[col];
-  const bv = col === "incidents" ? incidentsOf(b) : col === "cert_days" ? b.last_cert_days_remaining : b[col];
-  if (av == null && bv == null) return 0;
-  if (av == null) return 1; // nulls last, regardless of dir
-  if (bv == null) return -1;
-  return (av - bv) * s;
-}
+const TAB_IDS = TABS.map((t) => t.id);
 
 /** URL-synced group-by tag KEY (?groupBy=team). "none" = no grouping (the no-querystring default). Mirrors the
  *  tag filter's history.replaceState approach (shareable/restorable, no Suspense needed). */
@@ -67,8 +52,7 @@ export default function ReportsPage() {
   const [window, setWindow] = useState<ReportWindow>("7d");
   const { selected, toggle, clear } = useTagFilter();
   const { groupBy, setGroupBy } = useGroupBy();
-  const [sort, setSort] = useState<{ col: SortCol; dir: "asc" | "desc" }>({ col: "availability_pct", dir: "asc" });
-  const [expanded, setExpanded] = useState<number | null>(null);
+  const { tab, setTab } = useTab(TAB_IDS, "performance");
 
   // ★ The monitor SET comes from the live checks list — the proven, always-populated source (the same one
   // the status/monitors pages use). The old reports list bound only to /reports/availability, which returns
@@ -128,23 +112,11 @@ export default function ReportsPage() {
   }, [checks, sla, avail, perf]);
 
   const filtered = rows.filter((r) => matchesTags(r.tags, selected));
-  const sorted = [...filtered].sort((a, b) => compare(a, b, sort.col, sort.dir));
 
-  // Group-by: distinct tag KEYS to offer; when grouped, bucket the sorted rows by their value of that key and
-  // pair each value with the server-computed group aggregate (web_vitals/series) for that value.
+  // Group-by: distinct tag KEYS to offer. `grouped` also gates the fleet CWV/trend (groups[0] is the first tag
+  // VALUE, not the fleet, when grouped) — the per-group tiles render inside <MonitorReportList> instead.
   const groupKeys = useMemo(() => [...new Set((inUseTags ?? []).map((t) => t.key))].sort(), [inUseTags]);
   const grouped = groupBy !== "none";
-  const availByGroup = new Map((avail?.groups ?? []).map((g) => [g.group, g]));
-  const perfByGroup = new Map((perf?.groups ?? []).map((g) => [g.group, g]));
-  const rowsByValue = new Map<string, ReportRow[]>();
-  const untagged: ReportRow[] = [];
-  if (grouped)
-    for (const r of sorted) {
-      const v = r.tags.find((t) => t.key === groupBy)?.value ?? null;
-      if (v == null) untagged.push(r);
-      else (rowsByValue.get(v) ?? rowsByValue.set(v, []).get(v)!).push(r);
-    }
-  const groupValues = [...rowsByValue.keys()].sort();
 
   return (
     <div className="space-y-5">
@@ -154,24 +126,8 @@ export default function ReportsPage() {
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Reports</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {/* ★ Group-by a tag KEY (per-team / per-application reporting) — one section per tag value. */}
-          {groupKeys.length > 0 && (
-            <label className="flex items-center gap-1.5 text-xs text-[var(--color-ink-dim)]">
-              <span className="uppercase tracking-wider text-[var(--color-ink-faint)]">Group by</span>
-              <select
-                value={groupBy}
-                onChange={(e) => setGroupBy(e.target.value)}
-                aria-label="Group reports by tag key"
-                data-testid="group-by-select"
-                className="sw-input py-1 text-xs"
-              >
-                <option value="none">None</option>
-                {groupKeys.map((k) => (
-                  <option key={k} value={k}>{k}</option>
-                ))}
-              </select>
-            </label>
-          )}
+          {/* Window is a GLOBAL control — it scopes every tab's reports (stays above the tabs). Group-by moved
+              into the Monitors tab (it only reshapes the monitor list + suppresses fleet CWV/trend). */}
           <div className="inline-flex rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5" role="group" aria-label="window">
             {WINDOWS.map((w) => (
               <button
@@ -213,46 +169,8 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* P6 — alert-quality breakdown: how many reds were real vs monitor-bug vs transient (leads with precision). */}
-      <IncidentBreakdownCard window={window} tags={selected} />
-
-      {/* ★ Fleet Core Web Vitals (p75) + fleet trend — ONLY when ungrouped. When grouped, groups[0] is the first
-          tag VALUE (not the fleet), so a fleet-labelled tile would mislead; the per-group sections below render
-          each group's own CWV + trend instead. Both hide on honest-empty (no browser monitors / no series). */}
-      {!grouped && (
-        <>
-          <ReportWebVitals
-            vitals={perf?.groups[0]?.web_vitals ?? null}
-            browserCheckCount={perf?.groups[0]?.browser_check_count ?? 0}
-          />
-          {((avail?.groups[0]?.series?.length ?? 0) > 0 || (perf?.groups[0]?.series?.length ?? 0) > 0) && (
-            <div className="grid gap-4 sm:grid-cols-2" data-testid="report-fleet-trend">
-              <ReportSeriesArea
-                title="Fleet availability"
-                unit="% per day"
-                points={avail?.groups[0]?.series ?? []}
-                fmt={(v) => (v == null ? "—" : `${v.toFixed(1)}%`)}
-              />
-              <ReportSeriesArea
-                title="Fleet avg latency"
-                unit="avg ms per day"
-                points={perf?.groups[0]?.series ?? []}
-                fmt={formatDuration}
-              />
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ★ Fleet error budget (P5 v1) — per-check budget rows + a fleet rollup, tag-scoped like the tiles above.
-          Budget accounting only (no fast/slow-burn pills at fleet scope). Hides when no SLO targets are set. */}
-      <FleetSloReport window={window} tags={selected} />
-
-      {/* ★ Fleet MTTR / incident analytics (§A5) — mean+median time-to-resolve over RESOLVED incidents,
-          classification breakdown, and trend. Tag-scoped. Hides when the endpoint/incidents are absent. */}
-      <FleetMttrReport window={window} tags={selected} />
-
-      {/* Tags FILTER the list (multi-tag AND); only real in-use tags are offered. */}
+      {/* Tags FILTER the monitor list + scope every aggregate (multi-tag AND) — a GLOBAL control, above the
+          tabs. Only real in-use tags are offered. */}
       {(inUseTags?.length ?? 0) > 0 && (
         <TagFilter
           available={inUseTags ?? []}
@@ -263,123 +181,88 @@ export default function ReportsPage() {
         />
       )}
 
-      {isLoading && !checks ? (
-        <div className="py-16"><Spinner label="Building report…" /></div>
-      ) : sorted.length === 0 ? (
-        <EmptyState
-          title={
-            selected.length > 0
-              ? "No monitors match this filter."
-              : (checks?.length ?? 0) === 0
-                ? "No monitors yet."
-                : "No monitors to report on."
-          }
-          hint={selected.length > 0 ? "No monitor carries all the selected tags." : "Create a monitor to start collecting report data."}
-          action={selected.length > 0 ? <button onClick={clear} className="sw-btn">Clear filter</button> : undefined}
-        />
-      ) : (
-        <div className="space-y-4" data-testid="monitor-list">
-          {/* sort control (cards have no header row to click) */}
-          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--color-ink-faint)]">
-            <span className="uppercase tracking-wider">Sort</span>
-            {SORTS.map((s) => {
-              const active = sort.col === s.col;
-              return (
-                <button
-                  key={s.col}
-                  type="button"
-                  data-testid={`sort-${s.col}`}
-                  onClick={() =>
-                    setSort((cur) => (cur.col === s.col ? { col: s.col, dir: cur.dir === "asc" ? "desc" : "asc" } : { col: s.col, dir: s.col === "name" || s.col === "cert_days" ? "asc" : "desc" }))
-                  }
-                  className={`rounded-md border px-2 py-0.5 transition ${
-                    active
-                      ? "border-[var(--color-border-strong)] bg-[var(--color-panel-2)] text-[var(--color-ink)]"
-                      : "border-transparent hover:text-[var(--color-ink)]"
-                  }`}
-                >
-                  {s.label}
-                  {active && <span aria-hidden> {sort.dir === "asc" ? "▲" : "▼"}</span>}
-                </button>
-              );
-            })}
-          </div>
+      {/* Sub-tabs: only the ACTIVE tab's cards mount → the self-fetching Reliability cards (breakdown/SLO/MTTR)
+          fire their hooks only when Reliability is opened, not on page load. */}
+      <TabBar tabs={TABS} active={tab} onSelect={setTab} label="Report sections" />
 
-          {!grouped ? (
-            sorted.map((r) => (
-              <MonitorReportCard
-                key={r.check_id}
-                row={r}
-                window={window}
-                open={expanded === r.check_id}
-                onToggle={() => setExpanded((cur) => (cur === r.check_id ? null : r.check_id))}
-              />
-            ))
-          ) : (
-            <>
-              {/* One section per tag VALUE: the group's own CWV + trend (server-computed) + its monitor cards. */}
-              {groupValues.map((value) => {
-                const pg = perfByGroup.get(value);
-                const ag = availByGroup.get(value);
-                const bucket = rowsByValue.get(value) ?? [];
-                return (
-                  <section
-                    key={value}
-                    data-testid={`group-section-${value}`}
-                    className="space-y-3 rounded-lg border border-[var(--color-border)] p-3"
-                  >
-                    <h2 className="flex items-baseline gap-2 text-sm font-semibold text-[var(--color-ink)]">
-                      <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">{groupBy}</span>
-                      {value}
-                      <span className="text-[11px] font-normal text-[var(--color-ink-faint)]">
-                        · {bucket.length} monitor{bucket.length === 1 ? "" : "s"}
-                      </span>
-                    </h2>
-                    <ReportWebVitals vitals={pg?.web_vitals ?? null} browserCheckCount={pg?.browser_check_count ?? 0} />
-                    {(((ag?.series?.length ?? 0) > 0) || ((pg?.series?.length ?? 0) > 0)) && (
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <ReportSeriesArea title="Availability" unit="% per day" points={ag?.series ?? []} fmt={(v) => (v == null ? "—" : `${v.toFixed(1)}%`)} />
-                        <ReportSeriesArea title="Avg latency" unit="avg ms per day" points={pg?.series ?? []} fmt={formatDuration} />
-                      </div>
-                    )}
-                    {bucket.map((r) => (
-                      <MonitorReportCard
-                        key={r.check_id}
-                        row={r}
-                        window={window}
-                        open={expanded === r.check_id}
-                        onToggle={() => setExpanded((cur) => (cur === r.check_id ? null : r.check_id))}
-                      />
-                    ))}
-                  </section>
-                );
-              })}
-              {/* Honest accounting: monitors lacking the group-by tag aren't dropped — shown in their own section
-                  (the server's INNER JOIN excludes them from the aggregates, so no group tiles here). */}
-              {untagged.length > 0 && (
-                <section
-                  data-testid="group-section-untagged"
-                  className="space-y-3 rounded-lg border border-dashed border-[var(--color-border)] p-3"
-                >
-                  <h2 className="flex items-baseline gap-2 text-sm font-semibold text-[var(--color-ink-dim)]">
-                    No <span className="sw-mono">{groupBy}</span> tag
-                    <span className="text-[11px] font-normal text-[var(--color-ink-faint)]">
-                      · {untagged.length} monitor{untagged.length === 1 ? "" : "s"}
-                    </span>
-                  </h2>
-                  {untagged.map((r) => (
-                    <MonitorReportCard
-                      key={r.check_id}
-                      row={r}
-                      window={window}
-                      open={expanded === r.check_id}
-                      onToggle={() => setExpanded((cur) => (cur === r.check_id ? null : r.check_id))}
-                    />
-                  ))}
-                </section>
-              )}
-            </>
+      {tab === "performance" && (
+        /* ★ Fleet Core Web Vitals (p75) + fleet trend — ONLY when ungrouped. When grouped, groups[0] is the
+           first tag VALUE (not the fleet), so a fleet-labelled tile would mislead — the per-group tiles live in
+           the Monitors tab instead. Both hide on honest-empty (no browser monitors / no series). */
+        !grouped ? (
+          <div className="space-y-5" data-testid="reports-panel-performance">
+            <ReportWebVitals
+              vitals={perf?.groups[0]?.web_vitals ?? null}
+              browserCheckCount={perf?.groups[0]?.browser_check_count ?? 0}
+            />
+            {((avail?.groups[0]?.series?.length ?? 0) > 0 || (perf?.groups[0]?.series?.length ?? 0) > 0) && (
+              <div className="grid gap-4 sm:grid-cols-2" data-testid="report-fleet-trend">
+                <ReportSeriesArea
+                  title="Fleet availability"
+                  unit="% per day"
+                  points={avail?.groups[0]?.series ?? []}
+                  fmt={(v) => (v == null ? "—" : `${v.toFixed(1)}%`)}
+                />
+                <ReportSeriesArea
+                  title="Fleet avg latency"
+                  unit="avg ms per day"
+                  points={perf?.groups[0]?.series ?? []}
+                  fmt={formatDuration}
+                />
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="sw-panel p-4 text-sm text-[var(--color-ink-dim)]" data-testid="reports-panel-performance">
+            Fleet Core Web Vitals + trend are hidden while grouped by <span className="sw-mono">{groupBy}</span> —
+            see per-group tiles in the Monitors tab. Set Group by → None to show the fleet aggregate.
+          </p>
+        )
+      )}
+
+      {tab === "reliability" && (
+        <div className="space-y-5" data-testid="reports-panel-reliability">
+          {/* P6 — alert-quality breakdown: how many reds were real vs monitor-bug vs transient. */}
+          <IncidentBreakdownCard window={window} tags={selected} />
+          {/* ★ Fleet error budget (P5 v1) — per-check budget rows + a fleet rollup, tag-scoped. */}
+          <FleetSloReport window={window} tags={selected} />
+          {/* ★ Fleet MTTR / incident analytics (§A5) — mean+median time-to-resolve, classification, trend. */}
+          <FleetMttrReport window={window} tags={selected} />
+        </div>
+      )}
+
+      {tab === "monitors" && (
+        <div className="space-y-4" data-testid="reports-panel-monitors">
+          {/* ★ Group-by a tag KEY (per-team / per-application reporting) — a Monitors-tab control: it buckets the
+              list into one section per tag value and suppresses the fleet CWV/trend on the Performance tab. */}
+          {groupKeys.length > 0 && (
+            <label className="flex items-center gap-1.5 text-xs text-[var(--color-ink-dim)]">
+              <span className="uppercase tracking-wider text-[var(--color-ink-faint)]">Group by</span>
+              <select
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value)}
+                aria-label="Group reports by tag key"
+                data-testid="group-by-select"
+                className="sw-input py-1 text-xs"
+              >
+                <option value="none">None</option>
+                {groupKeys.map((k) => (
+                  <option key={k} value={k}>{k}</option>
+                ))}
+              </select>
+            </label>
           )}
+          <MonitorReportList
+            filtered={filtered}
+            checks={checks}
+            isLoading={isLoading}
+            window={window}
+            selected={selected}
+            clear={clear}
+            avail={avail}
+            perf={perf}
+            groupBy={groupBy}
+          />
         </div>
       )}
     </div>

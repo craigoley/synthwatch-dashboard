@@ -8,6 +8,11 @@ import { slaResponse, slaRow, defaultChecks } from "./fixtures";
 // — which returns empty even when monitors exist — so it showed "No monitors to report on" while the fleet
 // summary had data. These tests pin the fix (cards render when the report endpoints are empty/404) and the
 // redesign (availability/latency/incidents/narrative per monitor, window toggle).
+//
+// ★ SUB-TABS: the page is now Performance (default) / Reliability / Monitors. The per-monitor list lives in the
+// Monitors tab (?tab=monitors); the fleet CWV/trend in Performance (default); breakdown/SLO/MTTR in Reliability.
+const MONITORS = "/reports?tab=monitors";
+
 function world() {
   const w = defaultWorld();
   // check 1 = "API health" (http) → env:prod ; check 2 = "Homepage flow" (browser) → env:prod + team:web
@@ -31,10 +36,10 @@ function world() {
   return w;
 }
 
-test.describe("reports — per-monitor cards + tag filter", () => {
+test.describe("reports — per-monitor cards + tag filter (Monitors tab)", () => {
   test("renders a report card for every monitor (sourced from the live checks list)", async ({ page }) => {
     await mockApi(page, world());
-    await page.goto("/reports");
+    await page.goto(MONITORS);
     await expect(page.getByTestId("monitor-list")).toBeVisible();
     await expect(page.getByTestId("report-1")).toBeVisible();
     await expect(page.getByTestId("report-2")).toBeVisible();
@@ -47,7 +52,7 @@ test.describe("reports — per-monitor cards + tag filter", () => {
     const w = world();
     w.reportsEmpty = true; // 200 + groups:[] — the prod failure mode
     await mockApi(page, w);
-    await page.goto("/reports");
+    await page.goto(MONITORS);
 
     // The list is NOT empty — monitors come from /checks, availability from /sla.
     await expect(page.getByTestId("monitor-list")).toBeVisible();
@@ -61,7 +66,7 @@ test.describe("reports — per-monitor cards + tag filter", () => {
     const w = world();
     w.reportsServed = false;
     await mockApi(page, w);
-    await page.goto("/reports");
+    await page.goto(MONITORS);
     await expect(page.getByTestId("report-1")).toBeVisible();
     await expect(page.getByTestId("report-1")).toContainText("90.00%");
     await expect(page.getByTestId("reports-pending")).toHaveCount(0); // the old blocker is gone
@@ -69,7 +74,7 @@ test.describe("reports — per-monitor cards + tag filter", () => {
 
   test("the filter offers ONLY real in-use tags (never invented dimensions)", async ({ page }) => {
     await mockApi(page, world());
-    await page.goto("/reports");
+    await page.goto("/reports"); // tag filter is a GLOBAL control (above the tabs) — visible on any tab
     const filter = page.getByTestId("tag-filter");
     await expect(filter.getByRole("checkbox", { name: "filter env:prod" })).toBeVisible();
     await expect(filter.getByRole("checkbox", { name: "filter team:web" })).toBeVisible();
@@ -78,7 +83,7 @@ test.describe("reports — per-monitor cards + tag filter", () => {
 
   test("tags FILTER the list (not group it) — multi-tag AND", async ({ page }) => {
     await mockApi(page, world());
-    await page.goto("/reports");
+    await page.goto(MONITORS);
     await expect(page.getByTestId("report-1")).toBeVisible();
 
     await page.getByRole("checkbox", { name: "filter team:web" }).click();
@@ -89,7 +94,7 @@ test.describe("reports — per-monitor cards + tag filter", () => {
 
   test("sortable: availability vs name reorder the cards", async ({ page }) => {
     await mockApi(page, world());
-    await page.goto("/reports");
+    await page.goto(MONITORS);
     await page.getByRole("checkbox", { name: "filter env:prod" }).click(); // narrow to checks 1 & 2
     const firstCard = () => page.getByTestId("monitor-list").locator('[data-testid^="report-"]').first();
 
@@ -104,7 +109,7 @@ test.describe("reports — per-monitor cards + tag filter", () => {
     const w = world();
     w.metrics = [{ capturedAt: "2026-06-20T10:00:00Z", lcpMs: 1800, fcpMs: 900, ttfbMs: 200, cls: 0.05, inpMs: 120 }];
     await mockApi(page, w);
-    await page.goto("/reports");
+    await page.goto(MONITORS);
 
     // browser monitor (check 2) → expand → vitals panel with LCP, no INP
     await page.getByTestId("report-toggle-2").click();
@@ -132,7 +137,7 @@ test.describe("reports — per-monitor cards + tag filter", () => {
     //   incidentsOpened=id%5            → id4=4, id3=3, id1=1            (inc desc → 4,3,1)
     w.checks = defaultChecks().filter((c) => [1, 3, 4].includes(Number(c.id)));
     await mockApi(page, w);
-    await page.goto("/reports");
+    await page.goto(MONITORS);
 
     const order = () =>
       page.locator('[data-testid="monitor-list"] > section').evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
@@ -147,7 +152,8 @@ test.describe("reports — per-monitor cards + tag filter", () => {
 
 // ★ Tier-1 P1/P2: render the perf-report data the page already fetches but previously dropped — the FLEET
 // Core Web Vitals (p75) card + the fleet availability/avg-latency trends (groups[0].web_vitals + .series).
-test.describe("reports — fleet CWV + trend (P1/P2)", () => {
+// These live in the Performance tab (the default — no ?tab= param needed).
+test.describe("reports — fleet CWV + trend (P1/P2, Performance tab)", () => {
   test("fleet Core Web Vitals (p75) card renders, threshold-colored, INP honest-placeholder (not faked)", async ({ page }) => {
     await mockApi(page, world());
     await page.goto("/reports");
@@ -180,17 +186,18 @@ test.describe("reports — fleet CWV + trend (P1/P2)", () => {
     await mockApi(page, w);
     await page.goto("/reports");
 
-    await expect(page.getByTestId("monitor-list")).toBeVisible(); // page still renders
+    await expect(page.getByTestId("reports-panel-performance")).toBeVisible(); // the tab still renders
     await expect(page.getByTestId("report-cwv")).toHaveCount(0); // but no vitals card (none captured)
   });
 });
 
 // ★ Tier-1 P3: cert-expiry runway — the SSL last_cert_days_remaining already on each check, dropped from
 // ReportRow until now. A badge + an "expiring soonest" sort. gaps-not-zeros: non-cert checks show nothing.
-test.describe("reports — cert runway (P3)", () => {
+// Lives in the Monitors tab (it's a per-monitor-list column).
+test.describe("reports — cert runway (P3, Monitors tab)", () => {
   test("SSL monitor shows a cert-runway badge; non-cert monitors show none (gaps-not-zeros)", async ({ page }) => {
     await mockApi(page, defaultWorld()); // check 3 = "TLS cert" (ssl), lastCertDaysRemaining 12
-    await page.goto("/reports");
+    await page.goto(MONITORS);
 
     const cert = page.getByTestId("report-3").getByTestId("cert-runway");
     await expect(cert).toBeVisible();
@@ -201,7 +208,7 @@ test.describe("reports — cert runway (P3)", () => {
 
   test("'Cert expiry' sort surfaces cert monitors soonest-first (nulls-last)", async ({ page }) => {
     await mockApi(page, defaultWorld());
-    await page.goto("/reports");
+    await page.goto(MONITORS);
 
     await page.getByTestId("sort-cert_days").click();
     // the only cert check (report-3) sorts ABOVE the non-cert (null) checks, which fall to the bottom
@@ -213,7 +220,8 @@ test.describe("reports — cert runway (P3)", () => {
 
 // ★ Tag-scoped aggregates: the report tiles (CWV / fleet trend / verdict-breakdown) honor the SAME tag filter
 // as the monitor list (server-scoped via ?tag=), with a loud scope banner so a subset number is never read as
-// the fleet's — and honest-empty (no fake 0%) when a tag has no matching monitors.
+// the fleet's — and honest-empty (no fake 0%) when a tag has no matching monitors. The banner is GLOBAL; CWV is
+// Performance; the verdict-breakdown moved to the Reliability tab.
 test.describe("reports — tag-scoped aggregates", () => {
   test("a tag filter scopes the tiles + shows a scope banner (obvious subset)", async ({ page }) => {
     await mockApi(page, world());
@@ -223,8 +231,10 @@ test.describe("reports — tag-scoped aggregates", () => {
     await expect(banner).toBeVisible();
     await expect(banner).toContainText("team:web");
     await expect(banner).toContainText("1 of"); // 1 of N monitors — the subset is explicit
-    // the aggregate tiles still render, now scoped: CWV (check 2 is browser) + the verdict-breakdown card.
+    // Performance tab: the CWV tile still renders, now scoped (check 2 is browser).
     await expect(page.getByTestId("report-cwv")).toBeVisible();
+    // Reliability tab: the verdict-breakdown card, also scoped.
+    await page.getByTestId("reports-tab-reliability").click();
     await expect(page.getByText("Alert quality — were the reds real?")).toBeVisible();
   });
 
@@ -233,10 +243,11 @@ test.describe("reports — tag-scoped aggregates", () => {
     await page.goto("/reports?tags=team:none");
 
     await expect(page.getByTestId("report-scope-banner")).toContainText("0 of");
-    // the aggregate tiles vanish (no data for this tag) rather than showing a fabricated number…
+    // Performance tab: the aggregate tiles vanish (no data) rather than showing a fabricated number…
     await expect(page.getByTestId("report-cwv")).toHaveCount(0);
     await expect(page.getByTestId("report-fleet-trend")).toHaveCount(0);
-    // …and the verdict-breakdown reads "nothing to grade" (precision null), never "0% real".
+    // …and on Reliability the verdict-breakdown reads "nothing to grade" (precision null), never "0% real".
+    await page.getByTestId("reports-tab-reliability").click();
     await expect(page.getByText(/nothing to grade/i)).toBeVisible();
   });
 
@@ -249,8 +260,9 @@ test.describe("reports — tag-scoped aggregates", () => {
 
 // ★ #P4: group-by a tag KEY — per-team / per-application reporting. The API groups server-side (one group per
 // tag value); the UI renders one section per value (each with its own CWV/trend + bucketed cards). URL-synced,
-// composes with the tag filter.
-test.describe("reports — group by tag key", () => {
+// composes with the tag filter. Group-by is now a MONITORS-TAB control; it still suppresses the Performance
+// tab's fleet CWV/trend when active.
+test.describe("reports — group by tag key (Monitors tab)", () => {
   function groupedWorld() {
     const w = world(); // check 1 = env:prod, check 2 = env:prod + team:web
     // give check 1 a team too so grouping by team yields TWO values (platform + web).
@@ -267,16 +279,18 @@ test.describe("reports — group by tag key", () => {
 
   test("default (no group-by) → single aggregate, no group sections", async ({ page }) => {
     await mockApi(page, groupedWorld());
-    await page.goto("/reports");
+    await page.goto(MONITORS);
 
-    await expect(page.getByTestId("group-by-select")).toBeVisible();
-    await expect(page.getByTestId("report-fleet-trend")).toBeVisible(); // fleet aggregate present
+    await expect(page.getByTestId("group-by-select")).toBeVisible(); // the control lives in the Monitors tab
     await expect(page.locator('[data-testid^="group-section-"]')).toHaveCount(0); // no grouping
+    // the fleet aggregate lives on the Performance tab (present when ungrouped)
+    await page.getByTestId("reports-tab-performance").click();
+    await expect(page.getByTestId("report-fleet-trend")).toBeVisible();
   });
 
   test("group by team → one section per value, headers + cards bucketed; fleet aggregate hidden", async ({ page }) => {
     await mockApi(page, groupedWorld());
-    await page.goto("/reports?groupBy=team"); // ★ URL restores the grouping
+    await page.goto("/reports?tab=monitors&groupBy=team"); // ★ URL restores the tab + grouping
 
     await expect(page.getByTestId("group-by-select")).toHaveValue("team");
     const platform = page.getByTestId("group-section-platform");
@@ -288,21 +302,22 @@ test.describe("reports — group by tag key", () => {
     // ★ cards bucketed by tag value: check 1 under platform, check 2 under web
     await expect(platform.getByTestId("report-1")).toBeVisible();
     await expect(web.getByTestId("report-2")).toBeVisible();
-    // ★ the top fleet aggregate is HIDDEN when grouped (groups[0] is a tag value, not the fleet)
+    // ★ the fleet aggregate is HIDDEN when grouped (groups[0] is a tag value, not the fleet)
+    await page.getByTestId("reports-tab-performance").click();
     await expect(page.getByTestId("report-fleet-trend")).toHaveCount(0);
   });
 
   test("group-by composes with a tag filter (scope banner still shows)", async ({ page }) => {
     await mockApi(page, groupedWorld());
-    await page.goto("/reports?tags=env:prod&groupBy=team");
+    await page.goto("/reports?tab=monitors&tags=env:prod&groupBy=team");
 
-    await expect(page.getByTestId("report-scope-banner")).toBeVisible(); // filter still scoped + loud
+    await expect(page.getByTestId("report-scope-banner")).toBeVisible(); // filter still scoped + loud (global bar)
     await expect(page.getByTestId("group-section-web")).toBeVisible(); // …and still bucketed by team
   });
 
   test("selecting a key in the dropdown URL-syncs ?groupBy=", async ({ page }) => {
     await mockApi(page, groupedWorld());
-    await page.goto("/reports");
+    await page.goto(MONITORS);
 
     await page.getByTestId("group-by-select").selectOption("team");
     await expect(page).toHaveURL(/[?&]groupBy=team/);
