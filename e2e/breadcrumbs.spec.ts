@@ -63,6 +63,10 @@ test.describe("debug breadcrumbs", () => {
   test("Clear empties the captured trail", async ({ page }) => {
     await mockApi(page);
     await page.goto("/?debug=errors");
+    // Wait for the panel to mount (so installErrorCapture's effect has run) BEFORE dispatching — otherwise the
+    // event can fire before the listener is attached and the crumb is missed (a flaky race, matches the
+    // "captures a live window error" test above).
+    await expect(page.getByTestId("debug-breadcrumbs")).toBeVisible();
     await page.evaluate(() => {
       window.dispatchEvent(new ErrorEvent("error", { message: "x", error: new Error("to clear") }));
     });
