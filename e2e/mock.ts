@@ -82,6 +82,8 @@ export interface World {
   tags?: RawObj[];
   /** Reports served? false → /reports/* 404 (endpoint not deployed). Default true. */
   reportsServed?: boolean;
+  /** Status summary (§A3) served? false → GET /status 404 (the By-property section hides). Default true. */
+  statusServed?: boolean;
   /** Chat-to-prefill: set false to make /checks/parse-intent report unconfigured (the input hides). */
   parseIntentConfigured?: boolean;
   /** Fleet SLO report: which check ids have an SLO target (default [1,3]); which are "building baseline". */
@@ -607,6 +609,23 @@ export async function mockApi(
         ],
       });
     }
+    // Internal/stakeholder status summary (§A3) — property rollup. A DOWN property, an up one with a real %,
+    // and a building-baseline property (state up NOW but null uptime — the state≠uptime honesty).
+    if (path === "/api/status" && method === "GET") {
+      if (world.statusServed === false) return json(route, { error: "not_found" }, 404);
+      return json(route, {
+        window: "30d",
+        properties: [
+          { name: "meals2go", state: "down", checkCount: 2, upCount: 1, degradedCount: 0, downCount: 1, uptimePct: 88.94, buildingBaseline: false },
+          { name: "wegmans.com", state: "up", checkCount: 5, upCount: 5, degradedCount: 0, downCount: 0, uptimePct: 97.23, buildingBaseline: false },
+          { name: "newprop", state: "up", checkCount: 1, upCount: 1, degradedCount: 0, downCount: 0, uptimePct: null, buildingBaseline: true },
+        ],
+        recentIncidents: [
+          { property: "meals2go", title: "meals2go checkout down", openedAt: "2026-06-30T12:00:00Z", resolvedAt: null, status: "open", severity: "critical" },
+        ],
+      });
+    }
+
     // Fleet SLO / error-budget (P5 v1) — per-check budget rows + a fleet rollup, tag-responsive. sloCheckIds =
     // which checks have an SLO target; sloBuildingIds = insufficient_data ("building baseline", null remaining).
     if (path === "/api/reports/slo" && method === "GET") {
