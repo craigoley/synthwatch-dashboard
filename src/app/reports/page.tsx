@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { useAvailabilityReport, usePerformanceReport, useChecks, useSla, useTags } from "@/lib/client";
-import { EmptyState, Spinner } from "@/components/states";
 import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { NarrativeCard } from "@/components/narrative-card";
 import { IncidentBreakdownCard } from "@/components/incident-breakdown-card";
-import { MonitorReportCard, type ReportRow } from "@/components/monitor-report-card";
+import { type ReportRow } from "@/components/monitor-report-card";
+import { MonitorReportList } from "@/components/monitor-report-list";
 import { ReportWebVitals, ReportSeriesArea } from "@/components/charts";
 import { FleetSloReport } from "@/components/fleet-slo";
 import { FleetMttrReport } from "@/components/fleet-mttr";
@@ -15,32 +15,6 @@ import { formatDuration } from "@/lib/format";
 import type { ReportWindow } from "@/lib/types";
 
 const WINDOWS: ReportWindow[] = ["7d", "30d", "90d"];
-
-type SortCol = "availability_pct" | "p95_ms" | "incidents" | "cert_days" | "name";
-const SORTS: { col: SortCol; label: string }[] = [
-  { col: "availability_pct", label: "Availability" },
-  { col: "p95_ms", label: "p95" },
-  { col: "incidents", label: "Incidents" },
-  { col: "cert_days", label: "Cert expiry" },
-  { col: "name", label: "Name" },
-];
-
-function incidentsOf(r: ReportRow): number {
-  return r.incident_window_count ?? r.open_incident_count;
-}
-
-function compare(a: ReportRow, b: ReportRow, col: SortCol, dir: "asc" | "desc"): number {
-  const s = dir === "asc" ? 1 : -1;
-  if (col === "name") return a.name.localeCompare(b.name) * s;
-  // cert_days: non-cert checks are null → nulls-last (below), so "Cert expiry · asc" = expiring soonest first
-  // with non-cert monitors sorted out of the way.
-  const av = col === "incidents" ? incidentsOf(a) : col === "cert_days" ? a.last_cert_days_remaining : a[col];
-  const bv = col === "incidents" ? incidentsOf(b) : col === "cert_days" ? b.last_cert_days_remaining : b[col];
-  if (av == null && bv == null) return 0;
-  if (av == null) return 1; // nulls last, regardless of dir
-  if (bv == null) return -1;
-  return (av - bv) * s;
-}
 
 /** URL-synced group-by tag KEY (?groupBy=team). "none" = no grouping (the no-querystring default). Mirrors the
  *  tag filter's history.replaceState approach (shareable/restorable, no Suspense needed). */
@@ -67,8 +41,6 @@ export default function ReportsPage() {
   const [window, setWindow] = useState<ReportWindow>("7d");
   const { selected, toggle, clear } = useTagFilter();
   const { groupBy, setGroupBy } = useGroupBy();
-  const [sort, setSort] = useState<{ col: SortCol; dir: "asc" | "desc" }>({ col: "availability_pct", dir: "asc" });
-  const [expanded, setExpanded] = useState<number | null>(null);
 
   // ★ The monitor SET comes from the live checks list — the proven, always-populated source (the same one
   // the status/monitors pages use). The old reports list bound only to /reports/availability, which returns
@@ -128,23 +100,11 @@ export default function ReportsPage() {
   }, [checks, sla, avail, perf]);
 
   const filtered = rows.filter((r) => matchesTags(r.tags, selected));
-  const sorted = [...filtered].sort((a, b) => compare(a, b, sort.col, sort.dir));
 
-  // Group-by: distinct tag KEYS to offer; when grouped, bucket the sorted rows by their value of that key and
-  // pair each value with the server-computed group aggregate (web_vitals/series) for that value.
+  // Group-by: distinct tag KEYS to offer. `grouped` also gates the fleet CWV/trend (groups[0] is the first tag
+  // VALUE, not the fleet, when grouped) — the per-group tiles render inside <MonitorReportList> instead.
   const groupKeys = useMemo(() => [...new Set((inUseTags ?? []).map((t) => t.key))].sort(), [inUseTags]);
   const grouped = groupBy !== "none";
-  const availByGroup = new Map((avail?.groups ?? []).map((g) => [g.group, g]));
-  const perfByGroup = new Map((perf?.groups ?? []).map((g) => [g.group, g]));
-  const rowsByValue = new Map<string, ReportRow[]>();
-  const untagged: ReportRow[] = [];
-  if (grouped)
-    for (const r of sorted) {
-      const v = r.tags.find((t) => t.key === groupBy)?.value ?? null;
-      if (v == null) untagged.push(r);
-      else (rowsByValue.get(v) ?? rowsByValue.set(v, []).get(v)!).push(r);
-    }
-  const groupValues = [...rowsByValue.keys()].sort();
 
   return (
     <div className="space-y-5">
@@ -263,125 +223,17 @@ export default function ReportsPage() {
         />
       )}
 
-      {isLoading && !checks ? (
-        <div className="py-16"><Spinner label="Building report…" /></div>
-      ) : sorted.length === 0 ? (
-        <EmptyState
-          title={
-            selected.length > 0
-              ? "No monitors match this filter."
-              : (checks?.length ?? 0) === 0
-                ? "No monitors yet."
-                : "No monitors to report on."
-          }
-          hint={selected.length > 0 ? "No monitor carries all the selected tags." : "Create a monitor to start collecting report data."}
-          action={selected.length > 0 ? <button onClick={clear} className="sw-btn">Clear filter</button> : undefined}
-        />
-      ) : (
-        <div className="space-y-4" data-testid="monitor-list">
-          {/* sort control (cards have no header row to click) */}
-          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--color-ink-faint)]">
-            <span className="uppercase tracking-wider">Sort</span>
-            {SORTS.map((s) => {
-              const active = sort.col === s.col;
-              return (
-                <button
-                  key={s.col}
-                  type="button"
-                  data-testid={`sort-${s.col}`}
-                  onClick={() =>
-                    setSort((cur) => (cur.col === s.col ? { col: s.col, dir: cur.dir === "asc" ? "desc" : "asc" } : { col: s.col, dir: s.col === "name" || s.col === "cert_days" ? "asc" : "desc" }))
-                  }
-                  className={`rounded-md border px-2 py-0.5 transition ${
-                    active
-                      ? "border-[var(--color-border-strong)] bg-[var(--color-panel-2)] text-[var(--color-ink)]"
-                      : "border-transparent hover:text-[var(--color-ink)]"
-                  }`}
-                >
-                  {s.label}
-                  {active && <span aria-hidden> {sort.dir === "asc" ? "▲" : "▼"}</span>}
-                </button>
-              );
-            })}
-          </div>
-
-          {!grouped ? (
-            sorted.map((r) => (
-              <MonitorReportCard
-                key={r.check_id}
-                row={r}
-                window={window}
-                open={expanded === r.check_id}
-                onToggle={() => setExpanded((cur) => (cur === r.check_id ? null : r.check_id))}
-              />
-            ))
-          ) : (
-            <>
-              {/* One section per tag VALUE: the group's own CWV + trend (server-computed) + its monitor cards. */}
-              {groupValues.map((value) => {
-                const pg = perfByGroup.get(value);
-                const ag = availByGroup.get(value);
-                const bucket = rowsByValue.get(value) ?? [];
-                return (
-                  <section
-                    key={value}
-                    data-testid={`group-section-${value}`}
-                    className="space-y-3 rounded-lg border border-[var(--color-border)] p-3"
-                  >
-                    <h2 className="flex items-baseline gap-2 text-sm font-semibold text-[var(--color-ink)]">
-                      <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">{groupBy}</span>
-                      {value}
-                      <span className="text-[11px] font-normal text-[var(--color-ink-faint)]">
-                        · {bucket.length} monitor{bucket.length === 1 ? "" : "s"}
-                      </span>
-                    </h2>
-                    <ReportWebVitals vitals={pg?.web_vitals ?? null} browserCheckCount={pg?.browser_check_count ?? 0} />
-                    {(((ag?.series?.length ?? 0) > 0) || ((pg?.series?.length ?? 0) > 0)) && (
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <ReportSeriesArea title="Availability" unit="% per day" points={ag?.series ?? []} fmt={(v) => (v == null ? "—" : `${v.toFixed(1)}%`)} />
-                        <ReportSeriesArea title="Avg latency" unit="avg ms per day" points={pg?.series ?? []} fmt={formatDuration} />
-                      </div>
-                    )}
-                    {bucket.map((r) => (
-                      <MonitorReportCard
-                        key={r.check_id}
-                        row={r}
-                        window={window}
-                        open={expanded === r.check_id}
-                        onToggle={() => setExpanded((cur) => (cur === r.check_id ? null : r.check_id))}
-                      />
-                    ))}
-                  </section>
-                );
-              })}
-              {/* Honest accounting: monitors lacking the group-by tag aren't dropped — shown in their own section
-                  (the server's INNER JOIN excludes them from the aggregates, so no group tiles here). */}
-              {untagged.length > 0 && (
-                <section
-                  data-testid="group-section-untagged"
-                  className="space-y-3 rounded-lg border border-dashed border-[var(--color-border)] p-3"
-                >
-                  <h2 className="flex items-baseline gap-2 text-sm font-semibold text-[var(--color-ink-dim)]">
-                    No <span className="sw-mono">{groupBy}</span> tag
-                    <span className="text-[11px] font-normal text-[var(--color-ink-faint)]">
-                      · {untagged.length} monitor{untagged.length === 1 ? "" : "s"}
-                    </span>
-                  </h2>
-                  {untagged.map((r) => (
-                    <MonitorReportCard
-                      key={r.check_id}
-                      row={r}
-                      window={window}
-                      open={expanded === r.check_id}
-                      onToggle={() => setExpanded((cur) => (cur === r.check_id ? null : r.check_id))}
-                    />
-                  ))}
-                </section>
-              )}
-            </>
-          )}
-        </div>
-      )}
+      <MonitorReportList
+        filtered={filtered}
+        checks={checks}
+        isLoading={isLoading}
+        window={window}
+        selected={selected}
+        clear={clear}
+        avail={avail}
+        perf={perf}
+        groupBy={groupBy}
+      />
     </div>
   );
 }
