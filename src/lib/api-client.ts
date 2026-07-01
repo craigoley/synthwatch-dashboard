@@ -61,6 +61,8 @@ import type {
   CheckKind,
   SloReport,
   DeploysReport,
+  StatusPage,
+  StatusProperty,
   MttrReport,
   DnsRecordType,
   ParseIntentResult,
@@ -1688,9 +1690,6 @@ export async function getSla(window: SlaWindow = "24h"): Promise<SlaResponse> {
   };
 }
 
-// GET /api/reports/slo?window=&tag= (P5 v1, companion API PR). Fleet error-budget — per-check budget rows +
-// a fleet rollup, mirroring /sla (items + fleet + insufficient_data). Budget accounting only; burn_rate is
-// informational. ★ Maps ALL rows (the map-all lesson) + composes with the ?tag= filter (undefined when empty).
 // GET /api/reports/deploys?host=&window= (deploy-markers v1). Auto-detected deploy markers for a host, for the
 // chart overlay. ★ null-safe: no host → null; maps ALL rows; sha stays null for a non-commit marker (honest).
 export async function getDeploys(host: string, window: ReportWindow = "30d"): Promise<DeploysReport | null> {
@@ -1709,6 +1708,44 @@ export async function getDeploys(host: string, window: ReportWindow = "30d"): Pr
   }));
   return { host: String(raw?.host ?? host), window: String(raw?.window ?? window), deploys };
 }
+
+// GET /api/status (§A3) — the internal/stakeholder status page: per-PROPERTY current state + uptime + recent
+// incidents. ★ Maps ALL rows (the map-all lesson); null-safe (uptime stays null while building; state coerced
+// to a known value; missing arrays → []). Returns null on 404 → the page shows an empty state.
+export async function getStatus(): Promise<StatusPage | null> {
+  let raw: Record<string, unknown>;
+  try {
+    raw = await request<Record<string, unknown>>("/status");
+  } catch {
+    return null; // endpoint not deployed yet (companion API PR)
+  }
+  const num = (v: unknown) => Number(v ?? 0);
+  const nullable = (v: unknown) => (v == null ? null : Number(v));
+  const STATES = ["up", "degraded", "down", "unknown"] as const;
+  const properties = ((raw?.properties as Record<string, unknown>[]) ?? []).map((p) => ({
+    name: String(p.name ?? ""),
+    state: (STATES.includes(p.state as (typeof STATES)[number]) ? p.state : "unknown") as StatusProperty["state"],
+    check_count: num(p.checkCount),
+    up_count: num(p.upCount),
+    degraded_count: num(p.degradedCount),
+    down_count: num(p.downCount),
+    uptime_pct: nullable(p.uptimePct),
+    building_baseline: Boolean(p.buildingBaseline),
+  }));
+  const recent_incidents = ((raw?.recentIncidents as Record<string, unknown>[]) ?? []).map((i) => ({
+    property: String(i.property ?? ""),
+    title: String(i.title ?? ""),
+    opened_at: String(i.openedAt ?? ""),
+    resolved_at: i.resolvedAt ? String(i.resolvedAt) : null,
+    status: String(i.status ?? ""),
+    severity: String(i.severity ?? ""),
+  }));
+  return { window: String(raw?.window ?? "30d"), properties, recent_incidents };
+}
+
+// GET /api/reports/slo?window=&tag= (P5 v1, companion API PR). Fleet error-budget — per-check budget rows +
+// a fleet rollup, mirroring /sla (items + fleet + insufficient_data). Budget accounting only; burn_rate is
+// informational. ★ Maps ALL rows (the map-all lesson) + composes with the ?tag= filter (undefined when empty).
 
 export async function getSloReport(window: ReportWindow, tags: Tag[] = []): Promise<SloReport | null> {
   let raw: Record<string, unknown>;

@@ -504,6 +504,36 @@ export interface DeploysReport {
 }
 
 /**
+ * Internal/stakeholder status page (GET /status, §A3). A curated PROPERTY-level rollup — property names +
+ * states + uptime + recent incident titles ONLY (no raw check ids/URLs). ★ `state` is the CURRENT badge;
+ * `uptime_pct` is HISTORICAL — deliberately separate (a green "up" now ≠ a claim about the window). null
+ * uptime while building_baseline — never a fabricated %.
+ */
+export interface StatusProperty {
+  name: string;
+  state: "up" | "degraded" | "down" | "unknown";
+  check_count: number;
+  up_count: number;
+  degraded_count: number;
+  down_count: number;
+  uptime_pct: number | null;
+  building_baseline: boolean;
+}
+export interface StatusIncident {
+  property: string;
+  title: string;
+  opened_at: string;
+  resolved_at: string | null;
+  status: string;
+  severity: string;
+}
+export interface StatusPage {
+  window: string;
+  properties: StatusProperty[];
+  recent_incidents: StatusIncident[];
+}
+
+/**
  * Fleet MTTR / incident analytics (GET /reports/mttr, §A5). MTTR = time-to-resolve over RESOLVED incidents;
  * open incidents are EXCLUDED from the mean/median but COUNTED (open_count). mean_seconds/median_seconds are
  * null on insufficient data — never 0 (0 would read as "instant recovery"). mttd_proxy_seconds is a

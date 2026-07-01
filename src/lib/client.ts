@@ -48,6 +48,7 @@ import {
   getIncidentBreakdown,
   getSloReport,
   getDeploys,
+  getStatus,
   getMttrReport,
   getNarrative,
   getReconcileDrift,
@@ -107,6 +108,7 @@ const keys = {
   incidentBreakdown: (w: string, t: string) => ["report-incident-breakdown", w, t] as const,
   sloReport: (w: string, t: string) => ["report-slo", w, t] as const,
   deploys: (h: string, w: string) => ["deploys", h, w] as const,
+  status: () => ["status-page"] as const,
   mttrReport: (w: string, t: string) => ["report-mttr", w, t] as const,
   performanceReport: (w: string, g: string, t: string) => ["report-performance", w, g, t] as const,
   narrative: (scope: string, w: string, key: number | null) => ["narrative", scope, w, key] as const,
@@ -499,6 +501,14 @@ export function useDeploys(host: string | null, window: ReportWindow = "30d") {
   return useSWR(host ? keys.deploys(host, window) : null, () => getDeploys(host as string, window), {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
+  });
+}
+
+export function useStatus() {
+  return useSWR(keys.status(), () => getStatus(), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+    refreshInterval: 15000, // current state moves run-to-run — a gentle poll like the status grid
   });
 }
 
