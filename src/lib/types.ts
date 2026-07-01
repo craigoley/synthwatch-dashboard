@@ -466,7 +466,10 @@ export interface SloReportRow {
   consumed: number; // down-runs
   remaining: number; // budget - consumed (can go negative = blown)
   remaining_pct: number | null; // remaining/budget; null when insufficient_data
-  burn_rate: number | null; // (down/total)/(1-target) — informational
+  burn_rate: number | null; // (down/total)/(1-target) — informational (pooled window burn, NOT the page verdict)
+  // ★ P5 PR2 — the page-worthy, LOCATION-AWARE burn STATE from slo_burn_status (read == what the runner pages on).
+  burn_state: "fast" | "slow" | "none"; // 'fast' = critical 1h burn; 'slow' = 6h ticket; 'none' = within budget
+  reported_burn: number; // max at-floor burn of the firing window (0 when none)
   completed_runs: number;
   insufficient_data: boolean; // too few completed runs → "building baseline", never a fake %
 }

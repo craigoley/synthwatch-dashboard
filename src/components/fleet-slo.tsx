@@ -6,9 +6,10 @@ import { formatPct } from "@/lib/format";
 import type { ReportWindow, Tag, SloReportRow, SloReportFleet } from "@/lib/types";
 
 // ★ Fleet error-budget view (P5 v1). Budget ACCOUNTING only — visually consistent with the check-detail
-// SloPanel (same tone thresholds + budget-remaining bar) but at fleet scope. burn_rate is INFORMATIONAL
-// (pooled), never a page-grade pill here — the fast/slow-burn pills stay on the monitor (they need
-// location-aware burn: the follow-up PR). insufficient_data → "building baseline", never a fake %.
+// SloPanel (same tone thresholds + budget-remaining bar) but at fleet scope. ★ P5 PR2: the fast/slow-burn
+// pill is now REAL + page-worthy here — driven by burn_state from slo_burn_status (the SAME location-aware
+// verdict the runner pages on: read == page), replacing PR1's informational pooled burn number.
+// insufficient_data → "building baseline", never a fake %.
 
 type Tone = "pass" | "warn" | "fail" | "idle";
 
@@ -93,14 +94,39 @@ function SloRow({ row, window }: { row: SloReportRow; window: ReportWindow }) {
           </span>
         </div>
       )}
-      {/* Informational, pooled — NOT a burn pill. */}
+      {/* ★ P5 PR2 — the page-worthy, location-aware burn pill (the SAME verdict the runner pages on). */}
+      <BurnPill state={row.burn_state} burn={row.reported_burn} />
+    </div>
+  );
+}
+
+// Fast (1h ≥ 14.4× → critical) / slow (6h + 30m ≥ 6× → ticket) / none (within budget). Null-safe: a missing
+// field (older API) degrades to 'none'/0, never a crash (the .tone-crash lesson) — the pill just shows "—".
+function BurnPill({ state, burn }: { state?: SloReportRow["burn_state"] | null; burn?: number | null }) {
+  const s = state ?? "none";
+  const b = burn ?? 0;
+  if (s === "none") {
+    return (
       <span
         className="sw-mono text-right text-[12px] text-[var(--color-ink-faint)]"
-        title="Pooled burn rate over the window — informational, not a page-grade alert (burn alerts live on the monitor)."
+        title="Within error budget — no burn page."
       >
-        {row.burn_rate == null ? "—" : `${row.burn_rate.toFixed(1)}×`}
+        —
       </span>
-    </div>
+    );
+  }
+  const critical = s === "fast";
+  const color = critical ? "var(--color-fail)" : "var(--color-warn)";
+  return (
+    <span
+      data-testid={`slo-burn-${s}`}
+      className="sw-mono inline-flex shrink-0 items-center justify-end gap-1 justify-self-end rounded px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide"
+      style={{ color, background: `color-mix(in srgb, ${color} 12%, transparent)` }}
+      title={`${critical ? "Fast burn (1h ≥ 14.4×) — page-worthy" : "Slow burn (6h + 30m ≥ 6×) — ticket"}. Location-aware — the same verdict the runner pages on.`}
+    >
+      {critical ? "fast" : "slow"}
+      {b > 0 ? ` ${b.toFixed(1)}×` : ""}
+    </span>
   );
 }
 
