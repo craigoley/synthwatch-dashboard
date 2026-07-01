@@ -1,0 +1,13 @@
+{
+  "window": "30d",
+  "fleet": {
+    "totalRuns": 0,
+    "downRuns": 0,
+    "budget": 0,
+    "consumed": 0,
+    "remaining": 0,
+    "remainingPct": null,
+    "insufficientData": true
+  },
+  "items": []
+}

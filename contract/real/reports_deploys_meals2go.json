@@ -1,0 +1,12 @@
+{
+  "host": "www.meals2go.com",
+  "window": "90d",
+  "deploys": [
+    {
+      "sha": null,
+      "isSha": false,
+      "source": "etag",
+      "deployedAt": "2026-07-01T12:45:29.534345+00:00"
+    }
+  ]
+}

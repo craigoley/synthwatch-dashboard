@@ -1,0 +1,12 @@
+{
+  "host": "www.wegmans.com",
+  "window": "90d",
+  "deploys": [
+    {
+      "sha": "70d6c6f3913186848af7568b20384dce9c3669d0",
+      "isSha": true,
+      "source": "sentry-release",
+      "deployedAt": "2026-07-01T12:45:37.556193+00:00"
+    }
+  ]
+}
