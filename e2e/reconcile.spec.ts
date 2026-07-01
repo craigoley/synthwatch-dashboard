@@ -184,3 +184,48 @@ test.describe("phase 6b — reconcile drift surface", () => {
     await expect(page.getByTestId("reconcile-now")).toHaveCount(0); // but no compute-spending trigger
   });
 });
+
+// ★ Regression (live crash): /monitors threw "Cannot read properties of undefined (reading 'tone')" because
+// DriftPill did TYPE_META[drift_type].tone and the runner emits a drift type the dashboard didn't map
+// (redaction_mismatch, schema 0049; the api-client blind-casts driftType→DriftType). The tone lookup is now
+// null-safe + the type is mapped. These prove the surface renders for a mapped-new AND an unknown drift type.
+test.describe("phase 6b — drift surface: unmapped drift types don't crash /monitors", () => {
+  test("a redaction_mismatch drift row renders (no .tone crash) with a 'Redaction' pill", async ({ page }) => {
+    const errs: string[] = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    const w = defaultWorld();
+    w.reconcileDrift = {
+      items: [
+        { sourceKey: "sensitive-check", driftType: "redaction_mismatch", detail: { name: "Sensitive check" }, detectedAt: "2026-06-25T12:00:00Z" },
+      ],
+    };
+    await mockApi(page, w);
+    await page.goto("/monitors");
+
+    await expect(page.getByRole("heading", { name: "Monitors" })).toBeVisible(); // page loads (not the error boundary)
+    await expect(page.getByTestId("error-boundary")).toHaveCount(0);
+    const surface = page.getByTestId("reconcile-drift");
+    await expect(surface).toBeVisible();
+    await expect(surface.locator('[data-drift-type="redaction_mismatch"]')).toHaveCount(1);
+    await expect(surface).toContainText("Redaction");
+    expect(errs).toEqual([]); // no uncaught render throw
+  });
+
+  test("an UNKNOWN (future) drift type renders a neutral fallback pill, never crashes", async ({ page }) => {
+    const errs: string[] = [];
+    page.on("pageerror", (e) => errs.push(e.message));
+    const w = defaultWorld();
+    w.reconcileDrift = {
+      items: [
+        { sourceKey: "future-x", driftType: "some_future_type", detail: { name: "Future" }, detectedAt: "2026-06-25T12:00:00Z" },
+      ],
+    };
+    await mockApi(page, w);
+    await page.goto("/monitors");
+
+    await expect(page.getByRole("heading", { name: "Monitors" })).toBeVisible();
+    await expect(page.getByTestId("error-boundary")).toHaveCount(0);
+    await expect(page.getByTestId("reconcile-drift").locator('[data-drift-type="some_future_type"]')).toHaveCount(1);
+    expect(errs).toEqual([]);
+  });
+});

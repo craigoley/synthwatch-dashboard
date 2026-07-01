@@ -700,7 +700,9 @@ export interface Narrative {
  *  - orphan → a KNOWN GAP: Git defines a monitor the runner can't run yet (browser spec-exec deferred).
  *    NOT a failure — render it informationally/neutrally, visually distinct from the config-drift trio.
  */
-export type DriftType = "new" | "changed" | "missing" | "orphan";
+// redaction_mismatch (runner schema 0049): a `sensitive` check whose live redaction config diverges from what
+// Git declares — a B10 security-config drift (resolvable, so it sits with the config-drift trio, not orphan).
+export type DriftType = "new" | "changed" | "missing" | "orphan" | "redaction_mismatch";
 
 /**
  * One drift row. `source_key` is the monitor's manifest id. `detail` is the runner-written jsonb passed
