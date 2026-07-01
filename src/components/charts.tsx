@@ -355,16 +355,18 @@ function Vital({
   value,
   tone,
   hint,
+  testId,
 }: {
   label: string;
   value: string;
   tone: ReturnType<typeof cwvTone>;
   hint: string;
+  testId?: string;
 }) {
   const color =
     value === "—" ? "var(--color-ink-faint)" : tone === "idle" ? "var(--color-ink)" : TONE_VAR[tone];
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2.5">
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2.5" data-testid={testId}>
       <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">{label}</div>
       <div className="sw-mono mt-0.5 text-lg font-medium" style={{ color }}>
         {value}
@@ -402,8 +404,9 @@ function CoreWebVitals({ latest }: { latest: MetricPoint }) {
 /**
  * Fleet/group Core Web Vitals at p75 — fed by the /reports/performance group `web_vitals` the reports page
  * already fetches (and previously dropped). Reuses the Vital tile + cwvTone threshold authority (single
- * source). Gaps-not-zeros: a null vital renders "—", never a 0 or a false "good". INP is not yet captured
- * at the rollup (proposal P9) → shown as "—" with an explicit "not captured yet" hint, never faked.
+ * source). Gaps-not-zeros: a null vital renders "—", never a 0 or a false "good". P9 Stage 3: INP + resource
+ * count are now rendered — INP honestly over its own (partial) sample size, and "no interaction data" (never a
+ * fake 0) when a rollup captured no INP.
  */
 export function ReportWebVitals({
   vitals,
@@ -414,6 +417,19 @@ export function ReportWebVitals({
 }) {
   if (!vitals || browserCheckCount === 0) return null; // no browser monitors → no vitals (honest absence)
   const ms = (v: number | null) => (v != null ? formatDuration(v) : "—");
+
+  // ★ INP HONESTY (P9 Stage 3): INP is captured on only ~half of runs, so a null INP is a GAP, not a 0. When
+  // present, note its own sample size if it's a subset of the rollup; when absent, "no interaction data" —
+  // never a fabricated green 0ms (the no-fake-data discipline).
+  const hasInp = vitals.inp_ms != null;
+  const inpPartial =
+    vitals.inp_count != null && vitals.vitals_count != null && vitals.inp_count < vitals.vitals_count;
+  const inpHint = hasInp
+    ? inpPartial
+      ? `good ≤ 200ms · ${vitals.inp_count} of ${vitals.vitals_count} runs`
+      : "good ≤ 200ms"
+    : "no interaction data";
+
   return (
     <div className="sw-panel p-4" data-testid="report-cwv">
       <div className="mb-3 flex items-baseline justify-between gap-2">
@@ -422,7 +438,7 @@ export function ReportWebVitals({
           {browserCheckCount} browser monitor{browserCheckCount === 1 ? "" : "s"}
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Vital label="LCP" value={ms(vitals.lcp_ms)} tone={cwvTone("lcp", vitals.lcp_ms)} hint="good ≤ 2.5s" />
         <Vital
           label="CLS"
@@ -432,8 +448,22 @@ export function ReportWebVitals({
         />
         <Vital label="FCP" value={ms(vitals.fcp_ms)} tone={cwvTone("fcp", vitals.fcp_ms)} hint="good ≤ 1.8s" />
         <Vital label="TTFB" value={ms(vitals.ttfb_ms)} tone={cwvTone("ttfb", vitals.ttfb_ms)} hint="good ≤ 0.8s" />
-        {/* INP is a Core Web Vital but isn't aggregated into the rollup yet (P9) — honest placeholder, not a fake 0. */}
-        <Vital label="INP" value="—" tone="idle" hint="not captured yet" />
+        {/* INP — a real Core Web Vital, now aggregated. Honest when null (no interaction runs), never faked. */}
+        <Vital
+          label="INP"
+          value={hasInp ? ms(vitals.inp_ms) : "—"}
+          tone={hasInp ? cwvTone("inp", vitals.inp_ms) : "idle"}
+          hint={inpHint}
+          testId="report-cwv-inp"
+        />
+        {/* Resource count — supporting metric (p75 requests/run), not a graded vital → neutral tone. */}
+        <Vital
+          label="RES"
+          value={vitals.resource_count != null ? String(vitals.resource_count) : "—"}
+          tone="idle"
+          hint="requests · p75"
+          testId="report-cwv-res"
+        />
       </div>
     </div>
   );

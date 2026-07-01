@@ -756,6 +756,13 @@ export interface WebVitals {
   fcp_ms: number | null;
   ttfb_ms: number | null;
   cls: number | null;
+  // P9 Stage 3 — INP + resource count in the aggregate rollup (from feat/vitals-report-inp-resource).
+  // INP is ~half-null (only interaction runs capture it), so it carries its OWN sample size (inp_count) distinct
+  // from vitals_count — the UI shows INP honestly over inp_count, never a fabricated 0 when null.
+  inp_ms: number | null;
+  inp_count: number | null; // runs that captured INP (< vitals_count when interactions are sparse)
+  resource_count: number | null; // p75 resource/request count (supporting metric, not a graded CWV)
+  vitals_count: number | null; // total runs behind the rollup (the API's sampleCount)
 }
 
 export interface PerformanceCheckRow {

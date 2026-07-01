@@ -85,6 +85,39 @@ test.describe("API contract — extended seams", () => {
     expect(grp.check_count).toBe(g.checks.length);
   });
 
+  // ★ P9 Stage 3 contract — the field names the mapper reads for INP + resource_count (the anchor
+  // feat/vitals-report-inp-resource must satisfy so INP can't be silently re-dropped), plus null-safety so it
+  // self-degrades to null (never a fake 0) if the endpoint ships before Stage 2. Synthetic body: the captured
+  // fixture predates Stage 2.
+  test("★ /reports/performance — INP + resource_count map from inpP75Ms/inpCount/resourceCountP75/sampleCount", async () => {
+    const body = {
+      groupBy: "none",
+      groups: [
+        {
+          group: "all",
+          latency: { avgMs: 200, p50Ms: 180, p95Ms: 400, p99Ms: 600 },
+          series: [],
+          webVitals: { sampleCount: 200, lcpP75Ms: 1800, fcpP75Ms: 900, ttfbP75Ms: 200, clsP75: 0.05, inpP75Ms: 150, inpCount: 104, resourceCountP75: 48 },
+          checks: [],
+        },
+      ],
+    };
+    const wv = (await withRealResponse(body, () => getPerformanceReport("7d", "none")))!.groups[0]!.web_vitals!;
+    expect(wv.inp_ms).toBe(150);
+    expect(wv.inp_count).toBe(104); // INP's own (partial) sample size
+    expect(wv.vitals_count).toBe(200); // from sampleCount
+    expect(wv.resource_count).toBe(48);
+    expect(wv.lcp_ms).toBe(1800); // existing vitals unaffected
+
+    // Stage-2 fields ABSENT (endpoint live, Stage 2 not deployed) → null, never 0 → the UI shows honest "no data".
+    const noInp = { ...body, groups: [{ ...body.groups[0], webVitals: { sampleCount: 200, lcpP75Ms: 1800, clsP75: 0.05 } }] };
+    const wv2 = (await withRealResponse(noInp, () => getPerformanceReport("7d", "none")))!.groups[0]!.web_vitals!;
+    expect(wv2.inp_ms).toBeNull();
+    expect(wv2.inp_count).toBeNull();
+    expect(wv2.resource_count).toBeNull();
+    expect(wv2.lcp_ms).toBe(1800); // the vitals that DID ship still map
+  });
+
   test("/reports/narrative — factPack OBJECT → derived cited chips (guards the #82 blank-chips bug)", async () => {
     const raw = real("narrative_fleet_7d");
     expect(raw.headline, "fixture has a real narrative").toBeTruthy();
