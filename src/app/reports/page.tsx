@@ -10,6 +10,7 @@ import { IncidentBreakdownCard } from "@/components/incident-breakdown-card";
 import { MonitorReportCard, type ReportRow } from "@/components/monitor-report-card";
 import { ReportWebVitals, ReportSeriesArea } from "@/components/charts";
 import { FleetSloReport } from "@/components/fleet-slo";
+import { FleetMttrReport } from "@/components/fleet-mttr";
 import { formatDuration } from "@/lib/format";
 import type { ReportWindow } from "@/lib/types";
 
@@ -246,6 +247,10 @@ export default function ReportsPage() {
       {/* ★ Fleet error budget (P5 v1) — per-check budget rows + a fleet rollup, tag-scoped like the tiles above.
           Budget accounting only (no fast/slow-burn pills at fleet scope). Hides when no SLO targets are set. */}
       <FleetSloReport window={window} tags={selected} />
+
+      {/* ★ Fleet MTTR / incident analytics (§A5) — mean+median time-to-resolve over RESOLVED incidents,
+          classification breakdown, and trend. Tag-scoped. Hides when the endpoint/incidents are absent. */}
+      <FleetMttrReport window={window} tags={selected} />
 
       {/* Tags FILTER the list (multi-tag AND); only real in-use tags are offered. */}
       {(inUseTags?.length ?? 0) > 0 && (

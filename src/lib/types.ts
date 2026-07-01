@@ -486,6 +486,50 @@ export interface SloReport {
   fleet: SloReportFleet | null;
 }
 
+/**
+ * Fleet MTTR / incident analytics (GET /reports/mttr, §A5). MTTR = time-to-resolve over RESOLVED incidents;
+ * open incidents are EXCLUDED from the mean/median but COUNTED (open_count). mean_seconds/median_seconds are
+ * null on insufficient data — never 0 (0 would read as "instant recovery"). mttd_proxy_seconds is a
+ * detection-lag PROXY (consecutive_failures × interval), not a measured MTTD.
+ */
+export interface MttrCheckRow {
+  check_id: number;
+  check_name: string;
+  kind: CheckKind;
+  resolved_count: number;
+  open_count: number;
+  mean_seconds: number | null;
+  median_seconds: number | null;
+  mttd_proxy_seconds: number | null;
+  insufficient_data: boolean;
+}
+export interface MttrFleet {
+  resolved_count: number;
+  open_count: number;
+  total_incidents: number;
+  mean_seconds: number | null;
+  median_seconds: number | null;
+  mttd_proxy_seconds: number | null;
+  insufficient_data: boolean;
+}
+export interface MttrClassificationBucket {
+  classification: string;
+  count: number;
+  pct_of_total: number;
+}
+export interface MttrTrendPoint {
+  bucket_start: string;
+  resolved_count: number;
+  mean_seconds: number | null;
+}
+export interface MttrReport {
+  window: ReportWindow;
+  fleet: MttrFleet | null;
+  items: MttrCheckRow[];
+  classification: MttrClassificationBucket[];
+  trend: MttrTrendPoint[];
+}
+
 /** One bucket of the availability-over-time series. `availability_pct` null = no
  *  completed runs in that bucket (a GAP in the line, NOT a 0% dip). */
 export interface AvailabilityPoint {

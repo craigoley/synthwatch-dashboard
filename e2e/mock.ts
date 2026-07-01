@@ -87,6 +87,8 @@ export interface World {
   /** Fleet SLO report: which check ids have an SLO target (default [1,3]); which are "building baseline". */
   sloCheckIds?: number[];
   sloBuildingIds?: number[];
+  /** Which checks have incidents in the MTTR report (§A5). Default [1, 2]. Empty scope → honest-empty. */
+  mttrCheckIds?: number[];
   /** Successive GET /checks/{id} bodies for live-run polling tests: each poll advances; the last repeats.
    *  e.g. [runningDetail, passDetail] → the page shows 'running', then 'pass', via polling (no reload). */
   detailSequence?: Record<number, RawObj[]>;
@@ -641,6 +643,50 @@ export async function mockApi(
         ? { budget: fbudget, consumed: fcons, remaining: fbudget - fcons, remainingPct: fbudget > 0 ? (fbudget - fcons) / fbudget : null, insufficientData: active.length === 0 }
         : null;
       return json(route, { window: win, items, fleet });
+    }
+
+    // Fleet MTTR / incident analytics (§A5) — mean+median over resolved incidents + classification + trend.
+    // mttrCheckIds = which checks have incidents; deterministic durations so worst-mean-first sort is testable.
+    if (path === "/api/reports/mttr" && method === "GET") {
+      if (world.reportsServed === false) return json(route, { error: "not_found" }, 404);
+      const win = url.searchParams.get("window") ?? "30d";
+      const tagFilter = url.searchParams.getAll("tag");
+      const matches = (c: RawObj) =>
+        tagFilter.every((t) => {
+          const i = t.indexOf(":");
+          return ((c.tags as { key: string; value: string }[]) ?? []).some((tg) => tg.key === t.slice(0, i) && tg.value === t.slice(i + 1));
+        });
+      const mttrIds = world.mttrCheckIds ?? [1, 2];
+      const scoped = (world.checks ?? []).filter((c) => mttrIds.includes(Number(c.id)) && matches(c));
+      const items = scoped.map((c) => {
+        const id = Number(c.id);
+        return {
+          checkId: id, checkName: c.name, kind: c.kind, resolvedCount: 3, openCount: 1,
+          meanSeconds: id === 1 ? 200 : 900, medianSeconds: id === 1 ? 120 : 600, // check 2 slower → sorts first
+          mttdProxySeconds: 600, insufficientData: false,
+        };
+      });
+      if (scoped.length === 0) {
+        return json(route, {
+          window: win, items: [], classification: [], trend: [],
+          fleet: { resolvedCount: 0, openCount: 0, totalIncidents: 0, meanSeconds: null, medianSeconds: null, mttdProxySeconds: null, insufficientData: true },
+        });
+      }
+      const resolved = items.reduce((s, i) => s + i.resolvedCount, 0);
+      const open = items.reduce((s, i) => s + i.openCount, 0);
+      return json(route, {
+        window: win, items,
+        fleet: { resolvedCount: resolved, openCount: open, totalIncidents: resolved + open, meanSeconds: 500, medianSeconds: 300, mttdProxySeconds: 600, insufficientData: false },
+        classification: [
+          { classification: "real-outage", count: 4, pctOfTotal: 0.5 },
+          { classification: "selector-drift", count: 2, pctOfTotal: 0.25 },
+          { classification: "unclassified", count: 2, pctOfTotal: 0.25 },
+        ],
+        trend: [
+          { bucketStart: "2026-06-01T00:00:00Z", resolvedCount: 3, meanSeconds: 700 },
+          { bucketStart: "2026-06-08T00:00:00Z", resolvedCount: 3, meanSeconds: 300 },
+        ],
+      });
     }
     // Alerting reads (undefined → 404, exercising the "setup pending" path).
     if (path === "/api/channels" && method === "GET") {
