@@ -8,6 +8,7 @@ import { TONE_VAR } from "@/components/status-badge";
 import { Spinner } from "@/components/states";
 import { componentStatus, deriveSystemStatus } from "@/lib/status";
 import { PropertyStatusSection } from "@/components/status-board";
+import { EgressStabilitySection } from "@/components/egress-stability";
 import { formatLocalDateTime, formatRelative, formatSpan } from "@/lib/format";
 import type { CheckWithStatus, IncidentWithCheck, SlaWindow } from "@/lib/types";
 
@@ -135,6 +136,10 @@ export default function StatusPage() {
             {/* ★ By-property rollup (§A3) — the stakeholder-legible view (wegmans.com / meals2go up? uptime?),
                 above the per-check Components. Renders nothing when the /status endpoint or properties are absent. */}
             <PropertyStatusSection />
+
+            {/* ★ Egress stability — the Wegmans allowlist artifact + a live SNAT-rotation early-warning.
+                Self-hides until GET /reports/egress is deployed (404 → null). */}
+            <EgressStabilitySection />
 
             {/* Components / per-service status */}
             <section className="space-y-3">

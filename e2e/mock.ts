@@ -84,6 +84,9 @@ export interface World {
   reportsServed?: boolean;
   /** Deploy markers (deploy-markers v1) returned by GET /reports/deploys. Default: none. */
   deploys?: RawObj[];
+  /** Egress regions (GET /reports/egress, raw camelCase DTO). Unset → DEFAULT_EGRESS (3 regions, 1 IP each =
+   *  stable). Override with a region carrying distinctCount≥2 + multiple ips to exercise the rotation warning. */
+  egressRegions?: RawObj[];
   /** Status summary (§A3) served? false → GET /status 404 (the By-property section hides). Default true. */
   statusServed?: boolean;
   /** Chat-to-prefill: set false to make /checks/parse-intent report unconfigured (the input hides). */
@@ -177,6 +180,22 @@ export function defaultWorld(): World {
 
 const json = (route: Route, body: unknown, status = 200) =>
   route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+
+// Default GET /reports/egress body — the live shape (3 regions, 1 stable IP each). Mirrors real prod data.
+const egressStable = (location: string, ip: string, runCount: number): RawObj => ({
+  location,
+  currentIps: [ip],
+  distinctCount: 1,
+  firstSeen: "2026-06-30T22:00:23Z",
+  lastSeen: "2026-07-01T15:56:30Z",
+  runCount,
+  ips: [{ ip, firstSeen: "2026-06-30T22:00:23Z", lastSeen: "2026-07-01T15:56:30Z", runCount }],
+});
+const DEFAULT_EGRESS: RawObj[] = [
+  egressStable("centralus", "172.169.169.109", 1200),
+  egressStable("eastus2", "20.85.72.149", 1249),
+  egressStable("westus2", "20.80.135.196", 1004),
+];
 
 /**
  * Install the mock on a page. Pass a tweaked World for per-test variants.
@@ -636,6 +655,11 @@ export async function mockApi(
       if (world.reportsServed === false) return json(route, { error: "not_found" }, 404);
       const host = url.searchParams.get("host") ?? "";
       return json(route, { host, window: url.searchParams.get("window") ?? "30d", deploys: world.deploys ?? [] });
+    }
+
+    if (path === "/api/reports/egress" && method === "GET") {
+      if (world.reportsServed === false) return json(route, { error: "not_found" }, 404); // endpoint not deployed → section self-hides
+      return json(route, { window: url.searchParams.get("window") ?? "all", regions: world.egressRegions ?? DEFAULT_EGRESS });
     }
 
     if (path === "/api/reports/slo" && method === "GET") {
