@@ -47,6 +47,7 @@ import {
   getPerformanceReport,
   getIncidentBreakdown,
   getSloReport,
+  getDeploys,
   getStatus,
   getMttrReport,
   getNarrative,
@@ -106,6 +107,7 @@ const keys = {
   availabilityReport: (w: string, g: string, t: string) => ["report-availability", w, g, t] as const,
   incidentBreakdown: (w: string, t: string) => ["report-incident-breakdown", w, t] as const,
   sloReport: (w: string, t: string) => ["report-slo", w, t] as const,
+  deploys: (h: string, w: string) => ["deploys", h, w] as const,
   status: () => ["status-page"] as const,
   mttrReport: (w: string, t: string) => ["report-mttr", w, t] as const,
   performanceReport: (w: string, g: string, t: string) => ["report-performance", w, g, t] as const,
@@ -490,6 +492,13 @@ export function useIncidentBreakdown(window: ReportWindow, tags: Tag[] = []) {
 
 export function useSloReport(window: ReportWindow, tags: Tag[] = []) {
   return useSWR(keys.sloReport(window, tagKey(tags)), () => getSloReport(window, tags), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+}
+
+export function useDeploys(host: string | null, window: ReportWindow = "30d") {
+  return useSWR(host ? keys.deploys(host, window) : null, () => getDeploys(host as string, window), {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });

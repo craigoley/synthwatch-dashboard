@@ -12,6 +12,16 @@ import { RunHistory } from "@/components/run-history";
 import { LiveStepsChecklist } from "@/components/live-steps";
 import { TraceViewer } from "@/components/trace-viewer";
 import { StatusBadge, TONE_VAR } from "@/components/status-badge";
+
+// The host of a check's target_url → the deploy-marker overlay key (a deploy is per host). undefined when
+// the url doesn't parse (network kinds / bad url) → the charts simply render no overlay.
+function hostFromUrl(u: string | null | undefined): string | undefined {
+  try {
+    return u ? new URL(u).host : undefined;
+  } catch {
+    return undefined;
+  }
+}
 import { TagChips } from "@/components/tag-chips";
 import { RedactionBadge } from "@/components/redaction";
 import { Modal } from "@/components/modal";
@@ -528,12 +538,12 @@ export default function CheckDetailPage() {
         {!metricsCollapsed && (
           <div id="metrics-body" data-testid="metrics-body" className="space-y-6">
             {/* Availability SHAPE over time — complements the SLA panel's point-in-time %. */}
-            <AvailabilityChart checkId={check.id} />
+            <AvailabilityChart checkId={check.id} host={hostFromUrl(check.target_url)} />
 
             {/* SLO complements SLA: only when an SLO target is set (opt-in) */}
             {check.slo && <SloPanel slo={check.slo} />}
 
-            <LatencyChart runs={recent_runs} />
+            <LatencyChart runs={recent_runs} host={hostFromUrl(check.target_url)} />
 
             <div data-testid="telemetry-block">
               <h3 className="mb-3 text-sm font-semibold text-[var(--color-ink)]">Telemetry</h3>

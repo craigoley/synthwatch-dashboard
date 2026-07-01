@@ -487,6 +487,23 @@ export interface SloReport {
 }
 
 /**
+ * Auto-detected deploy markers (GET /reports/deploys, deploy-markers v1) — overlaid as ReferenceLines on the
+ * time-series charts. sha is null for a non-commit marker (etag/build-id): the UI labels it "deploy" honestly,
+ * never a fake sha (is_sha drives that).
+ */
+export interface DeployMarker {
+  sha: string | null;
+  is_sha: boolean;
+  source: string;
+  deployed_at: string;
+}
+export interface DeploysReport {
+  host: string;
+  window: string;
+  deploys: DeployMarker[];
+}
+
+/**
  * Internal/stakeholder status page (GET /status, §A3). A curated PROPERTY-level rollup — property names +
  * states + uptime + recent incident titles ONLY (no raw check ids/URLs). ★ `state` is the CURRENT badge;
  * `uptime_pct` is HISTORICAL — deliberately separate (a green "up" now ≠ a claim about the window). null
