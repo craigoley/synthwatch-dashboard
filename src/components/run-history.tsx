@@ -43,6 +43,8 @@ function RunArtifacts({ run }: { run: Run }) {
             </div>
           ) : (
             <a href={screenshot} target="_blank" rel="noreferrer">
+              {/* eslint-disable-next-line @next/next/no-img-element -- failure-artifact screenshots come from
+                  arbitrary runner/blob hosts; next/image optimization doesn't apply (would need a custom loader). */}
               <img
                 src={screenshot}
                 alt={`Failure screenshot for run ${run.id}`}

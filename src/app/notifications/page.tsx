@@ -22,7 +22,7 @@ import { EmptyState, Spinner } from "@/components/states";
 import { useToasts, ToastStack } from "@/components/toast";
 import { TagChips } from "@/components/tag-chips";
 import type { DeliveryReadiness } from "@/lib/api-client";
-import type { Channel, CheckWithStatus, Routing, RoutingSeverity, Tag, TagRule } from "@/lib/types";
+import type { Channel, CheckWithStatus, Routing, RoutingSeverity, Tag } from "@/lib/types";
 
 // Severities MUST match the API vocabulary (it 400s on anything else): critical | warning.
 const SEVERITIES: { key: RoutingSeverity; label: string; tone: string }[] = [

@@ -66,7 +66,7 @@ function FleetRollup({ fleet }: { fleet: SloReportFleet }) {
   );
 }
 
-function SloRow({ row, window }: { row: SloReportRow; window: ReportWindow }) {
+function SloRow({ row }: { row: SloReportRow }) {
   const tone = budgetTone(row.remaining, row.budget, row.insufficient_data);
   const frac = remainingFraction(row);
   const blown = !row.insufficient_data && row.remaining < 0;
@@ -174,7 +174,7 @@ export function FleetSloReport({ window, tags = [] }: { window: ReportWindow; ta
         </div>
         <div className="divide-y divide-[var(--color-border)]">
           {sorted.map((row) => (
-            <SloRow key={row.check_id} row={row} window={window} />
+            <SloRow key={row.check_id} row={row} />
           ))}
         </div>
       </div>

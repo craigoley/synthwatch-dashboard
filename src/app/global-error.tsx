@@ -30,7 +30,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // eslint-disable-next-line no-console -- a fatal render error must always surface, never be swallowed
+    // a fatal render error must always surface, never be swallowed
     console.error("[global-error]", error);
     record("boundary", error.message || String(error), error.digest);
   }, [error]);

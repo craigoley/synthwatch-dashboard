@@ -28,7 +28,7 @@ export function ErrorFallback({
   detail?: string;
 }) {
   useEffect(() => {
-    // eslint-disable-next-line no-console -- never swallow a render error; surface it for debugging
+    // never swallow a render error; surface it for debugging
     console.error("[error-boundary]", error);
     record("boundary", error.message || String(error), error.digest);
   }, [error]);

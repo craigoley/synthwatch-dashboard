@@ -22,6 +22,6 @@ export function isDebugOn(channel: string): boolean {
 /** Emit one [runs-debug] funnel line (no-op unless the "runs" debug channel is enabled). */
 export function runsDebug(stage: string, data?: Record<string, unknown>): void {
   if (!isDebugOn("runs")) return;
-  // eslint-disable-next-line no-console -- intentional, gated diagnostic output
+  // intentional, gated diagnostic output
   console.log(`[runs-debug] ${stage}`, data ?? {});
 }
