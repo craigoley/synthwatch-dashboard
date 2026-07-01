@@ -154,7 +154,7 @@ test.describe("reports — per-monitor cards + tag filter (Monitors tab)", () =>
 // Core Web Vitals (p75) card + the fleet availability/avg-latency trends (groups[0].web_vitals + .series).
 // These live in the Performance tab (the default — no ?tab= param needed).
 test.describe("reports — fleet CWV + trend (P1/P2, Performance tab)", () => {
-  test("fleet Core Web Vitals (p75) card renders, threshold-colored, INP honest-placeholder (not faked)", async ({ page }) => {
+  test("fleet Core Web Vitals (p75) card renders LCP/CLS/FCP/TTFB + INP + resource count (P9 Stage 3)", async ({ page }) => {
     await mockApi(page, world());
     await page.goto("/reports");
 
@@ -165,9 +165,31 @@ test.describe("reports — fleet CWV + trend (P1/P2, Performance tab)", () => {
     await expect(cwv).toContainText("CLS");
     await expect(cwv).toContainText("FCP");
     await expect(cwv).toContainText("TTFB");
-    // ★ INP is not aggregated yet (P9) → shown as a clear placeholder, never a fabricated value
-    await expect(cwv).toContainText("INP");
-    await expect(cwv).toContainText("not captured yet");
+    // ★ INP now aggregated (Stage 3): a real value, over its own (partial) sample size — not a placeholder.
+    const inp = page.getByTestId("report-cwv-inp");
+    await expect(inp).toContainText("INP");
+    await expect(inp).toContainText("150ms");
+    await expect(inp).toContainText("104 of 200 runs"); // its own INP sample size, honestly (inpCount < sampleCount)
+    // resource count tile renders (supporting metric)
+    await expect(page.getByTestId("report-cwv-res")).toContainText("48");
+  });
+
+  // ★ The no-fake-zero honesty test: INP is ~half-null. A rollup with NO INP must render "no interaction data",
+  // NEVER "0ms" (a fabricated-good CWV). Doubles as the Stage-2-not-deployed self-degrade (fields absent → null).
+  test("★ null INP → 'no interaction data' honestly, NOT a fake 0ms", async ({ page }) => {
+    const w = world();
+    w.vitalsNoInp = true; // webVitals present, but inpP75Ms/inpCount absent
+    await mockApi(page, w);
+    await page.goto("/reports");
+
+    const inp = page.getByTestId("report-cwv-inp");
+    await expect(inp).toContainText("INP");
+    await expect(inp).toContainText("no interaction data");
+    await expect(inp).toContainText("—"); // the honest gap glyph
+    await expect(inp).not.toContainText("0ms"); // ★ never a fabricated green zero
+    await expect(inp).not.toContainText("0.0"); // nor any fake numeric INP
+    // the other vitals still render (self-degrade is INP-only)
+    await expect(page.getByTestId("report-cwv")).toContainText("LCP");
   });
 
   test("fleet trend renders from the report series (availability + avg latency)", async ({ page }) => {

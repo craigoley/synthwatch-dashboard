@@ -116,6 +116,9 @@ export interface World {
   reportsEmpty?: boolean;
   /** Per-check run metrics (CWV) for the report drill-down web-vitals (raw camelCase). */
   metrics?: RawObj[];
+  /** P9 Stage 3: omit INP from the rollup webVitals (inpP75Ms/inpCount absent) → exercises the null-INP honesty
+   *  path (INP renders "no interaction data", never a fake 0). Also stands in for "Stage 2 not deployed yet". */
+  vitalsNoInp?: boolean;
   /** AI narratives (Layer 3). Unset → /reports/narrative 404 → card hides (graceful). */
   narratives?: { fleet?: RawObj; monitor?: Record<string, RawObj> };
   /**
@@ -586,20 +589,27 @@ export async function mockApi(
       // web-vitals under `webVitals` with p75 field names (lcpP75Ms/…). (The flat shape this mock used to
       // serve matched the OLD buggy mapper; the contract test now pins the nested truth.)
       const browserCount = checks.filter((c) => c.kind === "browser").length;
+      // ★ P9 Stage 3 web-vitals: INP + resource_count. INP carries its OWN (partial) sample size (inpCount <
+      // sampleCount, since INP only lands on interaction runs). world.vitalsNoInp omits inp → the null-INP
+      // honesty path (renders "no interaction data", never a fake 0).
+      const wvBase = (sample: number, inp: number) =>
+        world.vitalsNoInp
+          ? { sampleCount: sample, lcpP75Ms: 1800, fcpP75Ms: 900, ttfbP75Ms: 200, clsP75: 0.05, resourceCountP75: 48 }
+          : { sampleCount: sample, lcpP75Ms: 1800, fcpP75Ms: 900, ttfbP75Ms: 200, clsP75: 0.05, inpP75Ms: 150, inpCount: inp, resourceCountP75: 48 };
       const rows = checks.map((c) => {
         const id = Number(c.id);
         const p95 = p95Of(id);
         return {
           checkId: id, checkName: c.name,
           latency: { sampleCount: 100, avgMs: Math.round(p95 * 0.5), p50Ms: Math.round(p95 * 0.6), p95Ms: p95, p99Ms: Math.round(p95 * 1.5) },
-          webVitals: c.kind === "browser" ? { sampleCount: 50, lcpP75Ms: 1800, fcpP75Ms: 900, ttfbP75Ms: 200, clsP75: 0.05 } : null,
+          webVitals: c.kind === "browser" ? wvBase(50, 26) : null,
         };
       });
       const allGroup = {
         group: "all",
         latency: { sampleCount: 1000, avgMs: 200, p50Ms: 180, p95Ms: 400, p99Ms: 600 },
         series: perfSeries(400),
-        webVitals: browserCount ? { sampleCount: 200, lcpP75Ms: 1800, fcpP75Ms: 900, ttfbP75Ms: 200, clsP75: 0.05 } : null,
+        webVitals: browserCount ? wvBase(200, 104) : null,
         checks: rows,
       };
       const groups = gb === "none" ? [allGroup] : gb === "team"

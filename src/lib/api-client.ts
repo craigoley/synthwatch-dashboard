@@ -1640,7 +1640,12 @@ export async function getPerformanceReport(
       // on the group, and per-check uses `checkName` + a nested `latency`. Reading flat (g.p50Ms / wv.lcpMs
       // / c.p50Ms / c.name) silently nulled every percentile + vital + blanked names → the reports page's
       // "windowed" latency never populated (it always fell back to the 24h metrics). Anchored by a contract
-      // test now (the missing test let this ship). INP is intentionally absent (never captured).
+      // test now (the missing test let this ship).
+      // ★ P9 Stage 3 — INP + resource_count ARE now aggregated (feat/vitals-report-inp-resource); the prior
+      // "INP intentionally absent (never captured)" belief was FALSE (INP is captured on ~52% of runs) and is
+      // why the whole chain dropped it. Read the Stage-2 fields below (inpP75Ms/inpCount/resourceCountP75, +
+      // the existing sampleCount) — all `?? null`, so this self-degrades to honest "no data" (never crashes,
+      // never fakes a 0) if it ships before Stage 2 deploys.
       const lat = (g.latency ?? {}) as Record<string, unknown>;
       const wv = g.webVitals as Record<string, unknown> | null | undefined;
       const rawChecks = (g.checks as Record<string, unknown>[]) ?? [];
@@ -1668,6 +1673,13 @@ export async function getPerformanceReport(
               fcp_ms: (wv.fcpP75Ms as number) ?? null,
               ttfb_ms: (wv.ttfbP75Ms as number) ?? null,
               cls: (wv.clsP75 as number) ?? null,
+              // ★ P9 Stage 3: null-defensive — absent (pre-Stage-2) → null → the UI shows honest "no data".
+              inp_ms: (wv.inpP75Ms as number) ?? null,
+              inp_count: (wv.inpCount as number) ?? null,
+              // resource aggregate name is the one genuine ambiguity (count vs p75) — read both so a Stage-2
+              // naming choice can't silently re-drop it (the exact bug class this PR kills).
+              resource_count: (wv.resourceCountP75 as number) ?? (wv.resourceCount as number) ?? null,
+              vitals_count: (wv.sampleCount as number) ?? null,
             }
           : null,
         browser_check_count: (g.browserCheckCount as number) ?? rawChecks.filter((c) => c.webVitals != null).length,
