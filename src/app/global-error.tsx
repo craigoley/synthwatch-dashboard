@@ -9,6 +9,8 @@
 
 import { useEffect } from "react";
 
+import { record } from "@/lib/breadcrumbs";
+
 const C = {
   bg: "#090c0f",
   panel: "#121922",
@@ -30,6 +32,7 @@ export default function GlobalError({
   useEffect(() => {
     // eslint-disable-next-line no-console -- a fatal render error must always surface, never be swallowed
     console.error("[global-error]", error);
+    record("boundary", error.message || String(error), error.digest);
   }, [error]);
 
   const mono = "ui-monospace, SFMono-Regular, Menlo, monospace";
