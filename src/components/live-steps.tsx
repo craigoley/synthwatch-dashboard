@@ -3,9 +3,13 @@
 import { useRunSteps } from "@/lib/client";
 import { TONE_VAR } from "@/components/status-badge";
 import { stepStatusToken } from "@/lib/status";
-import type { Run, RunStep } from "@/lib/types";
+import type { Run, RunStep, RunStepStatus } from "@/lib/types";
 
-type RowStatus = "pass" | "fail" | "error" | "running" | "pending";
+// ★ DERIVED from RunStepStatus (the union that gates run_steps.status via enum-coverage.json) + a UI-only
+// "pending" (future/template steps not reached yet — not a DB status). This kills the old drift-prone local
+// copy: if run_steps.status grows a value, RunStepStatus must cover it (enum-coverage) AND the GLYPH Record
+// below won't compile until it's given a glyph — so a new step status can't render blank.
+type RowStatus = RunStepStatus | "pending";
 interface Row {
   index: number;
   name: string;
@@ -17,6 +21,7 @@ const GLYPH: Record<RowStatus, string> = {
   fail: "✗",
   error: "✗",
   running: "⟳",
+  skip: "⊘", // a step the runner skipped (RunStepStatus) — distinct from not-yet-reached (pending ◦)
   pending: "◦",
 };
 
@@ -38,7 +43,7 @@ export function LiveStepsChecklist({ run, templateRunId }: { run: Run; templateR
 
   const rows: Row[] = Array.from({ length: total }, (_, i) => {
     const live = liveByIndex.get(i);
-    if (live) return { index: i, name: live.name, status: live.status as RowStatus };
+    if (live) return { index: i, name: live.name, status: live.status }; // RunStepStatus ⊆ RowStatus — no cast
     return { index: i, name: template?.[i]?.name ?? `step ${i + 1}`, status: "pending" }; // not reached yet
   });
   const done = rows.filter((r) => r.status === "pass" || r.status === "fail" || r.status === "error").length;
