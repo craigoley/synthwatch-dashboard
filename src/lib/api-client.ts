@@ -1643,9 +1643,9 @@ export async function getPerformanceReport(
       // test now (the missing test let this ship).
       // ★ P9 Stage 3 — INP + resource_count ARE now aggregated (feat/vitals-report-inp-resource); the prior
       // "INP intentionally absent (never captured)" belief was FALSE (INP is captured on ~52% of runs) and is
-      // why the whole chain dropped it. Read the Stage-2 fields below (inpP75Ms/inpCount/resourceCountP75, +
+      // why the whole chain dropped it. Read the Stage-2 fields below (inpP75Ms/inpCount/resourceCount, +
       // the existing sampleCount) — all `?? null`, so this self-degrades to honest "no data" (never crashes,
-      // never fakes a 0) if it ships before Stage 2 deploys.
+      // never fakes a 0).
       const lat = (g.latency ?? {}) as Record<string, unknown>;
       const wv = g.webVitals as Record<string, unknown> | null | undefined;
       const rawChecks = (g.checks as Record<string, unknown>[]) ?? [];
@@ -1673,12 +1673,12 @@ export async function getPerformanceReport(
               fcp_ms: (wv.fcpP75Ms as number) ?? null,
               ttfb_ms: (wv.ttfbP75Ms as number) ?? null,
               cls: (wv.clsP75 as number) ?? null,
-              // ★ P9 Stage 3: null-defensive — absent (pre-Stage-2) → null → the UI shows honest "no data".
+              // ★ P9 Stage 3: null-defensive — absent → null → the UI shows honest "no data".
               inp_ms: (wv.inpP75Ms as number) ?? null,
               inp_count: (wv.inpCount as number) ?? null,
-              // resource aggregate name is the one genuine ambiguity (count vs p75) — read both so a Stage-2
-              // naming choice can't silently re-drop it (the exact bug class this PR kills).
-              resource_count: (wv.resourceCountP75 as number) ?? (wv.resourceCount as number) ?? null,
+              // Stage 2 (#147) shipped `resource_count` → resourceCount (the earlier resourceCountP75 hedge is
+              // a now-dead branch, removed in #168; verified against the live endpoint).
+              resource_count: (wv.resourceCount as number) ?? null,
               vitals_count: (wv.sampleCount as number) ?? null,
             }
           : null,

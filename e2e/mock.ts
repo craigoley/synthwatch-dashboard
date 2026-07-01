@@ -594,8 +594,8 @@ export async function mockApi(
       // honesty path (renders "no interaction data", never a fake 0).
       const wvBase = (sample: number, inp: number) =>
         world.vitalsNoInp
-          ? { sampleCount: sample, lcpP75Ms: 1800, fcpP75Ms: 900, ttfbP75Ms: 200, clsP75: 0.05, resourceCountP75: 48 }
-          : { sampleCount: sample, lcpP75Ms: 1800, fcpP75Ms: 900, ttfbP75Ms: 200, clsP75: 0.05, inpP75Ms: 150, inpCount: inp, resourceCountP75: 48 };
+          ? { sampleCount: sample, lcpP75Ms: 1800, fcpP75Ms: 900, ttfbP75Ms: 200, clsP75: 0.05, resourceCount: 48 }
+          : { sampleCount: sample, lcpP75Ms: 1800, fcpP75Ms: 900, ttfbP75Ms: 200, clsP75: 0.05, inpP75Ms: 150, inpCount: inp, resourceCount: 48 };
       const rows = checks.map((c) => {
         const id = Number(c.id);
         const p95 = p95Of(id);
