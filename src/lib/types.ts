@@ -670,6 +670,31 @@ export interface Routing {
 // ─── reporting (Layer 2): availability + performance, grouped by tag, windowed ──
 export type ReportWindow = "7d" | "30d" | "90d";
 
+// ─── egress stability (GET /reports/egress) — the Wegmans allowlist artifact + SNAT-rotation early-warning ──
+// Per region: the current egress IP(s) (copy into the allowlist) + a distinct-IP soak (distinct_count 1 =
+// stable/allowlistable; ≥2 = the SNAT pool rotated → a future allowlisted login monitor would silently break).
+// Its own window vocabulary ("all" = full soak history, "24h" = current view) — NOT ReportWindow.
+export type EgressWindow = "all" | "24h";
+export interface EgressIp {
+  ip: string;
+  first_seen: string; // when this IP first appeared for the region — for a 2nd IP, this IS the rotation moment
+  last_seen: string;
+  run_count: number;
+}
+export interface EgressRegion {
+  location: string;
+  current_ips: string[]; // the IP(s) to allowlist right now (latest window)
+  distinct_count: number; // over the window; 1 = stable, ≥2 = rotation
+  first_seen: string;
+  last_seen: string;
+  run_count: number;
+  ips: EgressIp[]; // every distinct IP with its first/last-seen (drives the rotation-timestamp display)
+}
+export interface EgressReport {
+  window: string;
+  regions: EgressRegion[];
+}
+
 // Reports P6 — the verdict-taxonomy breakdown (incidents.rca.classification). `precision` = real-outage /
 // classified (the fraction of JUDGED reds that were genuine outages); null when classified === 0 (honest empty,
 // not a fake 0%). `unclassified` is an explicit bucket — incidents with no RCA yet are never dropped.

@@ -48,6 +48,7 @@ import {
   getIncidentBreakdown,
   getSloReport,
   getDeploys,
+  getEgressReport,
   getStatus,
   getMttrReport,
   getNarrative,
@@ -73,6 +74,7 @@ import { runsDebug } from "@/lib/debug";
 import type {
   IncidentWithCheck,
   ReportWindow,
+  EgressWindow,
   Routing,
   Run,
   SlaWindow,
@@ -107,6 +109,7 @@ const keys = {
   incidentBreakdown: (w: string, t: string) => ["report-incident-breakdown", w, t] as const,
   sloReport: (w: string, t: string) => ["report-slo", w, t] as const,
   deploys: (h: string, w: string) => ["deploys", h, w] as const,
+  egress: (w: string) => ["report-egress", w] as const,
   status: () => ["status-page"] as const,
   mttrReport: (w: string, t: string) => ["report-mttr", w, t] as const,
   performanceReport: (w: string, g: string, t: string) => ["report-performance", w, g, t] as const,
@@ -500,6 +503,16 @@ export function useDeploys(host: string | null, window: ReportWindow = "30d") {
   return useSWR(host ? keys.deploys(host, window) : null, () => getDeploys(host as string, window), {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
+  });
+}
+
+// Egress soak (GET /reports/egress). A live SNAT-rotation monitor → a gentle poll so a rotation surfaces
+// without a reload. 404 → null (self-hide); never retried on error.
+export function useEgress(window: EgressWindow = "all") {
+  return useSWR(keys.egress(window), () => getEgressReport(window), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+    refreshInterval: 60000,
   });
 }
 

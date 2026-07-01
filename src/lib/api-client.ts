@@ -61,6 +61,9 @@ import type {
   CheckKind,
   SloReport,
   DeploysReport,
+  EgressReport,
+  EgressWindow,
+  EgressIp,
   StatusPage,
   StatusProperty,
   MttrReport,
@@ -1706,6 +1709,36 @@ export async function getDeploys(host: string, window: ReportWindow = "30d"): Pr
     deployed_at: String(d.deployedAt ?? ""),
   }));
   return { host: String(raw?.host ?? host), window: String(raw?.window ?? window), deploys };
+}
+
+// GET /api/reports/egress?window=all|24h — per-region egress-IP soak: the current IP(s) to allowlist +
+// distinct-IP rotation monitor. ★ null-safe (mirrors getDeploys): 404 / endpoint-not-deployed → null so the
+// /status section self-hides. Maps ALL regions + their per-IP first/last-seen; camel→snake.
+export async function getEgressReport(window: EgressWindow = "all"): Promise<EgressReport | null> {
+  let raw: Record<string, unknown>;
+  try {
+    raw = await request<Record<string, unknown>>("/reports/egress", { window });
+  } catch {
+    return null; // endpoint not deployed yet → the section self-hides (never crashes the status page)
+  }
+  const str = (v: unknown) => String(v ?? "");
+  const num = (v: unknown) => Number(v ?? 0);
+  const mapIp = (d: Record<string, unknown>): EgressIp => ({
+    ip: str(d.ip),
+    first_seen: str(d.firstSeen),
+    last_seen: str(d.lastSeen),
+    run_count: num(d.runCount),
+  });
+  const regions = ((raw?.regions as Record<string, unknown>[]) ?? []).map((r) => ({
+    location: str(r.location),
+    current_ips: ((r.currentIps as unknown[]) ?? []).map((x) => String(x)),
+    distinct_count: num(r.distinctCount),
+    first_seen: str(r.firstSeen),
+    last_seen: str(r.lastSeen),
+    run_count: num(r.runCount),
+    ips: ((r.ips as Record<string, unknown>[]) ?? []).map(mapIp),
+  }));
+  return { window: str(raw?.window ?? window), regions };
 }
 
 // GET /api/status (§A3) — the internal/stakeholder status page: per-PROPERTY current state + uptime + recent
