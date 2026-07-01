@@ -1786,7 +1786,9 @@ function mapTrustRow(r: Record<string, unknown>): TrustRow {
       perf_regression: num(inc.perfRegression),
       unclassified: num(inc.unclassified),
     },
-    red_test_captured: Boolean(rt.captured), // API sends {captured:false} in v1 → false → "not captured"
+    red_test_captured: Boolean(rt.captured), // true only when a harness-confirmed red_tests row exists
+    red_test_tested_at: rt.testedAt == null ? null : String(rt.testedAt),
+    red_test_method: rt.method == null ? null : String(rt.method),
     spec_provenance: {
       executed_sha256: sp.executedSha256 == null ? null : String(sp.executedSha256),
       spec_path: sp.specPath == null ? null : String(sp.specPath),

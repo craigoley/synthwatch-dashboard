@@ -8,7 +8,7 @@ import { EmptyState, Spinner } from "@/components/states";
 import {
   TrustChipBadge,
   TrustLegend,
-  RedTestNotCaptured,
+  RedTestStatus,
   TRUST_RANK,
   retryRateText,
   lastGreenText,
@@ -114,7 +114,11 @@ export default function TrustPage() {
                   >
                     {redsText(row)}
                   </span>
-                  <RedTestNotCaptured />
+                  <RedTestStatus
+                    captured={row.red_test_captured}
+                    testedAt={row.red_test_tested_at}
+                    method={row.red_test_method}
+                  />
                   <TrustChipBadge chip={row.trust} />
                 </div>
               );
