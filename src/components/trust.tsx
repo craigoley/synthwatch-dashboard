@@ -74,15 +74,52 @@ export function TrustLegend() {
   );
 }
 
-/** The honest red-test slot — a planned capability, NEVER rendered as passing/green in v1. */
+/** The honest red-test slot when no red-test is recorded — NEVER rendered as passing/green. */
 export function RedTestNotCaptured() {
   return (
     <span
       className="sw-mono text-[12px] text-[var(--color-ink-faint)]"
       data-testid="trust-redtest"
-      title="Red-test tracking (does a real failure actually turn this monitor red?) is a planned capability; not yet captured."
+      title="Red-test tracking (does a real failure actually turn this monitor red?) is not captured for this monitor yet."
     >
       ✗ not captured
+    </span>
+  );
+}
+
+// ★ The method labels render DISTINCTLY — an executed harness proof is a stronger fact than a human
+// attestation; the scorecard must not collapse them to a generic "tested" (the method distinction IS the
+// honesty). Unknown methods fall through to their raw string rather than a fabricated label.
+const RED_TEST_METHOD_LABEL: Record<string, string> = {
+  "executed-red-fixture": "executed",
+  "attested-manual": "attested",
+};
+
+/** The red-test slot: the honest "✗ not captured" GAP, or — when a harness-confirmed red_tests row exists — a
+ *  recorded proof carrying its METHOD (executed vs attested, shown distinctly) + recency. captured=true is only
+ *  ever set from a real red-test (§D1 v2), never inferred. */
+export function RedTestStatus({
+  captured,
+  testedAt,
+  method,
+}: {
+  captured: boolean;
+  testedAt: string | null;
+  method: string | null;
+}) {
+  if (!captured) return <RedTestNotCaptured />;
+  const label = method ? (RED_TEST_METHOD_LABEL[method] ?? method) : "recorded";
+  const when = testedAt ? formatRelative(testedAt) : null;
+  return (
+    <span
+      className="sw-mono text-[12px] text-[var(--color-ink)]"
+      data-testid="trust-redtest"
+      title={`Red-tested (${method ?? "recorded"}) — a known-bad input was proven to turn this monitor red${
+        testedAt ? ` (${formatRelative(testedAt)})` : ""
+      }. executed = automated harness proof; attested = human-recorded.`}
+    >
+      ✓ red-tested · {label}
+      {when ? ` · ${when}` : ""}
     </span>
   );
 }
@@ -175,7 +212,11 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
         <h3 className="text-sm font-semibold text-[var(--color-ink)]">Trust</h3>
         <div className="flex items-center gap-2">
           <TrustChipBadge chip={m.trust} />
-          <RedTestNotCaptured />
+          <RedTestStatus
+            captured={m.red_test_captured}
+            testedAt={m.red_test_tested_at}
+            method={m.red_test_method}
+          />
         </div>
       </div>
 

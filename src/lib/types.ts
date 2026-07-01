@@ -722,7 +722,9 @@ export interface TrustRow {
   retry_count: number;
   retry_rate: number | null; // null = no runs → "—", never 0%
   incidents: TrustIncidents;
-  red_test_captured: boolean; // v1: always false → rendered "✗ not captured", never a pass
+  red_test_captured: boolean; // true ONLY when a harness-confirmed red_tests row exists (else the honest gap)
+  red_test_tested_at: string | null; // ISO when captured; null when not
+  red_test_method: string | null; // 'executed-red-fixture' | 'attested-manual' | null — rendered distinctly
   spec_provenance: TrustSpecProvenance;
   trust: TrustChip; // API-derived from the named-constant rule (rendered verbatim in the legend)
 }

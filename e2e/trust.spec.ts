@@ -48,6 +48,25 @@ test.describe("trust scorecard — fleet page", () => {
     await expect(rt).not.toContainText("captured live");
   });
 
+  test("★ redTest CAPTURED renders 'red-tested' with its METHOD — executed vs attested render DISTINCTLY", async ({ page }) => {
+    const inc = { total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0 };
+    const sp = { executedSha256: "abc", specPath: "monitors/x.spec.ts" };
+    const base = { sensitive: false, lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:00:00Z", runCount: 10, retryCount: 0, retryRate: 0, incidents: inc, specProvenance: sp, trust: "proven-live" };
+    const w = defaultWorld();
+    w.trustMonitors = [
+      { ...base, checkId: 101, checkName: "mon-executed", redTest: { captured: true, testedAt: "2026-06-28T00:00:00Z", method: "executed-red-fixture" } },
+      { ...base, checkId: 102, checkName: "mon-attested", redTest: { captured: true, testedAt: "2026-06-30T00:00:00Z", method: "attested-manual" } },
+      { ...base, checkId: 103, checkName: "mon-none", redTest: { captured: false } },
+    ];
+    await mockApi(page, w);
+    await page.goto("/trust");
+    // ★ both captured methods render — DISTINCTLY, not collapsed to a generic "tested"
+    await expect(page.getByText(/red-tested · executed/)).toBeVisible();
+    await expect(page.getByText(/red-tested · attested/)).toBeVisible();
+    // the not-captured row keeps the honest gap
+    await expect(page.getByText("✗ not captured")).toBeVisible();
+  });
+
   test("★ never-green renders 'never verified' (a first-class state, not an error)", async ({ page }) => {
     await mockApi(page, defaultWorld());
     await page.goto("/trust");
