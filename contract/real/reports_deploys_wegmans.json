@@ -7,6 +7,12 @@
       "isSha": true,
       "source": "sentry-release",
       "deployedAt": "2026-07-01T12:45:37.556193+00:00"
+    },
+    {
+      "sha": "3210ffe2df93f19f6764379276aed1605ea737da",
+      "isSha": true,
+      "source": "sentry-release",
+      "deployedAt": "2026-07-01T19:10:42.260033+00:00"
     }
   ]
 }

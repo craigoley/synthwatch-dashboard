@@ -5,83 +5,404 @@
     {
       "group": null,
       "latency": {
-        "sampleCount": 2435,
-        "avgMs": 2241,
-        "p50Ms": 1126,
-        "p95Ms": 11001,
-        "p99Ms": 13885
+        "sampleCount": 11325,
+        "avgMs": 9982.2,
+        "p50Ms": 4205,
+        "p95Ms": 32756,
+        "p99Ms": 36902
       },
       "webVitals": {
-        "sampleCount": 287,
-        "lcpP75Ms": 1660,
-        "fcpP75Ms": 1338,
-        "ttfbP75Ms": 378,
-        "clsP75": 0.5432
+        "sampleCount": 6242,
+        "lcpP75Ms": 5671,
+        "fcpP75Ms": 1392,
+        "ttfbP75Ms": 363,
+        "clsP75": 0.7254,
+        "inpP75Ms": 200,
+        "inpCount": 3329,
+        "resourceCount": 302
       },
       "checks": [
         {
           "checkId": 33,
           "checkName": "API CORS preflight",
           "latency": {
-            "sampleCount": 937,
-            "avgMs": 745.5,
-            "p50Ms": 193,
-            "p95Ms": 1964,
-            "p99Ms": 2386
+            "sampleCount": 2343,
+            "avgMs": 548.8,
+            "p50Ms": 179,
+            "p95Ms": 1844,
+            "p99Ms": 2202
           },
           "webVitals": null
+        },
+        {
+          "checkId": 192,
+          "checkName": "Amore: menu page exposes a downloadable menu",
+          "latency": {
+            "sampleCount": 195,
+            "avgMs": 6901.8,
+            "p50Ms": 6943,
+            "p95Ms": 7663,
+            "p99Ms": 7841
+          },
+          "webVitals": {
+            "sampleCount": 195,
+            "lcpP75Ms": 1304,
+            "fcpP75Ms": 896,
+            "ttfbP75Ms": 194,
+            "clsP75": 0.0128,
+            "inpP75Ms": null,
+            "inpCount": 0,
+            "resourceCount": 87
+          }
+        },
+        {
+          "checkId": 193,
+          "checkName": "Amore: reservations OpenTable widget loads",
+          "latency": {
+            "sampleCount": 107,
+            "avgMs": 6650,
+            "p50Ms": 6732,
+            "p95Ms": 7502,
+            "p99Ms": 7822
+          },
+          "webVitals": {
+            "sampleCount": 107,
+            "lcpP75Ms": 1222,
+            "fcpP75Ms": 768,
+            "ttfbP75Ms": 194,
+            "clsP75": 0.0128,
+            "inpP75Ms": null,
+            "inpCount": 0,
+            "resourceCount": 80
+          }
+        },
+        {
+          "checkId": 221,
+          "checkName": "Meals 2 Go: browse a cuisine menu (anon)",
+          "latency": {
+            "sampleCount": 114,
+            "avgMs": 10091.5,
+            "p50Ms": 10102,
+            "p95Ms": 11968,
+            "p99Ms": 12627
+          },
+          "webVitals": {
+            "sampleCount": 114,
+            "lcpP75Ms": 6439,
+            "fcpP75Ms": 330,
+            "ttfbP75Ms": 275,
+            "clsP75": 0.0828,
+            "inpP75Ms": null,
+            "inpCount": 0,
+            "resourceCount": 161
+          }
+        },
+        {
+          "checkId": 81,
+          "checkName": "Meals 2 Go: homepage load",
+          "latency": {
+            "sampleCount": 1117,
+            "avgMs": 9239.6,
+            "p50Ms": 9170,
+            "p95Ms": 10725,
+            "p99Ms": 11882
+          },
+          "webVitals": {
+            "sampleCount": 1117,
+            "lcpP75Ms": 4548,
+            "fcpP75Ms": 404,
+            "ttfbP75Ms": 319,
+            "clsP75": 0.0245,
+            "inpP75Ms": null,
+            "inpCount": 0,
+            "resourceCount": 91
+          }
+        },
+        {
+          "checkId": 80,
+          "checkName": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
+          "latency": {
+            "sampleCount": 413,
+            "avgMs": 30505,
+            "p50Ms": 30566,
+            "p95Ms": 36821,
+            "p99Ms": 38282
+          },
+          "webVitals": {
+            "sampleCount": 413,
+            "lcpP75Ms": 4548,
+            "fcpP75Ms": 364,
+            "ttfbP75Ms": 287,
+            "clsP75": 0.9244,
+            "inpP75Ms": 176,
+            "inpCount": 413,
+            "resourceCount": 269
+          }
+        },
+        {
+          "checkId": 194,
+          "checkName": "Next Door: homepage location picker",
+          "latency": {
+            "sampleCount": 249,
+            "avgMs": 3961.7,
+            "p50Ms": 4002,
+            "p95Ms": 4635,
+            "p99Ms": 5041
+          },
+          "webVitals": {
+            "sampleCount": 249,
+            "lcpP75Ms": 1352,
+            "fcpP75Ms": 1352,
+            "ttfbP75Ms": 215,
+            "clsP75": 0,
+            "inpP75Ms": null,
+            "inpCount": 0,
+            "resourceCount": 52
+          }
+        },
+        {
+          "checkId": 195,
+          "checkName": "Next Door: reservations OpenTable widget loads",
+          "latency": {
+            "sampleCount": 188,
+            "avgMs": 3032,
+            "p50Ms": 2857,
+            "p95Ms": 3416,
+            "p99Ms": 3731
+          },
+          "webVitals": {
+            "sampleCount": 188,
+            "lcpP75Ms": 1536,
+            "fcpP75Ms": 1532,
+            "ttfbP75Ms": 224,
+            "clsP75": 0,
+            "inpP75Ms": null,
+            "inpCount": 0,
+            "resourceCount": 54
+          }
         },
         {
           "checkId": 4,
           "checkName": "SynthWatch API health",
           "latency": {
-            "sampleCount": 1067,
-            "avgMs": 1630,
-            "p50Ms": 1473,
-            "p95Ms": 3127,
-            "p99Ms": 3855
+            "sampleCount": 2409,
+            "avgMs": 1365.2,
+            "p50Ms": 1051,
+            "p95Ms": 3060,
+            "p99Ms": 3539
           },
           "webVitals": null
+        },
+        {
+          "checkId": 222,
+          "checkName": "SynthWatch dashboard homepage",
+          "latency": {
+            "sampleCount": 250,
+            "avgMs": 2858.5,
+            "p50Ms": 2858,
+            "p95Ms": 3585,
+            "p99Ms": 3815
+          },
+          "webVitals": {
+            "sampleCount": 250,
+            "lcpP75Ms": 967,
+            "fcpP75Ms": 479,
+            "ttfbP75Ms": 122,
+            "clsP75": 0.0266,
+            "inpP75Ms": null,
+            "inpCount": 0,
+            "resourceCount": 63
+          }
         },
         {
           "checkId": 2,
           "checkName": "Wegmans homepage",
           "latency": {
-            "sampleCount": 287,
-            "avgMs": 10481.6,
-            "p50Ms": 10605,
-            "p95Ms": 14751,
-            "p99Ms": 16940
+            "sampleCount": 653,
+            "avgMs": 11858.1,
+            "p50Ms": 11508,
+            "p95Ms": 15485,
+            "p99Ms": 17209
           },
           "webVitals": {
-            "sampleCount": 287,
-            "lcpP75Ms": 1660,
-            "fcpP75Ms": 1338,
-            "ttfbP75Ms": 378,
-            "clsP75": 0.5432
+            "sampleCount": 653,
+            "lcpP75Ms": 8172,
+            "fcpP75Ms": 1368,
+            "ttfbP75Ms": 396,
+            "clsP75": 0.7645,
+            "inpP75Ms": null,
+            "inpCount": 0,
+            "resourceCount": 366
           }
         },
         {
           "checkId": 10,
           "checkName": "Wegmans.com cert",
           "latency": {
-            "sampleCount": 144,
-            "avgMs": 76.6,
-            "p50Ms": 64,
-            "p95Ms": 166,
-            "p99Ms": 175
+            "sampleCount": 314,
+            "avgMs": 84,
+            "p50Ms": 75,
+            "p95Ms": 170,
+            "p99Ms": 176
           },
           "webVitals": null
         },
         {
-          "checkId": 74,
-          "checkName": "Wegmans: search \u2192 product page",
+          "checkId": 223,
+          "checkName": "Wegmans: homepage load",
           "latency": {
-            "sampleCount": 0,
-            "avgMs": null,
-            "p50Ms": null,
-            "p95Ms": null,
-            "p99Ms": null
+            "sampleCount": 174,
+            "avgMs": 22773.5,
+            "p50Ms": 23434,
+            "p95Ms": 26446,
+            "p99Ms": 30105
+          },
+          "webVitals": {
+            "sampleCount": 174,
+            "lcpP75Ms": 12004,
+            "fcpP75Ms": 1311,
+            "ttfbP75Ms": 416,
+            "clsP75": 0.9206,
+            "inpP75Ms": 112,
+            "inpCount": 135,
+            "resourceCount": 414
+          }
+        },
+        {
+          "checkId": 77,
+          "checkName": "Wegmans: recipe navigation",
+          "latency": {
+            "sampleCount": 906,
+            "avgMs": 32487.6,
+            "p50Ms": 32594,
+            "p95Ms": 38660,
+            "p99Ms": 41356
+          },
+          "webVitals": {
+            "sampleCount": 906,
+            "lcpP75Ms": 11826,
+            "fcpP75Ms": 1348,
+            "ttfbP75Ms": 398,
+            "clsP75": 0.940075,
+            "inpP75Ms": 376,
+            "inpCount": 906,
+            "resourceCount": 587
+          }
+        },
+        {
+          "checkId": 220,
+          "checkName": "Wegmans: recipe search",
+          "latency": {
+            "sampleCount": 100,
+            "avgMs": 26162.8,
+            "p50Ms": 25942,
+            "p95Ms": 29691,
+            "p99Ms": 30684
+          },
+          "webVitals": {
+            "sampleCount": 100,
+            "lcpP75Ms": 13009,
+            "fcpP75Ms": 1766,
+            "ttfbP75Ms": 765,
+            "clsP75": 0.7069,
+            "inpP75Ms": 178,
+            "inpCount": 100,
+            "resourceCount": 421
+          }
+        },
+        {
+          "checkId": 224,
+          "checkName": "Wegmans: search autocomplete suggestions",
+          "latency": {
+            "sampleCount": 98,
+            "avgMs": 23213.1,
+            "p50Ms": 23932,
+            "p95Ms": 26834,
+            "p99Ms": 29383
+          },
+          "webVitals": {
+            "sampleCount": 98,
+            "lcpP75Ms": 12931,
+            "fcpP75Ms": 1343,
+            "ttfbP75Ms": 397,
+            "clsP75": 0.938575,
+            "inpP75Ms": 468,
+            "inpCount": 98,
+            "resourceCount": 474
+          }
+        },
+        {
+          "checkId": 74,
+          "checkName": "Wegmans: search → product page",
+          "latency": {
+            "sampleCount": 984,
+            "avgMs": 20877.2,
+            "p50Ms": 20837,
+            "p95Ms": 24804,
+            "p99Ms": 29671
+          },
+          "webVitals": {
+            "sampleCount": 984,
+            "lcpP75Ms": 1676,
+            "fcpP75Ms": 1656,
+            "ttfbP75Ms": 384,
+            "clsP75": 0.9414,
+            "inpP75Ms": 176,
+            "inpCount": 983,
+            "resourceCount": 403
+          }
+        },
+        {
+          "checkId": 197,
+          "checkName": "Wegmans: shop category browse",
+          "latency": {
+            "sampleCount": 290,
+            "avgMs": 23666.5,
+            "p50Ms": 23516,
+            "p95Ms": 26791,
+            "p99Ms": 28388
+          },
+          "webVitals": {
+            "sampleCount": 290,
+            "lcpP75Ms": 1715,
+            "fcpP75Ms": 1708,
+            "ttfbP75Ms": 378,
+            "clsP75": 0.8161,
+            "inpP75Ms": 160,
+            "inpCount": 290,
+            "resourceCount": 411
+          }
+        },
+        {
+          "checkId": 196,
+          "checkName": "Wegmans: store locator",
+          "latency": {
+            "sampleCount": 404,
+            "avgMs": 16363,
+            "p50Ms": 16396,
+            "p95Ms": 18522,
+            "p99Ms": 19559
+          },
+          "webVitals": {
+            "sampleCount": 404,
+            "lcpP75Ms": 5920,
+            "fcpP75Ms": 1401,
+            "ttfbP75Ms": 437,
+            "clsP75": 0.2234,
+            "inpP75Ms": 96,
+            "inpCount": 404,
+            "resourceCount": 346
+          }
+        },
+        {
+          "checkId": 306,
+          "checkName": "meals2go cert expiry",
+          "latency": {
+            "sampleCount": 17,
+            "avgMs": 105.5,
+            "p50Ms": 115,
+            "p95Ms": 142,
+            "p99Ms": 176
           },
           "webVitals": null
         },
@@ -100,24 +421,28 @@
       ],
       "series": [
         {
-          "day": "2026-06-21",
-          "avgMs": 4590.9
-        },
-        {
-          "day": "2026-06-22",
-          "avgMs": 2321.3
-        },
-        {
-          "day": "2026-06-23",
-          "avgMs": 2028.6
-        },
-        {
-          "day": "2026-06-24",
-          "avgMs": 2207.7
-        },
-        {
           "day": "2026-06-25",
           "avgMs": 2304.7
+        },
+        {
+          "day": "2026-06-26",
+          "avgMs": 4679
+        },
+        {
+          "day": "2026-06-27",
+          "avgMs": 8584.2
+        },
+        {
+          "day": "2026-06-28",
+          "avgMs": 9223
+        },
+        {
+          "day": "2026-06-29",
+          "avgMs": 9826.5
+        },
+        {
+          "day": "2026-06-30",
+          "avgMs": 11898.9
         }
       ]
     }

@@ -1,42 +1,6 @@
 {
   "items": [
     {
-      "id": 35,
-      "checkId": 74,
-      "status": "open",
-      "severity": "critical",
-      "openedAt": "2026-06-26T00:00:26.415975+00:00",
-      "resolvedAt": null,
-      "openedRunId": 843925,
-      "resolvedRunId": null,
-      "consecutiveFailures": 2,
-      "summary": "Check \"Wegmans: search \u2192 product page\" down (error) from 2 of 2 locations.",
-      "checkName": "Wegmans: search \u2192 product page",
-      "checkKind": "browser",
-      "rca": {
-        "classification": "environment-regional",
-        "confidence": "high",
-        "observed": [
-          "Error: Cannot find module '/Users/craigoleyagent/Developer/synthwatch/runner/dist/specfetch/specShim.js' imported from /tmp/sw-specfetch-XGWWP8/spec.mjs",
-          "Run status: error",
-          "HTTP status: n/a",
-          "Recent run history: error, error, error, error, error",
-          "Multi-location: failing from 2 of 2 location(s)"
-        ],
-        "inferred": [
-          "The synthetic runner/agent process cannot load a local module (specShim.js), indicating a problem in the monitoring runtime rather than the target site.",
-          "The check fails before producing any HTTP response (HTTP status n/a), so this is not showing a site 5xx or network-level error.",
-          "Consistent errors across recent runs and across both locations point to a systemic issue (e.g., broken deploy, missing file, or corrupted install) on the collectors/agents.",
-          "Likely causes to investigate: missing/renamed file, bad agent deployment or update, or file permission/path issues on the runner hosts."
-        ],
-        "summary": "The synthetic runner cannot find a required module (specShim.js), causing the check to error out before contacting the site; this appears to be a monitoring/runtime deployment issue affecting collectors rather than a Wegmans outage. Investigate the runner/agent installation, recent deploys, and file paths/permissions on the collectors.",
-        "signature": "74|Cannot find module '/Users/craigoleyagent/Developer/synthwatch/runner/dist/specfetch/specShim.js' imported from /tmp/sw-specfetch-XGWWP8/spec.mjs|",
-        "model": "gpt-5-mini",
-        "cached": false,
-        "generated_at": "2026-06-26T00:00:47.710Z"
-      }
-    },
-    {
       "id": 34,
       "checkId": 59,
       "status": "open",
@@ -45,7 +9,7 @@
       "resolvedAt": null,
       "openedRunId": 842903,
       "resolvedRunId": null,
-      "consecutiveFailures": 2,
+      "consecutiveFailures": 3,
       "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
       "checkName": "rca-demo",
       "checkKind": "http",
