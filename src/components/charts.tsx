@@ -22,12 +22,20 @@ import { cwvTone } from "@/lib/status";
 import { useAvailabilitySeries, useIncidents, useDeploys } from "@/lib/client";
 
 // ★ Deploy-marker overlay (deploy-markers v1). A custom hook (always called — never conditionally) → the
-// deploys within the chart's [tsMin,tsMax]. Null-safe: no host / endpoint-absent (null) / no deploys → [].
+// deploys within the chart's [tsMin,tsMax]. Null-safe: no host / endpoint-absent (404 → null) / no deploys → [].
+// ★ `unavailable` distinguishes a FETCH ERROR (500/network — getDeploys rethrows → SWR error) from a genuine
+// empty (200 with no deploys): both yield zero markers, but only the error surfaces a small caption so
+// "markers couldn't load" ≠ "no deploys happened". The chart itself is unaffected either way.
 interface DeployMark { ts: number; label: string; source: string }
-function useDeployMarks(host: string | undefined, tsMin: number | undefined, tsMax: number | undefined): DeployMark[] {
-  const { data } = useDeploys(host ?? null, "90d"); // widest window; filtered to the chart range below
-  if (!host || tsMin == null || tsMax == null) return [];
-  return (data?.deploys ?? [])
+function useDeployMarks(
+  host: string | undefined,
+  tsMin: number | undefined,
+  tsMax: number | undefined,
+): { marks: DeployMark[]; unavailable: boolean } {
+  const { data, error } = useDeploys(host ?? null, "90d"); // widest window; filtered to the chart range below
+  const unavailable = Boolean(host) && Boolean(error); // a real fetch error (404 → null data, not error)
+  if (!host || tsMin == null || tsMax == null) return { marks: [], unavailable };
+  const marks = (data?.deploys ?? [])
     .map((d) => ({
       ts: new Date(d.deployed_at).getTime(),
       // is_sha → the short commit; a non-commit marker (etag) is labelled "deploy", never a fake sha.
@@ -35,6 +43,21 @@ function useDeployMarks(host: string | undefined, tsMin: number | undefined, tsM
       source: d.source,
     }))
     .filter((m) => Number.isFinite(m.ts) && m.ts >= tsMin && m.ts <= tsMax);
+  return { marks, unavailable };
+}
+
+// A small, unobtrusive caption for the ChartCard legend slot when the deploy-marker fetch ERRORED — the chart
+// stays fully rendered; this only says the overlay annotation couldn't load (error ≠ "no deploys").
+function DeployMarksUnavailable() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10px] text-[var(--color-warn)]"
+      data-testid="deploy-marks-unavailable"
+      title="Couldn’t load deploy markers for this chart (the deploys fetch failed). The chart data is unaffected; this is NOT a claim that no deploys occurred."
+    >
+      <span aria-hidden>⚠</span> deploy markers unavailable
+    </span>
+  );
 }
 
 // recharts needs ReferenceLines as direct children → a render helper returning the array (not a component).
@@ -128,7 +151,7 @@ export function LatencyChart({ runs, host }: { runs: Run[]; host?: string }) {
     .map((r) => ({ ts: new Date(r.started_at).getTime(), duration: r.duration_ms as number }))
     .sort((a, b) => a.ts - b.ts);
   // Hook called unconditionally (before the empty-data return) — deploy verticals within the chart's range.
-  const deployMarks = useDeployMarks(host, data[0]?.ts, data[data.length - 1]?.ts);
+  const { marks: deployMarks, unavailable: deploysUnavailable } = useDeployMarks(host, data[0]?.ts, data[data.length - 1]?.ts);
 
   if (data.length === 0) {
     return (
@@ -141,7 +164,7 @@ export function LatencyChart({ runs, host }: { runs: Run[]; host?: string }) {
   }
 
   return (
-    <ChartCard title="Latency over time" unit="duration_ms">
+    <ChartCard title="Latency over time" unit="duration_ms" legend={deploysUnavailable ? <DeployMarksUnavailable /> : undefined}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -8 }}>
           <defs>
@@ -213,7 +236,7 @@ export function AvailabilityChart({ checkId, host }: { checkId: number; host?: s
           .map((i) => ({ id: i.id, ts: new Date(i.opened_at).getTime() }))
           .filter((m) => m.ts >= tsMin && m.ts <= tsMax)
       : [];
-  const deployMarks = useDeployMarks(host, tsMin, tsMax);
+  const { marks: deployMarks, unavailable: deploysUnavailable } = useDeployMarks(host, tsMin, tsMax);
 
   const toggle = (
     <div className="inline-flex rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5">
@@ -235,7 +258,7 @@ export function AvailabilityChart({ checkId, host }: { checkId: number; host?: s
   );
 
   return (
-    <ChartCard title="Availability over time" action={toggle}>
+    <ChartCard title="Availability over time" action={toggle} legend={deploysUnavailable ? <DeployMarksUnavailable /> : undefined}>
       {rows.length === 0 ? (
         <div className="flex h-full items-center justify-center text-xs text-[var(--color-ink-faint)]">
           {isLoading ? "loading…" : "no availability data in this window yet"}

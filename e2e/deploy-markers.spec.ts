@@ -26,9 +26,11 @@ test.describe("charts — deploy-marker overlay", () => {
     // the availability chart still renders WITH the overlay (no crash)
     const card = page.locator(".sw-panel", { hasText: "Availability over time" });
     await expect(card.locator(".recharts-line-curve").first()).toBeVisible();
+    // markers loaded fine → no "unavailable" caption
+    await expect(page.getByTestId("deploy-marks-unavailable")).toHaveCount(0);
   });
 
-  test("no deploys → the chart renders clean, no overlay (null-safe)", async ({ page }) => {
+  test("no deploys (empty 200) → chart renders, no overlay, NO 'unavailable' caption (genuinely none)", async ({ page }) => {
     const world = defaultWorld();
     world.deploys = []; // endpoint present but nothing detected yet
     await mockApi(page, world);
@@ -37,6 +39,21 @@ test.describe("charts — deploy-marker overlay", () => {
 
     const card = page.locator(".sw-panel", { hasText: "Availability over time" });
     await expect(card.locator(".recharts-line-curve").first()).toBeVisible(); // still renders, no crash
+    // ★ empty ≠ error: a genuine no-deploys window shows NO caption
+    await expect(page.getByTestId("deploy-marks-unavailable")).toHaveCount(0);
+  });
+
+  test("★ deploys 500 → chart renders + 'markers unavailable' caption (error ≠ no-deploys)", async ({ page }) => {
+    const world = defaultWorld();
+    world.deploys500 = true; // the overlay fetch ERRORS (not 404-absent, not empty-200)
+    await mockApi(page, world);
+    await page.goto("/checks/1");
+
+    // ★ the chart itself is unaffected — only the overlay failed
+    const card = page.locator(".sw-panel", { hasText: "Availability over time" });
+    await expect(card.locator(".recharts-line-curve").first()).toBeVisible();
+    // ★ must-go-red: the caption surfaces the marker-load failure (old behavior showed no markers, silently)
+    await expect(page.getByTestId("deploy-marks-unavailable").first()).toBeVisible();
   });
 
   test("endpoint 404 (not deployed / table not migrated) → charts render, no overlay", async ({ page }) => {
@@ -47,5 +64,7 @@ test.describe("charts — deploy-marker overlay", () => {
     await page.waitForTimeout(500);
 
     await expect(page.locator(".sw-panel", { hasText: "Availability over time" }).locator(".recharts-line-curve").first()).toBeVisible();
+    // 404 = feature absent (not an error) → no caption, same as a genuine no-deploys window
+    await expect(page.getByTestId("deploy-marks-unavailable")).toHaveCount(0);
   });
 });

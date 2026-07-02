@@ -87,6 +87,9 @@ export interface World {
   reports500?: boolean;
   /** Deploy markers (deploy-markers v1) returned by GET /reports/deploys. Default: none. */
   deploys?: RawObj[];
+  /** Force GET /reports/deploys to 500 (overlay fetch ERROR, distinct from 404-absent) → the chart still
+   *  renders + a "deploy markers unavailable" caption shows (error ≠ "no deploys"). */
+  deploys500?: boolean;
   /** Egress regions (GET /reports/egress, raw camelCase DTO). Unset → DEFAULT_EGRESS (3 regions, 1 IP each =
    *  stable). Override with a region carrying distinctCount≥2 + multiple ips to exercise the rotation warning. */
   egressRegions?: RawObj[];
@@ -698,6 +701,7 @@ export async function mockApi(
     // Deploy markers (deploy-markers v1) — GET /reports/deploys?host=&window=. Echoes the host; serves
     // world.deploys (default none). reportsServed=false → 404 (endpoint/table not present → no overlay).
     if (path === "/api/reports/deploys" && method === "GET") {
+      if (world.deploys500) return json(route, { error: "boom" }, 500); // overlay fetch ERRORS (not 404-absent)
       if (world.reportsServed === false) return json(route, { error: "not_found" }, 404);
       const host = url.searchParams.get("host") ?? "";
       return json(route, { host, window: url.searchParams.get("window") ?? "30d", deploys: world.deploys ?? [] });
