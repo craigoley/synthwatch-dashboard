@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { EmptyState, Spinner } from "@/components/states";
+import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { MonitorReportCard, type ReportRow } from "@/components/monitor-report-card";
 import { ReportWebVitals, ReportSeriesArea } from "@/components/charts";
 import { formatDuration } from "@/lib/format";
@@ -43,6 +43,7 @@ export function MonitorReportList({
   filtered,
   checks,
   isLoading,
+  error,
   window,
   selected,
   clear,
@@ -53,6 +54,7 @@ export function MonitorReportList({
   filtered: ReportRow[];
   checks: CheckWithStatus[] | undefined;
   isLoading: boolean;
+  error?: unknown;
   window: ReportWindow;
   selected: Tag[];
   clear: () => void;
@@ -80,6 +82,11 @@ export function MonitorReportList({
     }
   const groupValues = [...rowsByValue.keys()].sort();
 
+  // ★ Loud-not-quiet: a failed checks fetch must not render as "No monitors to report on" (a fake-empty that
+  // reads like a healthy zero-monitor fleet). Show the error; the honest empty is only for a real empty set.
+  if (error && !checks) {
+    return <ErrorState testId="monitor-list-error" message="Couldn’t load monitors — the API is unreachable. Retry shortly." />;
+  }
   if (isLoading && !checks) {
     return (
       <div className="py-16">

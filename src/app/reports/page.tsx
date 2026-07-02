@@ -61,7 +61,7 @@ export default function ReportsPage() {
   // empty even when monitors exist → the misleading "No monitors to report on". SLA supplies windowed
   // availability (computed from up/down counts). The rollup reports, when present, ENRICH each row with
   // windowed latency percentiles + downtime/incident counts; when empty they simply don't override.
-  const { data: checks, isLoading } = useChecks();
+  const { data: checks, isLoading, error: checksError } = useChecks();
   const { data: sla } = useSla(window);
   // ★ The aggregate tiles (CWV / trend / verdict-breakdown) take the SAME tag filter as the monitor list,
   // server-scoped via ?tag= — so a filtered view shows the SUBSET's numbers, never the fleet's. Empty → fleet.
@@ -258,6 +258,7 @@ export default function ReportsPage() {
             filtered={filtered}
             checks={checks}
             isLoading={isLoading}
+            error={checksError}
             window={window}
             selected={selected}
             clear={clear}
