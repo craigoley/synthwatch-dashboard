@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
 
+import { PROXY_COOKIE } from "@/lib/auth";
+
 // SAME-ORIGIN trace proxy. The Playwright trace viewer (self-hosted at
 // /trace-viewer) must fetch() the trace.zip — and fetch() is CORS-gated. The trace
 // lives behind the C# API's managed-identity proxy on a DIFFERENT origin
@@ -14,20 +16,31 @@ export const dynamic = "force-dynamic";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
 
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   if (!/^\d+$/.test(id) || !API_BASE) {
     return new Response("not found", { status: 404 });
   }
 
+  // Forward the caller's session bearer (mirrored into a same-origin cookie by lib/auth) so the API's
+  // artifact-auth gate (synthwatch-api #154) sees an authenticated request. No session → forward nothing and
+  // let the API 401 (the viewer requiring login is the correct new behavior — never fabricate a token).
+  const token = req.cookies.get(PROXY_COOKIE)?.value;
+  const headers: Record<string, string> = { accept: "application/zip" };
+  if (token) headers.authorization = `Bearer ${token}`;
+
   let upstream: Response;
   try {
     // Server→server (no CORS); the C# API streams the blob via its managed identity.
-    upstream = await fetch(`${API_BASE}/runs/${id}/trace`, { headers: { accept: "application/zip" } });
+    upstream = await fetch(`${API_BASE}/runs/${id}/trace`, { headers });
   } catch {
     return new Response("trace upstream unreachable", { status: 502 });
   }
   if (!upstream.ok || !upstream.body) {
+    // ★ Pass auth failures THROUGH as-is (not 500/502) so the UI can show "sign in to view traces".
+    if (upstream.status === 401 || upstream.status === 403) {
+      return new Response("sign in to view traces", { status: upstream.status });
+    }
     return new Response("trace unavailable", { status: upstream.status === 404 ? 404 : 502 });
   }
 

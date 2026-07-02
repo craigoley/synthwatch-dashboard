@@ -28,6 +28,28 @@ export interface Session {
 
 const STORAGE_KEY = "synthwatch.session";
 
+/**
+ * ★ Same-origin cookie mirroring JUST the bearer token, for the trace-proxy ONLY (app/trace-proxy/*). Those
+ * routes run SERVER-side and stream forensic artifacts from the C# API, which (synthwatch-api #154) now gates
+ * behind a bearer. A server route can't read localStorage, and the browser attaches nothing to the viewer's
+ * iframe/download/fetch — so the token is also mirrored here where the proxy can read it (req.cookies) and
+ * forward it as `Authorization: Bearer`. SameSite=Lax + same-origin: it is NEVER sent to the cross-origin API,
+ * only to the dashboard's own proxy. Not httpOnly (set client-side) — SAME XSS exposure as the localStorage
+ * token, no worse; the API is still the real boundary (opaque, server-revocable session).
+ */
+export const PROXY_COOKIE = "sw_proxy_session";
+
+function writeProxyCookie(session: Session): void {
+  if (typeof document === "undefined") return;
+  const maxAge = Math.max(0, Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000));
+  const secure = typeof location !== "undefined" && location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${PROXY_COOKIE}=${encodeURIComponent(session.token)}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure}`;
+}
+function clearProxyCookie(): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${PROXY_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+}
+
 /** Auth events raised by the request() interceptor on a 401/403 from a NON-auth endpoint. */
 export type AuthEvent =
   | { type: "unauthorized" } // session expired/invalid mid-action → clear + prompt re-login
@@ -49,8 +71,10 @@ function loadFromStorage(): Session | null {
     const s = JSON.parse(raw) as Session;
     if (!isLive(s)) {
       window.localStorage.removeItem(STORAGE_KEY);
+      clearProxyCookie();
       return null;
     }
+    writeProxyCookie(s); // resync the proxy cookie with the restored session (cookie may have lapsed)
     return s;
   } catch {
     return null;
@@ -76,6 +100,7 @@ export function setSession(session: Session): void {
     } catch {
       /* storage full / disabled — in-memory still works for this tab */
     }
+    writeProxyCookie(session); // mirror the bearer for the server-side trace-proxy
   }
   emitSession();
 }
@@ -89,6 +114,7 @@ export function clearSession(): void {
     } catch {
       /* ignore */
     }
+    clearProxyCookie(); // drop the proxy bearer on logout/expiry (the viewer reverts to 401 → "sign in")
   }
   emitSession();
 }
