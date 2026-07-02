@@ -218,8 +218,11 @@ const trustInc = (o: Partial<Record<string, number>> = {}) => ({
   total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0, ...o,
 });
 const DEFAULT_TRUST: RawObj[] = [
+  // ★ proven-live WITH retriedPasses > 0 — the coexistence case: a healthy chip + the degrading-but-green
+  // annotation. (Other rows omit retriedPasses → the tolerant mapper reads 0 → annotation hidden, which also
+  // exercises pre-deploy-API tolerance.)
   { checkId: 1, checkName: "API health", sensitive: false, lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
-    runCount: 500, retryCount: 6, retryRate: 0.012, incidents: trustInc(), redTest: { captured: false },
+    runCount: 500, retryCount: 6, retryRate: 0.012, retriedPasses: 4, incidents: trustInc(), redTest: { captured: false },
     specProvenance: { executedSha256: "abc123def456", specPath: "monitors/api/health.spec.ts" }, trust: "proven-live" },
   { checkId: 2, checkName: "Homepage flow", sensitive: false, lastGreenAt: "2026-07-01T19:00:00Z", lastRunAt: "2026-07-01T20:00:00Z",
     runCount: 400, retryCount: 240, retryRate: 0.6, incidents: trustInc({ total: 3, flakyTransient: 3 }), redTest: { captured: false },

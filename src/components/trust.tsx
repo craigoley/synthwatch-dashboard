@@ -58,6 +58,31 @@ export function TrustChipBadge({ chip }: { chip: TrustChip }) {
   );
 }
 
+// ★ "Degrading-but-green" early warning. The ONLY threshold is > 0 (any passing run that needed a real retry
+// is worth surfacing) — named, not magic. Deliberately SEPARATE from TRUST_RULES: this is NOT a chip rule.
+export const RETRIED_PASSES_MIN_TO_WARN = 1;
+
+/**
+ * An ANNOTATION on a healthy monitor — NEVER a chip demotion. The API carries `retried_passes` (PASS/WARN runs
+ * that still needed a real retry) as a DISPLAY-ONLY fact that never feeds the trust chip: a proven-live monitor
+ * with retried passes STAYS proven-live. Rendered warn-toned but visually DISTINCT from TrustChipBadge — plain
+ * caption text with a small dot, no pill — so it reads as "watch this", not "downgraded". Hidden when 0.
+ */
+export function RetriedPassesNote({ retriedPasses, window }: { retriedPasses: number; window: string }) {
+  if (retriedPasses < RETRIED_PASSES_MIN_TO_WARN) return null;
+  return (
+    <span
+      className="mt-0.5 inline-flex items-center gap-1 text-[11px]"
+      style={{ color: TONE_VAR.warn }}
+      data-testid="trust-retried-passes"
+      title={`${retriedPasses} passing run(s) needed a real retry in the last ${window} — degrading, but still green. This does NOT change the trust chip.`}
+    >
+      <span className="h-1 w-1 rounded-full" style={{ background: TONE_VAR.warn }} />
+      {retriedPasses} {retriedPasses === 1 ? "pass" : "passes"} needed retries · {window}
+    </span>
+  );
+}
+
 /** The rule legend — load-bearing: the chip is only trustworthy because the rule is inspectable. */
 export function TrustLegend() {
   return (
@@ -230,6 +255,13 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
         </div>
       </div>
 
+      {/* degrading-but-green early warning — a distinct annotation, NOT a chip demotion (the chip stays as-is) */}
+      {m.retried_passes >= RETRIED_PASSES_MIN_TO_WARN && (
+        <div className="mb-3">
+          <RetriedPassesNote retriedPasses={m.retried_passes} window={window} />
+        </div>
+      )}
+
       <div className="mb-4 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
         <div>
           <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Last green</div>
@@ -344,13 +376,17 @@ export function TrustScorecard({ window }: { window: ReportWindow }) {
                   data-testid={`trust-row-${row.check_id}`}
                   className={`grid grid-cols-2 ${SCORECARD_TEMPLATE} items-center gap-x-3 gap-y-1 px-4 py-2.5`}
                 >
-                  <Link
-                    href={`/checks/${row.check_id}`}
-                    className="col-span-2 truncate text-[13px] font-medium text-[var(--color-ink)] hover:text-[var(--color-brand)] sm:col-span-1"
-                    title={row.check_name}
-                  >
-                    {row.check_name}
-                  </Link>
+                  <div className="col-span-2 min-w-0 sm:col-span-1">
+                    <Link
+                      href={`/checks/${row.check_id}`}
+                      className="block truncate text-[13px] font-medium text-[var(--color-ink)] hover:text-[var(--color-brand)]"
+                      title={row.check_name}
+                    >
+                      {row.check_name}
+                    </Link>
+                    {/* degrading-but-green annotation — under the name, distinct from the Trust chip (last column) */}
+                    <RetriedPassesNote retriedPasses={row.retried_passes} window={window} />
+                  </div>
                   <span
                     className={`text-[12px] ${neverGreen ? "font-medium text-[var(--color-ink-dim)]" : "text-[var(--color-ink-dim)]"}`}
                     data-testid={`trust-lastgreen-${row.check_id}`}

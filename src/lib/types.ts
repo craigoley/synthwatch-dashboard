@@ -742,6 +742,9 @@ export interface TrustRow {
   run_count: number;
   retry_count: number;
   retry_rate: number | null; // null = no runs → "—", never 0%
+  // ★ "degrading-but-green" early warning: PASS/WARN runs that STILL needed a real retry. DISPLAY-ONLY — it
+  // does NOT feed `trust` (a proven-live monitor with retried passes stays proven-live). 0 → annotation hidden.
+  retried_passes: number;
   incidents: TrustIncidents;
   red_test_captured: boolean; // true ONLY when a harness-confirmed red_tests row exists (else the honest gap)
   red_test_tested_at: string | null; // ISO when captured; null when not
