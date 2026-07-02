@@ -188,7 +188,7 @@ Complete `process.env` inventory:
 | `SYNTHWATCH_API_BASE`, `SYNTHWATCH_AI_RUN_ID`, `SYNTHWATCH_BASELINE_RUN_ID`, `RUNNER_SCHEMA`, `CI` | capture/enum-coverage scripts, playwright configs | non-secret tooling config |
 | `CLAUDE_CODE_OAUTH_TOKEN`, `GH_TOKEN` | `.github/workflows/*` via `secrets.` | CI-scoped, never in app runtime |
 
-**Bundle proof (performed, not assumed):** after `pnpm build`, grepping the emitted client output — `grep -rhoE "NEXT_PUBLIC_[A-Z_]+" .next/static` returns exactly one name, `NEXT_PUBLIC_API_BASE_URL`; greps for `bypass`/`x-vercel-protection`/`VERCEL_AUTOMATION`/token-value patterns return zero secret hits (the only matches are the `token_env` *field name* of the check-auth config and the literal `authorization` header name in the compiled api-client). No secret names or values reach the client bundle. (Local build ran without env vars set, so the inlined base-URL value is the empty-string default — which also demonstrates `.env.example:161`'s "MUST be set in every deployed environment" footgun: a build with the var missing produces same-origin requests against an origin that has no backend.)
+**Bundle proof (performed, not assumed):** after `pnpm build`, grepping the emitted client output — `grep -rhoE "NEXT_PUBLIC_[A-Z_]+" .next/static` returns exactly one name, `NEXT_PUBLIC_API_BASE_URL`; greps for `bypass`/`x-vercel-protection`/`VERCEL_AUTOMATION`/token-value patterns return zero secret hits (the only matches are the `token_env` *field name* of the check-auth config and the literal `authorization` header name in the compiled api-client). No secret names or values reach the client bundle. (Local build ran without env vars set, so the inlined base-URL value is the empty-string default — which also demonstrates the `api-client.ts:159-162` "MUST be set in every deployed/local environment" footgun: a build with the var missing produces same-origin requests against an origin that has no backend.)
 
 ### 4.2 Auth architecture (the access_requests model)
 
@@ -208,4 +208,34 @@ Checked: **no `middleware.ts` exists** (root or `src/`), the root layout does no
 1. **No CSP / security headers anywhere** — `next.config.ts` defines no `headers()`; no `vercel.json`. The localStorage-token trade-off (§4.2) explicitly leans on XSS hygiene, and there is no header-level backstop behind it. External screenshot URLs render via plain `<img>` with no allow-list (noted in `next.config.ts:9-12` comments).
 2. **Zero dashboard-layer enforcement** means any future page that renders sensitive data client-side before the API 403 lands would leak; today no such page exists (verified: `/users` gates its queries on `isAdmin` before fetching).
 3. Supply-chain posture is otherwise strong: CodeQL, Semgrep, OSV (PR + scheduled), dependency-review, and eslint-plugin-security workflows all present (`.github/workflows/`), `pnpm audit` clean (§5).
+
+---
+
+## 5. CODE HEALTH (report-only; all commands run locally at `ffc0263`)
+
+**Build:** `pnpm build` (Next.js 16.2.9, Turbopack) — succeeds; compile 5.2 s, TypeScript pass 7.7 s, 12 static shells + 3 dynamic routes. **Zero build warnings** (the only notice is Next telemetry boilerplate). Note Turbopack no longer prints per-route First-Load-JS sizes, so bundle numbers below were computed from the build artifacts directly.
+
+**Typecheck:** `npx tsc --noEmit` — **0 errors**. The baseline is already strict: `strict: true` *and* `noUncheckedIndexedAccess: true` are on (`tsconfig.json`). **Strict-delta:** the only mainstream flag left is `exactOptionalPropertyTypes`, which adds **20 errors**; adopting it is the entire remaining strictness gap.
+
+**Lint:** `pnpm lint` (`eslint . --max-warnings 0`, includes `eslint-plugin-security`) — **clean at zero-warning enforcement**.
+
+**Bundle size per route** (uncompressed on-disk JS, summed from each page's client-reference manifest; shared app baseline ≈ 452 KB = react-dom chunk 228 KB + framework 148 KB + runtime/init ~76 KB):
+
+| Route | Client JS | Notes |
+|---|---|---|
+| `/checks/[id]` | **628 KB** | heaviest — pulls the 376 KB recharts chunk |
+| `/reports` | **572 KB** | same recharts chunk |
+| `/monitors` | 216 KB | |
+| `/` | 212 KB | |
+| `/specs` | 200 KB | |
+| `/notifications` | 172 KB | |
+| `/status` | 168 KB | |
+| `/trust`, `/incidents`, `/incidents/[id]` | 160 KB | |
+| `/users` | 152 KB | |
+
+**Heaviest offender:** the recharts+d3 chunk — **376 KB, 60% of `/checks/[id]`'s page-specific weight** — loaded only by the two chart routes (verified via client-reference manifests: only `/checks/[id]` and `/reports` reference it). The homepage sparklines do *not* pull it (`sparkline.tsx` is hand-rolled SVG). Total client JS emitted: 1.54 MB.
+
+**Dependencies:** `pnpm outdated` — all current within one patch/minor except `eslint` 9.39.4 → 10.6.0 and `@eslint/js` 9 → 10 (majors, dev-only). `pnpm audit` — **no known vulnerabilities**. One pinned override: `postcss >= 8.5.10` (`package.json`).
+
+**Not run here (out of scope for a local docs-only pass):** `pnpm e2e` (needs browsers + mock server; CI-gated), `pnpm contract` (runs in the required CI gate per `.github/workflows/e2e.yml:37-38`).
 
