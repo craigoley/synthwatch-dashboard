@@ -239,3 +239,107 @@ Checked: **no `middleware.ts` exists** (root or `src/`), the root layout does no
 
 **Not run here (out of scope for a local docs-only pass):** `pnpm e2e` (needs browsers + mock server; CI-gated), `pnpm contract` (runs in the required CI gate per `.github/workflows/e2e.yml:37-38`).
 
+---
+
+## 6. BOUNDARY CONTRACTS
+
+### CONSUMES
+
+The dashboard reads **zero tables directly** (§1.1 — no DB driver exists). Everything below is HTTP against the C# API at `NEXT_PUBLIC_API_BASE_URL`; the *shape it assumes* is the hand-written `Raw*` interface / inline mapping cited (this table is the dashboard half of the api repo's §6; the api repo's half should be diffed against it). All responses camelCase; ✔ = anchored by a contract test against a captured real response.
+
+**Reads (JSON):**
+
+| Endpoint | Assumed shape (source of truth in this repo) | ✔ |
+|---|---|---|
+| `GET /checks` | `RawCheckListItem[]` — check fields + `currentStatus, p50Ms, p95Ms, runs24h, spark[], openIncidentCount, maxOpenSeverity, lastCertDaysRemaining, locations[]` (`api-client.ts:308-358`) | ✔ |
+| `GET /checks/{id}` | `RawCheckDetail` = check + `recentRuns[]` (`:377-379`) | ✔ |
+| `GET /checks/{id}/runs?from,to,cursor,pageSize` | envelope `{items[], nextCursor, pageSize}` (`:381-385`) | ✔ |
+| `GET /checks/{id}/metrics` | `{items: RawMetric[]}` (`:395-416`); `started_at`/`status` are client-fabricated (`:561-562`) | ✔ |
+| `GET /checks/{id}/availability-series?window` | `{bucket, points[{ts, availabilityPct, upRuns, downRuns}]}` (`:1955-1985`) | ✔ |
+| `GET /checks/{id}/locations`, `GET /locations` | `{locations[]}` (`:1290-1307`) | — |
+| `GET /checks/{id}/tags`, `GET /tags`, `GET /tags/suggested` | `Tag[]` or `{tags}` wrapper-tolerant (`:1380-1418`) | — |
+| `GET /runs/{id}/steps` | `RawStep[]` (`:418-427`) | — |
+| `POST /runs/{id}/ai-insights` *(read-as-POST)* | **flat** `AiInsightsDto` `{configured, summary, performance[], network[], errors[], suggestions[], caveats[], note}` (`:700-716`; the nested-`insights` assumption was the #100 bug) | ✔ |
+| `POST /runs/{id}/baseline-diff` | `{configured, note, retryable, failing, baseline, diff{console{onlyInA/B}, network{…A/B}}, insight}` (`:819-848`) | ✔ |
+| `GET /incidents?status,checkId,from,to,cursor,pageSize` | envelope `{items: RawIncident[], nextCursor, pageSize}` (`:389-393,429-443`); default 30d window, `status=open` exempt | ✔ |
+| `GET /incidents/{id}` | `RawIncidentDetail` + `perLocation[], timeline[], recurrence[]` (`:1017-1052`) | ✔ |
+| `GET /flows` | bare `RawFlow[]` (`:1092-1097`) | ✔ |
+| `GET /reconcile/drift` / `GET /reconcile/plan` | `{items[], detectedAt}` / `{items[], computedAt}`; 404 = not deployed (`:1119-1168`) | ✔/— |
+| `GET /specs` | `{items: RawSpecItem[], probedAt}` incl. nested `health` (`:1215-1263`) | ✔ |
+| `GET /channels` | bare `Channel[]` passthrough (`:1331`) | — |
+| `GET /routing` | `{severity{}, perCheck{}, tagRules[]}` (`:1364-1366`) — **read unanchored; wipe-adjacent (§2.b)** | write only |
+| `GET /channels/{id}/test/status` | partial `{status, detail?, deliveredAt?}` (`:1479-1490`) | — |
+| `GET /notifications/health` | readiness flags (`:1510-1518`) | — |
+| `GET /sla?window` | `{window, items: RawSlaItem[], fleet}` (`:445-470`) | ✔ |
+| `GET /reports/availability?window,groupBy,tag` | `{groups[{key, checkCount, checks[], series[{day, availabilityPct}]}]}` (`:1544-1699`) — **`day`, not `date`: the F-01 contract** | ✔ |
+| `GET /reports/performance?window,groupBy,tag` | groups + nested `latency{p50,p75,p95}`, `webVitals{}`, series `{day, avgMs}` (`:1635-1694`) | ✔ |
+| `GET /reports/narrative` | factPack object → chips (`:1607-1633`) | ✔ |
+| `GET /reports/deploys?host,window` | `{host, window, deploys[{sha, isSha, source, deployedAt}]}` (`:1713-1728`) | ✔ |
+| `GET /reports/egress?window` | `{regions[{location, currentIps[], distinctCount, ips[]}]}` (`:1733-1758`) | — |
+| `GET /reports/trust?window`, `GET /reports/trust/{id}?window` | `{monitors[]}` / `{monitor, retrySeries[{day, runCount, retryCount, retryRate}]}` with nested `incidents{}, specProvenance{}, redTest{}` (`:1765-1829`) | — |
+| `GET /reports/slo?window,tag` | `{items[{target, budget, consumed, remaining, remainingPct, burnRate, burnState, reportedBurn, completedRuns, insufficientData}], fleet}` (`:1869-1905`) | ✔ |
+| `GET /reports/mttr?window,tag` | `{items[], fleet, classification[], trend[{bucketStart, resolvedCount, meanSeconds}]}` (`:1910-1953`) | — |
+| `GET /reports/incident-breakdown?window,tag` | `{buckets[]}` (`:2123-2146`) | request-shape only |
+| `GET /status` | `{window, properties[{name, state, checkCount, upCount, degradedCount, downCount, uptimePct, buildingBaseline}], recentIncidents[]}` (`:1834-1863`) | — |
+| `GET /auth/me`, `GET /editors`, `GET /access-requests` | `{email, role}` / `RawEditor[]` / `RawAccessRequest[]` (`:2039-2115`) | — |
+
+**Reads (binary, credential-less):** `GET /runs/{id}/trace`, `GET /checks/{id}/success-trace` (via the trace proxies, §1.4); `GET /api/runs/{id}/screenshot` via direct `<img src={apiUrl(...)}>` loads (`api-client.ts:180,187-195`).
+
+**Writes:** `POST/PATCH/DELETE /checks(/{id})`, `POST /checks/{id}/run`, `PUT /checks/{id}/locations`, `PUT /checks/{id}/tags`, `POST /checks/parse-intent`, `POST/PUT/DELETE /channels(/{id})`, `POST /channels/{id}/test`, `PUT /routing` (3-dimension body, contract-pinned), `POST /reconcile/{trigger,approve,reject,apply}`, `POST /auth/{request-code,verify,logout,request-access}`, `POST/DELETE /editors(/{email})`, `DELETE /access-requests/{email}`. All bodies snake→camel via `toCamelBody` (`:297-304`).
+
+**Cross-repo file contract (not HTTP):** the runner's `db/schema.sql` enum `CHECK` constraints, consumed read-only by `scripts/check-enum-coverage.mjs` in CI (`enum-coverage.json` manifest maps `runs.status → RunStatus`, `run_steps.status → RunStepStatus`, `reconcile_drift.drift_type → DriftType`).
+
+### EXPOSES
+
+Very nearly nothing — verified, not assumed:
+
+1. `GET /trace-proxy/{id}` and `GET /trace-proxy/check/{id}` — the only route handlers in the app (no `src/app/api/` exists). They re-expose two upstream API binaries on the dashboard's origin, unauthenticated (§4.3). **This is the app's entire dynamic API surface.**
+2. Static assets: the vendored Playwright trace-viewer bundle under `public/trace-viewer/**` (checked-in build, refreshed by `scripts/vendor-trace-viewer.mjs`).
+3. Static page shells for the 13 pages (no data embedded at build time — all data is client-fetched, so the shells expose nothing but markup).
+
+No webhooks, no exported feeds, no server actions, no cron endpoints.
+
+---
+
+## 7. TECH DEBT REGISTER · IMPROVEMENTS + FEATURE IDEAS · OPEN QUESTIONS
+
+### 7.1 Tech debt register (ranked by risk-to-users ÷ effort)
+
+| # | Item | Evidence | Sev | Effort |
+|---|---|---|---|---|
+| TD-1 | Seven read seams swallow **all** errors as `null` → monitoring sections vanish silently on API 500s (indistinguishable from "not deployed") | §2.b(C); `api-client.ts:1718,1737,1805,1816,1838,1873,1914` | Major | S (copy the in-file 404-only pattern) |
+| TD-2 | Trust/D1 scorecard + all report aggregates have **unbounded staleness** (no poll, no focus revalidate, no "as of" timestamp) | §1.3; `client.ts:478-537,547-560` | Major (freshness-sensitive surface) | S–M |
+| TD-3 | `getRouting` read is contract-unanchored while feeding `setRouting` — residual silent-wipe path (API-side 400 is the only guard) | §2.b(A); `api-client.ts:1364-1366`; `CONTRACT-DRIFT-FINDINGS.md` F-05 | Major (write-loss class) | S (one capture + test) |
+| TD-4 | zod schemas are runtime-dead (`import type` only; `runsQuerySchema` unimported) — false confidence that validation exists | §2.a; `schemas.ts`, `api-client.ts:99` | Medium | M (becomes the §2.c fix) |
+| TD-5 | No scheduled `capture:contracts` — live API drift undetected between manual re-captures | `contract/README.md` staleness note; no workflow exists | Medium | S (one cron workflow) |
+| TD-6 | No CSP/security headers behind the localStorage-token trade-off | §4.4; `next.config.ts` | Medium | M (CSP needs the img-src audit) |
+| TD-7 | `CONTRACT-DRIFT-FINDINGS.md` is stale (pre-refactor line numbers; F-01–F-09 fixed) — misleads future audits | §2.a diff | Low | XS (mark superseded, link here) |
+| TD-8 | "Burn (pooled)" header mislabels `reported_burn`; stale `types.ts:459-461` comment | §3.1 M-1/M-2 | Low | XS |
+| TD-9 | `formatPct` rounds 99.996% → "100.00%" on a status page | §3.3 M-5; `format.ts:95-98` | Low | XS (floor to precision for availability) |
+| TD-10 | `listIncidents` 200-row single page over 365d — silent truncation at scale | §2.b; `api-client.ts:1000-1015` | Low today | S |
+| TD-11 | recharts chunk (376 KB) dominates the two chart routes | §5 | Low | M (lazy-load charts or lighter lib) |
+| TD-12 | `exactOptionalPropertyTypes` delta = 20 errors; last strictness flag unadopted | §5 | Low | S–M |
+| TD-13 | Prior doc's F-10–F-14 (swallowed write errors, ignored SWR error states, uncapped poll, stale-window flash) unre-verified | §2.a | Unknown | S to re-triage |
+
+### 7.2 Improvements + feature ideas (grounded in data the platform already collects; ranked value/effort)
+
+1. **Deploy-correlated incidents** (high value / S–M): deploy markers (`getDeploys`) are already fetched but only drawn as chart reference-lines (`charts.tsx`). Join them client-side against `incident.opened_at` to render a "deploy-adjacent" chip on incident detail and the MTTR classification — the single most actionable RCA signal the platform already has and doesn't surface.
+2. **Freshness stamps + manual refresh on no-poll surfaces** (high value / S): every no-poll panel (trust, SLO, MTTR, availability/perf reports, narrative) should render "as of HH:MM" + a refresh affordance — converts TD-2's unbounded staleness from a trap into a visible property. SWR's `mutate` already exists for all keys (`client.ts` `revalidate*` helpers).
+3. **Loud drift/error states** (high value / S): pair with TD-1 — a thin "This panel failed to load (HTTP 500)" state distinguishing outage from not-deployed from genuinely-empty. The components already have honest-empty patterns to extend (`fleet-mttr.tsx:120-124`).
+4. **Trust trend** (medium / M): `retry_series` daily data is already delivered per check (`api-client.ts:1822-1827`) but the fleet page shows only current chips — a per-monitor retry-rate sparkline and a fleet red-test-coverage-over-time strip are free from existing data.
+5. **Trace signals on run history** (medium / cross-repo): no `trace_signals` reference exists in this repo (grep-verified) though the runner collects them; surfacing per-run console-error/network-failure counts as row badges would make run history scannable without opening traces. Requires an API endpoint first — belongs on the api repo's §7 as the other half.
+6. **Egress rotation alerting** (low-medium / S): `distinct_count` per region is already on `/status` (`egress-stability.tsx`); a "rotated in last 24 h" banner + channel routing would turn a passive soak into the allowlist-drift alarm it was built to be.
+7. **SLO burn history** (medium / cross-repo): `slo_burn_status` presumably has history; the dashboard shows only the current pill. A burn-state timeline on check detail would answer "how often does this page-worthy-burn" — the alert-fatigue question the trust page circles.
+
+### 7.3 Open questions
+
+- **Q1 (math provenance):** do the `sla_availability_*` views and the `slo_burn_status` producer in `craigoley/synthwatch` implement exactly the formulas the dashboard documents (`types.ts:463-478`) and the tooltips promise (1 h ≥ 14.4×, 6 h+30 m ≥ 6×)? Unverifiable from this repo (§3.0); needs the api/runner repo's matching deep-review section.
+- **Q2 (trace exposure):** does the C# API authenticate `GET /runs/{id}/trace` and `GET /checks/{id}/success-trace` itself? The dashboard's proxies forward no credentials (§4.3); if the upstream is open, Playwright traces — including sensitive checks' — are anonymously enumerable through the dashboard origin.
+- **Q3 (bypass token):** where does the Vercel protection-bypass token actually live (it is not in this repo, §4.1), and is Vercel Deployment Protection enabled at all for production? If it is, how do anonymous status-page viewers get through; if it isn't, Q2 matters more.
+- **Q4 (incident volume):** can the fleet plausibly exceed 200 resolved incidents in 365 d (TD-10)? A single number from the DB answers whether `listIncidents`' sparsity assumption holds.
+- **Q5 (ownership of re-capture):** who owns refreshing `contract/real/*` when the API deploys a shape change — should the api repo's CI trigger a capture PR here (TD-5)?
+
+---
+
+*End of review. Analysis produced without applying fixes; every `file:line` refers to `main @ ffc0263`.*
+
