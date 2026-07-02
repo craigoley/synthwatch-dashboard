@@ -315,6 +315,11 @@ export function defaultIncidentDetails(): Record<number, RawObj> {
       recurrence: [
         { id: 3, openedAt: "2026-06-20T10:00:00Z", resolvedAt: "2026-06-20T10:30:00Z", status: "resolved", summary: "earlier westus2 blip" },
       ],
+      // deploy-proximity: one BEFORE (SHA) + one AFTER (etag/fingerprint) — synthetic (no live examples exist yet).
+      nearbyDeploys: [
+        { detectedAt: "2026-06-22T17:35:00Z", source: "run-capture", isSha: true,  sha: "abcdef1234567890", fingerprint: "abcdef1234567890", offsetMinutes: -15 },
+        { detectedAt: "2026-06-22T17:55:00Z", source: "run-capture", isSha: false, sha: "",                 fingerprint: "etag-9f8e",        offsetMinutes: 5 },
+      ],
     }),
     // id 2 — rca null (graceful: no RCA panel), no recurrence
     2: incidentDetail({

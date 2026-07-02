@@ -89,6 +89,41 @@ test.describe("incident detail page", () => {
     await expect(page.getByRole("link", { name: /earlier westus2 blip/ })).toHaveAttribute("href", "/incidents/3");
   });
 
+  test("★ deploy-proximity: renders nearby deploys (before + after, SHA + fingerprint) as correlation, not causation", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/incidents/1");
+    const section = page.getByTestId("incident-nearby-deploys");
+    await expect(section).toBeVisible();
+    // ★ WORDING IS LOAD-BEARING: correlation not causation; timestamp is DETECTION time
+    await expect(section).toContainText("not causation");
+    await expect(section).toContainText("detection");
+    await expect(section).not.toContainText("caused by");
+    await expect(section).not.toContainText("broke");
+    // two rows: -15min (SHA → short-SHA) before, +5min (fingerprint/etag) after
+    await expect(section.getByTestId("incident-nearby-deploy")).toHaveCount(2);
+    await expect(section).toContainText("15 min before");
+    await expect(section).toContainText("abcdef1"); // short SHA (7 chars)…
+    await expect(section).not.toContainText("abcdef1234567890"); // …not the full 16
+    await expect(section).toContainText("5 min after");
+    await expect(section).toContainText("etag-9f8e");
+  });
+
+  test("★ deploy-proximity: absent (honest-empty) when there are no nearby deploys — no fabricated row", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/incidents/2"); // fixture has no nearbyDeploys → mapper → [] → section absent
+    await expect(page.getByRole("heading", { name: "Incident #2" })).toBeVisible();
+    await expect(page.getByTestId("incident-nearby-deploys")).toHaveCount(0);
+  });
+
+  test("★ deploy-proximity: a fetch error is LOUD (ErrorState), never silently absent", async ({ page }) => {
+    const w = defaultWorld();
+    w.failAllReads = true; // the incident GET 500s → the whole detail errors (this data rides that payload)
+    await mockApi(page, w);
+    await page.goto("/incidents/1");
+    await expect(page.getByText(/ERROR ·/)).toBeVisible(); // loud ErrorState (#175), not a silent blank
+    await expect(page.getByTestId("incident-nearby-deploys")).toHaveCount(0);
+  });
+
   test("an rca-null incident detail renders with no RCA panel", async ({ page }) => {
     await mockApi(page);
     await page.goto("/incidents/2");

@@ -11,7 +11,7 @@ import { TagChips } from "@/components/tag-chips";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { runStatusMeta, severityMeta } from "@/lib/status";
 import { formatDuration, formatLocalDateTime, formatRelative, formatSpan } from "@/lib/format";
-import type { IncidentDetail, IncidentTimelineRun, LocationStatus } from "@/lib/types";
+import type { IncidentDetail, IncidentTimelineRun, LocationStatus, NearbyDeploy } from "@/lib/types";
 
 const isDown = (s: string) => s === "fail" || s === "error";
 
@@ -150,6 +150,52 @@ function Recurrence({ items, currentId }: { items: IncidentDetail["recurrence"];
   );
 }
 
+/**
+ * Deploys DETECTED near this incident — ★ possible CORRELATION, never CAUSATION. detected_at is DETECTION time
+ * (a monitor run first SAW the deploy), so it lags the real deploy. Empty → the section is ABSENT (no fabricated
+ * content); a fetch failure surfaces at the incident level as a loud ErrorState (this data rides the incident
+ * payload), never a silent blank here.
+ */
+function NearbyDeploys({ deploys }: { deploys: NearbyDeploy[] }) {
+  if (deploys.length === 0) return null; // honest-empty → render absence, never a placeholder row
+  return (
+    <section data-testid="incident-nearby-deploys">
+      <h2 className="text-sm font-semibold text-[var(--color-ink)]">Deploys detected near this incident</h2>
+      <p className="mt-1 text-[12px] text-[var(--color-ink-dim)]">
+        Possible correlation — not causation. The timestamp is <strong>detection</strong> time (when a monitor run
+        first saw the deploy), which lags the actual deploy.
+      </p>
+      <ul className="mt-2 space-y-1.5">
+        {deploys.map((d, i) => {
+          const mins = Math.abs(d.offset_minutes);
+          const dir = d.offset_minutes <= 0 ? "before" : "after"; // negative offset = detected before open
+          const ident = d.is_sha ? d.sha.slice(0, 7) : d.fingerprint; // short-SHA, else the fingerprint label
+          return (
+            <li
+              key={i}
+              data-testid="incident-nearby-deploy"
+              className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-l-2 pl-3 text-[13px]"
+              style={{ borderColor: TONE_VAR.warn }}
+            >
+              <span className="text-[var(--color-ink)]">
+                Deploy detected{" "}
+                <strong>
+                  {mins} min {dir}
+                </strong>{" "}
+                this incident opened
+              </span>
+              <span className="sw-mono text-[12px] text-[var(--color-ink-dim)]">
+                {d.source} · {d.is_sha ? "SHA" : "fingerprint"} <code>{ident}</code> · detected{" "}
+                {formatRelative(d.detected_at)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 export default function IncidentDetailPage() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
@@ -197,6 +243,9 @@ export default function IncidentDetailPage() {
       </header>
 
       <PerLocation locations={incident.per_location ?? []} />
+
+      {/* deploy-proximity annotation — correlation, not causation; absent when none (honest-empty) */}
+      <NearbyDeploys deploys={incident.nearby_deploys ?? []} />
 
       {/* rca null → no panel (graceful, exactly like the list) */}
       {incident.rca && <RcaPanel rca={incident.rca} />}

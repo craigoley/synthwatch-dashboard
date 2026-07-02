@@ -367,6 +367,21 @@ export interface IncidentRecurrence {
   summary: string | null;
 }
 
+/**
+ * A deploy DETECTED near an incident (same host, inside the proximity window). ★ Possible correlation, NEVER
+ * causation. detected_at is DETECTION time (captured passively by browser-check runs → poll latency), not
+ * authoritative deploy time. offset_minutes is signed relative to opened_at (negative = detected BEFORE the
+ * incident opened). sha is empty unless is_sha; otherwise fingerprint is the human label.
+ */
+export interface NearbyDeploy {
+  detected_at: string;
+  source: string;
+  is_sha: boolean;
+  sha: string; // empty unless is_sha
+  fingerprint: string;
+  offset_minutes: number; // signed; negative = detected before the incident opened
+}
+
 /** Full incident investigation payload (GET /api/incidents/{id}). */
 export interface IncidentDetail {
   id: number;
@@ -383,6 +398,8 @@ export interface IncidentDetail {
   per_location: LocationStatus[];
   timeline: IncidentTimelineRun[];
   recurrence: IncidentRecurrence[];
+  // Deploys detected near this incident (empty when none — the UI renders absence, never a fabricated row).
+  nearby_deploys: NearbyDeploy[];
 }
 
 /**
