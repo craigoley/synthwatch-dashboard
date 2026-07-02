@@ -113,6 +113,21 @@ test.describe("API contract — high-risk seam anchors", () => {
       expect(res.recurrence[0]!.opened_at).toBe(raw.recurrence[0].openedAt);
       expect(res.recurrence[0]!.resolved_at).toBe(raw.recurrence[0].resolvedAt);
     }
+
+    // ★ nearby_deploys[] (deploy-proximity, api #157) — forward-compatible: the field is optional and this
+    // captured fixture predates deploy capture, so it maps to []. Re-capture after #157 deploys picks up the
+    // real (empty-for-incident-34) array; the mapper stays tolerant of the field being absent.
+    expect(Array.isArray(res.nearby_deploys)).toBe(true);
+    expect(res.nearby_deploys).toEqual(
+      (raw.nearbyDeploys ?? []).map((d: Record<string, unknown>) => ({
+        detected_at: d.detectedAt,
+        source: d.source,
+        is_sha: d.isSha,
+        sha: d.sha ?? "",
+        fingerprint: d.fingerprint,
+        offset_minutes: d.offsetMinutes,
+      })),
+    );
   });
 
   // 3 ── getSpecCatalog — the per-item + nested HEALTH mapping (previously length-anchored only).

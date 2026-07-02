@@ -1054,6 +1054,16 @@ interface RawIncidentDetail {
   perLocation: LocationStatus[] | null;
   timeline: RawTimelineRun[] | null;
   recurrence: RawRecurrence[] | null;
+  nearbyDeploys?: RawNearbyDeploy[] | null; // optional → tolerant of the pre-#157 API (absent → [])
+}
+
+interface RawNearbyDeploy {
+  detectedAt: string;
+  source: string;
+  isSha: boolean;
+  sha: string;
+  fingerprint: string;
+  offsetMinutes: number;
 }
 
 /** GET /api/incidents/{id} — the incident investigation payload. */
@@ -1090,6 +1100,15 @@ export async function getIncident(id: number): Promise<IncidentDetail> {
       resolved_at: r.resolvedAt,
       status: r.status,
       summary: r.summary,
+    })),
+    // Absent (pre-#157 API) → [] → the annotation section is absent. Forward-compatible.
+    nearby_deploys: (raw.nearbyDeploys ?? []).map((d) => ({
+      detected_at: d.detectedAt,
+      source: d.source,
+      is_sha: d.isSha,
+      sha: d.sha ?? "",
+      fingerprint: d.fingerprint,
+      offset_minutes: d.offsetMinutes,
     })),
   };
 }
