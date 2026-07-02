@@ -171,3 +171,41 @@ Client arithmetic, verified: seconds→ms once for the formatter (`fmtDur`, `fle
 
 The dashboard's own arithmetic is **correct and defensively guarded** — every division has a zero/insufficient-data guard, empty series degrade to honest states, and the client deliberately re-derives `remaining/budget` rather than trusting a redundant server field. The material risks are not miscalculation but **mislabeling** (M-1) and **provenance**: all load-bearing formulas live in SQL this repo can neither see nor test, with only enum drift (not formula drift) CI-guarded, and the burn thresholds existing here only as tooltip prose. A monitoring product whose math is subtly wrong is worse than no product — today the place that wrongness would enter is the unverified seam to `slo_burn_status` and the `sla_availability_*` views, not this codebase.
 
+---
+
+## 4. SECURITY-ADJACENT SURFACE
+
+### 4.1 Secrets: what exists, and the bundle proof
+
+**The Vercel bypass token is not referenced anywhere in this repo.** Case-insensitive grep for `bypass`, `x-vercel`, `VERCEL_AUTOMATION` across all source/config/workflow files returns only comments about HTTP-cache bypass and CI branch protection (`api-client.ts:243`, `auto-merge.yml:49`) — no `VERCEL_AUTOMATION_BYPASS_SECRET`, no `x-vercel-protection-bypass` header, no `vercel.json`. If a bypass token exists for this deployment, it lives in another repo (presumably the runner, to probe the protected preview) or in Vercel settings — Open Question Q3.
+
+Complete `process.env` inventory:
+
+| Name | Where | Exposure |
+|---|---|---|
+| `NEXT_PUBLIC_API_BASE_URL` | `.env.example:11`, `api-client.ts:163`, both trace-proxy routes (`[id]/route.ts:15`), `next.config.ts` comment | **Client-inlined by design** (it's the public API origin, not a secret) |
+| `SYNTHWATCH_API_TOKEN` | `contract/capture.mjs:80,86,110` | Dev-tooling only; never in app code; "NEVER hardcoded/committed" (`capture.mjs:77`); capture skips if unset |
+| `SYNTHWATCH_API_BASE`, `SYNTHWATCH_AI_RUN_ID`, `SYNTHWATCH_BASELINE_RUN_ID`, `RUNNER_SCHEMA`, `CI` | capture/enum-coverage scripts, playwright configs | non-secret tooling config |
+| `CLAUDE_CODE_OAUTH_TOKEN`, `GH_TOKEN` | `.github/workflows/*` via `secrets.` | CI-scoped, never in app runtime |
+
+**Bundle proof (performed, not assumed):** after `pnpm build`, grepping the emitted client output — `grep -rhoE "NEXT_PUBLIC_[A-Z_]+" .next/static` returns exactly one name, `NEXT_PUBLIC_API_BASE_URL`; greps for `bypass`/`x-vercel-protection`/`VERCEL_AUTOMATION`/token-value patterns return zero secret hits (the only matches are the `token_env` *field name* of the check-auth config and the literal `authorization` header name in the compiled api-client). No secret names or values reach the client bundle. (Local build ran without env vars set, so the inlined base-URL value is the empty-string default — which also demonstrates `.env.example:161`'s "MUST be set in every deployed environment" footgun: a build with the var missing produces same-origin requests against an origin that has no backend.)
+
+### 4.2 Auth architecture (the access_requests model)
+
+Auth is **client-side UX over an API-enforced boundary**, stated explicitly at `auth.ts:12-13`, `write-gate.tsx:6-9`, `users/page.tsx:4-8`. OTP email login → `POST /auth/verify` mints an opaque bearer session (`api-client.ts:2018-2049`); roles `admin | editor | anonymous` (`auth.ts:19`); admins manage an editor allowlist plus an `access_requests` queue (`api-client.ts:2090-2119`). The token lives in **`localStorage`** (`synthwatch.session`, `auth.ts:29,71-79`) — a documented trade-off (`auth.ts:10-16`): the API is a different origin authenticating by header, so the token must be JS-readable; mitigations are opacity + server-side revocability + 30-day expiry. It is attached header-only on every request (`api-client.ts:226,249-253`), never in URLs or logs. The interceptor maps 401 → clear session + re-login prompt, 403 → permission toast without clearing (`api-client.ts:271-281`), `/auth/*` exempt. E2E coverage genuinely exercises this: token injection on writes, 401→re-login, 403→toast, enumeration-safe login and request-access copy (`e2e/auth.spec.ts:117,121-154,186-199`).
+
+### 4.3 Route-protection coverage: the honest answer is "none, by design"
+
+Checked: **no `middleware.ts` exists** (root or `src/`), the root layout does no gating (`layout.tsx:34-45`), and `AppShell` only hides nav chrome (`app-shell.tsx:18,128`). Therefore **every one of the 13 pages renders for anonymous visitors**; the product is read-open (it *is* a status page) and write-gated at the API. Per-route:
+
+- All read pages (`/`, `/status`, `/incidents*`, `/checks/[id]`, `/reports`, `/trust`, `/specs`, `/monitors`, `/notifications`): no gate; write affordances hidden via `canWrite` (`write-gate.tsx:18-20`); writes 401/403 server-side.
+- `/users`: renders a shell for everyone; data queries are `enabled`-gated on client `isAdmin` (`users/page.tsx:19-21,66-81`) and the API 403s non-admins on `/editors` + `/access-requests`. Client gating is UX only — acceptable *only because* the API is the boundary.
+- `/throw-test`: public but inert (throws on `?boom=1` to exercise error boundaries; no data, no side effects).
+- **`/trace-proxy/[id]` and `/trace-proxy/check/[id]`: unauthenticated and enumerable — the one finding that matters.** Verified by direct read: the handlers validate only `^\d+$` (`[id]/route.ts:19`), forward **no credentials** upstream (`:26` — `accept: application/zip` only), and stream the response to any caller, with `cache-control: private, max-age=300` (`:38`). Whether anonymous users can therefore download arbitrary Playwright traces (which contain full request/response bodies, console output, and screenshots of the monitored flows — including "sensitive" checks, which the redaction feature exists for) depends entirely on whether the upstream C# `GET /runs/{id}/trace` endpoint independently authenticates. The proxy's own comments say the upstream authenticates *to blob storage* via managed identity (`:25`) — that is the API's credential, not the caller's. **Rated: Major if the upstream is open; unverifiable here without probing the live API (out of scope for this docs-only run). Open Question Q2 — the single highest-priority follow-up of this review.** SSRF exposure is nil (digits-only id, fixed base).
+
+### 4.4 Defense-in-depth gaps (report-only)
+
+1. **No CSP / security headers anywhere** — `next.config.ts` defines no `headers()`; no `vercel.json`. The localStorage-token trade-off (§4.2) explicitly leans on XSS hygiene, and there is no header-level backstop behind it. External screenshot URLs render via plain `<img>` with no allow-list (noted in `next.config.ts:9-12` comments).
+2. **Zero dashboard-layer enforcement** means any future page that renders sensitive data client-side before the API 403 lands would leak; today no such page exists (verified: `/users` gates its queries on `isAdmin` before fetching).
+3. Supply-chain posture is otherwise strong: CodeQL, Semgrep, OSV (PR + scheduled), dependency-review, and eslint-plugin-security workflows all present (`.github/workflows/`), `pnpm audit` clean (§5).
+
