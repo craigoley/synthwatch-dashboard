@@ -10,7 +10,7 @@ export function Spinner({ label }: { label?: string }) {
   );
 }
 
-export function ErrorState({ message }: { message: string }) {
+export function ErrorState({ message, testId }: { message: string; testId?: string }) {
   return (
     <div
       className="sw-panel p-5 text-sm"
@@ -18,6 +18,8 @@ export function ErrorState({ message }: { message: string }) {
         borderColor: "color-mix(in srgb, var(--color-fail) 40%, transparent)",
         color: "var(--color-fail)",
       }}
+      role="alert"
+      data-testid={testId}
     >
       <span className="sw-mono text-xs tracking-wider">ERROR · </span>
       {message}

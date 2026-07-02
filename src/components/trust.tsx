@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { useTrustDetail, useTrustReport } from "@/lib/client";
 import { TONE_VAR } from "@/components/status-badge";
-import { EmptyState, Spinner } from "@/components/states";
+import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { formatRelative } from "@/lib/format";
 import type { ReportWindow, TrustChip, TrustIncidents, TrustRetryPoint, TrustRow } from "@/lib/types";
 
@@ -204,7 +204,9 @@ function RetrySparkline({ series }: { series: TrustRetryPoint[] }) {
  * committed assertion code that ran — explicitly NOT a red-test).
  */
 export function TrustCard({ checkId, window = "30d" }: { checkId: number; window?: "7d" | "30d" | "90d" }) {
-  const { data } = useTrustDetail(checkId, window);
+  const { data, error } = useTrustDetail(checkId, window);
+  // ★ Loud-not-silent: a 500/network error shows a visible state; a 404 → data null → hide (feature absent).
+  if (error) return <ErrorState testId="trust-card-error" message="Trust data failed to load — retry." />;
   if (!data) return null;
   const m = data.monitor;
   const neverGreen = m.last_green_at == null;
@@ -290,7 +292,7 @@ const SCORECARD_TEMPLATE = "sm:grid-cols-[1fr_110px_130px_90px_110px_120px]";
  * shared window control. Null-safe: 404 → a quiet "unavailable" (legend still shows). Sorted worst-first.
  */
 export function TrustScorecard({ window }: { window: ReportWindow }) {
-  const { data, isLoading } = useTrustReport(window);
+  const { data, isLoading, error } = useTrustReport(window);
 
   const sorted = [...(data?.monitors ?? [])].sort(
     (a, b) => TRUST_RANK[a.trust] - TRUST_RANK[b.trust] || a.check_name.localeCompare(b.check_name),
@@ -300,7 +302,11 @@ export function TrustScorecard({ window }: { window: ReportWindow }) {
     <div className="space-y-3" data-testid="trust-scorecard">
       <TrustLegend />
 
-      {isLoading && !data ? (
+      {/* ★ Loud-not-silent: a 500/network error is a distinct, visible state — NOT the "unavailable" empty
+          (which is the honest 404-absent state). A monitoring scorecard must not vanish/blank on incident day. */}
+      {error ? (
+        <ErrorState testId="trust-error" message="Trust scorecard failed to load — retry." />
+      ) : isLoading && !data ? (
         <div className="py-16"><Spinner label="Building trust scorecard…" /></div>
       ) : !data ? (
         <EmptyState title="Trust data unavailable." hint="The trust report endpoint isn’t reachable right now." />

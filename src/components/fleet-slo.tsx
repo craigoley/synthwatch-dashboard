@@ -2,6 +2,7 @@
 
 import { useSloReport } from "@/lib/client";
 import { TONE_VAR } from "@/components/status-badge";
+import { ErrorState } from "@/components/states";
 import { formatPct } from "@/lib/format";
 import type { ReportWindow, Tag, SloReportRow, SloReportFleet } from "@/lib/types";
 
@@ -131,8 +132,10 @@ function BurnPill({ state, burn }: { state?: SloReportRow["burn_state"] | null; 
 }
 
 export function FleetSloReport({ window, tags = [] }: { window: ReportWindow; tags?: Tag[] }) {
-  const { data } = useSloReport(window, tags);
-  // Endpoint absent (companion API not deployed) OR loading → hide quietly (data is null on 404).
+  const { data, error } = useSloReport(window, tags);
+  // ★ Loud-not-silent: a real error (500/network/parse) shows a visible error state — a monitoring panel must
+  // NEVER vanish on incident day looking like "not deployed". A 404 → data null → hide (feature absent, correct).
+  if (error) return <ErrorState testId="fleet-slo-error" message="Error budget failed to load — retry." />;
   if (!data) return null;
 
   if (data.items.length === 0) {
