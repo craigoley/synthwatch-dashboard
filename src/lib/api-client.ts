@@ -1715,8 +1715,11 @@ export async function getDeploys(host: string, window: ReportWindow = "30d"): Pr
   let raw: Record<string, unknown>;
   try {
     raw = await request<Record<string, unknown>>("/reports/deploys", { host, window });
-  } catch {
-    return null; // endpoint not deployed / deploys table not migrated yet → no overlay
+  } catch (err) {
+    // ★ 404 = feature genuinely absent (endpoint/table not migrated) → null (no overlay, correct). A
+    // 500/network/parse error is NOT "absent" — rethrow so the caller can surface it (loud, not silent).
+    if (err instanceof ApiRequestError && err.status === 404) return null;
+    throw err; // no overlay + the SWR error is visible to useDeployMarks (chart stays; caption shows)
   }
   const deploys = ((raw?.deploys as Record<string, unknown>[]) ?? []).map((d) => ({
     sha: d.sha == null ? null : String(d.sha),
@@ -1734,8 +1737,9 @@ export async function getEgressReport(window: EgressWindow = "all"): Promise<Egr
   let raw: Record<string, unknown>;
   try {
     raw = await request<Record<string, unknown>>("/reports/egress", { window });
-  } catch {
-    return null; // endpoint not deployed yet → the section self-hides (never crashes the status page)
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null; // absent → self-hide (correct)
+    throw err; // 500/network → surface a loud error, not a silent blank (the incident-day failure mode)
   }
   const str = (v: unknown) => String(v ?? "");
   const num = (v: unknown) => Number(v ?? 0);
@@ -1802,8 +1806,9 @@ export async function getTrustReport(window: ReportWindow = "30d"): Promise<Trus
   let raw: Record<string, unknown>;
   try {
     raw = await request<Record<string, unknown>>("/reports/trust", { window });
-  } catch {
-    return null; // endpoint not deployed yet → the /trust page self-hides its table
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null; // absent → self-hide (correct)
+    throw err; // 500/network → the scorecard shows a loud error, not a blank (silent on incident day)
   }
   const monitors = ((raw?.monitors as Record<string, unknown>[]) ?? []).map(mapTrustRow);
   return { window: String(raw?.window ?? window), monitors };
@@ -1813,8 +1818,9 @@ export async function getTrustDetail(checkId: number, window: ReportWindow = "30
   let raw: Record<string, unknown>;
   try {
     raw = await request<Record<string, unknown>>(`/reports/trust/${checkId}`, { window });
-  } catch {
-    return null; // endpoint absent / check has no trust data → the detail card self-hides
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null; // absent → card self-hides (correct)
+    throw err; // 500/network → the trust card shows a loud error, not a silent blank
   }
   const m = raw?.monitor as Record<string, unknown> | null | undefined;
   if (!m) return null;
@@ -1835,8 +1841,9 @@ export async function getStatus(): Promise<StatusPage | null> {
   let raw: Record<string, unknown>;
   try {
     raw = await request<Record<string, unknown>>("/status");
-  } catch {
-    return null; // endpoint not deployed yet (companion API PR)
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null; // absent → section self-hides (correct)
+    throw err; // 500/network → the by-property section shows a loud error, not a silent blank
   }
   const num = (v: unknown) => Number(v ?? 0);
   const nullable = (v: unknown) => (v == null ? null : Number(v));
@@ -1870,8 +1877,9 @@ export async function getSloReport(window: ReportWindow, tags: Tag[] = []): Prom
   let raw: Record<string, unknown>;
   try {
     raw = await request<Record<string, unknown>>("/reports/slo", { window, tag: tagParams(tags) });
-  } catch {
-    return null; // endpoint not deployed yet (companion API PR) → the section hides gracefully
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null; // absent → section hides (correct)
+    throw err; // 500/network → the error-budget panel shows a loud error, not a silent blank
   }
   const num = (v: unknown) => Number(v ?? 0);
   const nullable = (v: unknown) => (v == null ? null : Number(v));
@@ -1911,8 +1919,9 @@ export async function getMttrReport(window: ReportWindow, tags: Tag[] = []): Pro
   let raw: Record<string, unknown>;
   try {
     raw = await request<Record<string, unknown>>("/reports/mttr", { window, tag: tagParams(tags) });
-  } catch {
-    return null; // endpoint not deployed yet (companion API PR) → the section hides gracefully
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null; // absent → section hides (correct)
+    throw err; // 500/network → the incident-analytics panel shows a loud error, not a silent blank
   }
   const num = (v: unknown) => Number(v ?? 0);
   const nullable = (v: unknown) => (v == null ? null : Number(v));

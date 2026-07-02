@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { useEgress } from "@/lib/client";
 import { TONE_VAR } from "@/components/status-badge";
+import { ErrorState } from "@/components/states";
 import { formatLocalDateTime, formatRelative } from "@/lib/format";
 import type { EgressRegion } from "@/lib/types";
 
@@ -110,7 +111,17 @@ function RegionCard({ r }: { r: EgressRegion }) {
 }
 
 export function EgressStabilitySection() {
-  const { data } = useEgress("all");
+  const { data, error } = useEgress("all");
+  // ★ Loud-not-silent: a 500/network error shows a visible state (the egress rotation monitor going blank on
+  // an incident is the exact silent failure we're killing). A 404 → data null → hide (feature absent, correct).
+  if (error) {
+    return (
+      <section data-testid="egress-section">
+        <h2 className="mb-2 text-sm font-semibold tracking-tight text-[var(--color-ink)]">Egress stability</h2>
+        <ErrorState testId="egress-error" message="Egress stability failed to load — retry." />
+      </section>
+    );
+  }
   if (!data || data.regions.length === 0) return null;
 
   const allCurrent = data.regions.flatMap((r) => r.current_ips);

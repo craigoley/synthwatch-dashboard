@@ -2,6 +2,7 @@
 
 import { useStatus } from "@/lib/client";
 import { TONE_VAR } from "@/components/status-badge";
+import { ErrorState } from "@/components/states";
 import { formatPct } from "@/lib/format";
 import type { StatusProperty } from "@/lib/types";
 
@@ -65,7 +66,16 @@ function PropertyCard({ p }: { p: StatusProperty }) {
 // the section renders NOTHING, so the existing status page is unaffected. unknown state → the idle fallback;
 // null/building uptime → an em-dash (never a fabricated %).
 export function PropertyStatusSection() {
-  const { data } = useStatus();
+  const { data, error } = useStatus();
+  // ★ Loud-not-silent: a 500/network error shows a visible state; a 404 → data null → hide (feature absent).
+  if (error) {
+    return (
+      <section className="space-y-3" data-testid="status-properties-section">
+        <h2 className="text-sm font-semibold tracking-tight text-[var(--color-ink)]">By property</h2>
+        <ErrorState testId="status-properties-error" message="Property status failed to load — retry." />
+      </section>
+    );
+  }
   if (!data || data.properties.length === 0) return null;
 
   return (

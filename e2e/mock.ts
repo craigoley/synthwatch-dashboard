@@ -82,6 +82,9 @@ export interface World {
   tags?: RawObj[];
   /** Reports served? false → /reports/* 404 (endpoint not deployed). Default true. */
   reportsServed?: boolean;
+  /** Force report endpoints to 500 (a real error, not "absent") → panels must render a LOUD error state, never
+   *  a silent blank. Distinct from reportsServed:false (404 → hide). Applied to the SLO + trust routes. */
+  reports500?: boolean;
   /** Deploy markers (deploy-markers v1) returned by GET /reports/deploys. Default: none. */
   deploys?: RawObj[];
   /** Egress regions (GET /reports/egress, raw camelCase DTO). Unset → DEFAULT_EGRESS (3 regions, 1 IP each =
@@ -707,6 +710,7 @@ export async function mockApi(
 
     // §D1 trust — fleet scorecard + per-check detail (with daily retry series).
     if (path === "/api/reports/trust" && method === "GET") {
+      if (world.reports500) return json(route, { error: "boom" }, 500); // real error → LOUD, not a silent hide
       if (world.reportsServed === false) return json(route, { error: "not_found" }, 404); // self-hides the page table
       return json(route, { window: url.searchParams.get("window") ?? "30d", monitors: world.trustMonitors ?? DEFAULT_TRUST });
     }
@@ -720,6 +724,7 @@ export async function mockApi(
     }
 
     if (path === "/api/reports/slo" && method === "GET") {
+      if (world.reports500) return json(route, { error: "boom" }, 500); // real error → LOUD, not a silent hide
       if (world.reportsServed === false) return json(route, { error: "not_found" }, 404);
       const win = url.searchParams.get("window") ?? "30d";
       const tagFilter = url.searchParams.getAll("tag");
