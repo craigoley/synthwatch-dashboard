@@ -1805,6 +1805,7 @@ function mapTrustRow(r: Record<string, unknown>): TrustRow {
     run_count: num(r.runCount),
     retry_count: num(r.retryCount),
     retry_rate: nul(r.retryRate), // null preserved → "—", never a fake 0%
+    retried_passes: num(r.retriedPasses), // absent (pre-deploy API) → 0 → annotation hidden; forward-compatible
     incidents: {
       total: num(inc.total),
       real_outage: num(inc.realOutage),

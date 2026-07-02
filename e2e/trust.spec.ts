@@ -38,10 +38,11 @@ test.describe("trust scorecard — Reports 'Trust' tab", () => {
   test("worst-first sort: unverified + flaky lead, proven-live last", async ({ page }) => {
     await mockApi(page, defaultWorld());
     await page.goto("/reports?tab=trust");
-    const order = await page
-      .getByTestId("trust-table")
-      .locator('[data-testid^="trust-row-"]')
-      .evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
+    // ★ Wait for the rows before snapshotting: the Trust tab is lazy + async-fetched, and evaluateAll does NOT
+    // auto-retry — snapshotting immediately after goto raced the fetch and got [] on CI (flaky).
+    const rows = page.getByTestId("trust-table").locator('[data-testid^="trust-row-"]');
+    await expect(rows).toHaveCount(4);
+    const order = await rows.evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
     // unverified(4) → flaky(2) → nominal(3) → proven-live(1)
     expect(order).toEqual(["trust-row-4", "trust-row-2", "trust-row-3", "trust-row-1"]);
   });
@@ -100,6 +101,24 @@ test.describe("trust scorecard — Reports 'Trust' tab", () => {
     await expect(reds).not.toContainText("3 /");
   });
 
+  test("★ degrading-but-green: the retried-passes annotation COEXISTS with proven-live (never a demotion)", async ({ page }) => {
+    await mockApi(page, defaultWorld());
+    await page.goto("/reports?tab=trust");
+    const row = page.getByTestId("trust-row-1"); // API health: proven-live AND retriedPasses = 4
+    // ★ the chip is UNCHANGED (still proven-live) — the annotation is additive, not a downgrade
+    await expect(row.getByTestId("trust-chip-proven-live")).toBeVisible();
+    const note = row.getByTestId("trust-retried-passes");
+    await expect(note).toBeVisible();
+    await expect(note).toContainText("4 passes needed retries");
+  });
+
+  test("★ the annotation is ABSENT when retriedPasses is 0 (no false warning on a clean monitor)", async ({ page }) => {
+    await mockApi(page, defaultWorld());
+    await page.goto("/reports?tab=trust");
+    // check 3 omits retriedPasses → the tolerant mapper reads 0 → no annotation
+    await expect(page.getByTestId("trust-row-3").getByTestId("trust-retried-passes")).toHaveCount(0);
+  });
+
   test("null-safe: endpoint 404 → the table self-hides to a quiet unavailable state, no crash", async ({ page }) => {
     const w = defaultWorld();
     w.reportsServed = false; // /reports/trust 404s
@@ -128,6 +147,14 @@ test.describe("trust card — monitor detail", () => {
     await expect(page.getByTestId("trust-incident-unclassified")).toContainText("1");
     // spec-provenance hash shown as an integrity fact (not a red-test)
     await expect(page.getByTestId("trust-provenance")).toContainText("cafe0002");
+  });
+
+  test("★ detail card shows the degrading-but-green annotation alongside a proven-live chip", async ({ page }) => {
+    await mockApi(page, defaultWorld());
+    await page.goto("/checks/1"); // API health: proven-live + retriedPasses 4
+    const card = page.getByTestId("trust-card");
+    await expect(card.getByTestId("trust-chip-proven-live")).toBeVisible();  // ★ chip UNCHANGED — not a demotion
+    await expect(card.getByTestId("trust-retried-passes")).toContainText("4 passes needed retries");
   });
 
   test("null-safe: 404 → the trust card self-hides, rest of the detail page renders", async ({ page }) => {
