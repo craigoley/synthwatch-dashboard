@@ -38,10 +38,11 @@ test.describe("trust scorecard — Reports 'Trust' tab", () => {
   test("worst-first sort: unverified + flaky lead, proven-live last", async ({ page }) => {
     await mockApi(page, defaultWorld());
     await page.goto("/reports?tab=trust");
-    const order = await page
-      .getByTestId("trust-table")
-      .locator('[data-testid^="trust-row-"]')
-      .evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
+    // ★ Wait for the rows before snapshotting: the Trust tab is lazy + async-fetched, and evaluateAll does NOT
+    // auto-retry — snapshotting immediately after goto raced the fetch and got [] on CI (flaky).
+    const rows = page.getByTestId("trust-table").locator('[data-testid^="trust-row-"]');
+    await expect(rows).toHaveCount(4);
+    const order = await rows.evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
     // unverified(4) → flaky(2) → nominal(3) → proven-live(1)
     expect(order).toEqual(["trust-row-4", "trust-row-2", "trust-row-3", "trust-row-1"]);
   });
