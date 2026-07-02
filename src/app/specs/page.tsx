@@ -22,7 +22,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { useSpecCatalog } from "@/lib/client";
-import { EmptyState, Spinner } from "@/components/states";
+import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { StatusDot } from "@/components/status-badge";
 import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";
@@ -432,7 +432,7 @@ function CatalogBody({
 }
 
 export default function SpecCatalogPage() {
-  const { data, isLoading } = useSpecCatalog();
+  const { data, isLoading, error } = useSpecCatalog();
   const [activating, setActivating] = useState<SpecCatalogEntry | null>(null);
   const filters = useSpecFilters();
 
@@ -466,6 +466,10 @@ export default function SpecCatalogPage() {
       {data === undefined ? (
         isLoading ? (
           <div className="py-16"><Spinner label="Loading catalog…" /></div>
+        ) : error ? (
+          // ★ Loud-not-quiet: a real error (500/network) → visible, never a blank that reads as "no specs".
+          // (404 is the `data === null` neutral box below — feature absent, not broken.)
+          <ErrorState testId="specs-load-error" message="Couldn’t load the catalog — the API is unreachable. Retry shortly." />
         ) : null
       ) : data === null ? (
         // 404 — the API doesn't serve /api/specs yet. Neutral, not an error.

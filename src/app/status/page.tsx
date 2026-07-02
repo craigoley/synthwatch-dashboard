@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useChecks, useIncidents, useSla } from "@/lib/client";
 import { AvailabilityValue } from "@/components/sla";
 import { TONE_VAR } from "@/components/status-badge";
-import { Spinner } from "@/components/states";
+import { ErrorState, Spinner } from "@/components/states";
 import { componentStatus, deriveSystemStatus } from "@/lib/status";
 import { PropertyStatusSection } from "@/components/status-board";
 import { EgressStabilitySection } from "@/components/egress-stability";
@@ -52,7 +52,7 @@ function StatusGlyph({ token }: { token: "pass" | "warn" | "fail" }) {
 export default function StatusPage() {
   // Named slaWindow (NOT `window`) so it doesn't shadow the global `window` object.
   const [slaWindow, setSlaWindow] = useState<SlaWindow>("24h");
-  const { data: checks, isLoading } = useChecks();
+  const { data: checks, isLoading, error } = useChecks();
   const { data: incidents } = useIncidents();
   const w24 = useSla("24h");
   const w7 = useSla("7d");
@@ -105,6 +105,14 @@ export default function StatusPage() {
 
         {isLoading && !checks ? (
           <div className="py-20"><Spinner label="Loading status…" /></div>
+        ) : error && !checks ? (
+          // ★ Loud-not-quiet: if the checks fetch FAILED we cannot know system status — show it, never a fake
+          // green banner. deriveSystemStatus([]) returns "operational", so swallowing the error to []
+          // would render "All Systems Operational" on a broken fetch — the worst lie a status page can tell.
+          <ErrorState
+            testId="status-load-error"
+            message="Couldn’t load system status — the monitoring API is unreachable. This is NOT a claim that systems are healthy; retry shortly."
+          />
         ) : (
           <>
             {/* Overall status banner */}

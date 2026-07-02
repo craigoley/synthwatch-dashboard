@@ -144,7 +144,14 @@ export default function UsersPage() {
       {/* Pending access requests */}
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-[var(--color-ink)]">Pending access requests</h2>
-        {(requestsQ.data?.length ?? 0) === 0 ? (
+        {/* ★ Loud-not-quiet: a failed fetch must not read as "no pending requests" (a real request could be
+            waiting, unseen). Check error BEFORE the empty state — mirrors the editors section above. */}
+        {requestsQ.error ? (
+          <ErrorState
+            testId="requests-load-error"
+            message={requestsQ.error instanceof Error ? requestsQ.error.message : "Failed to load access requests."}
+          />
+        ) : (requestsQ.data?.length ?? 0) === 0 ? (
           <div className="sw-panel px-4 py-5 text-sm text-[var(--color-ink-dim)]">
             No pending requests. People who ask for access via the sign-in screen appear here.
           </div>
