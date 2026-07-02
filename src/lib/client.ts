@@ -502,7 +502,9 @@ export function useIncidentBreakdown(window: ReportWindow, tags: Tag[] = []) {
 
 export function useSloReport(window: ReportWindow, tags: Tag[] = []) {
   return useSWR(keys.sloReport(window, tagKey(tags)), () => getSloReport(window, tags), {
-    revalidateOnFocus: false,
+    // fetch-once aggregate (no poll — an expensive SLO rollup). revalidateOnFocus refreshes on tab-return; the
+    // panel also shows a "fetched HH:MM" stamp + manual refresh so staleness is visible between focuses.
+    revalidateOnFocus: true,
     shouldRetryOnError: false,
   });
 }
@@ -527,7 +529,9 @@ export function useEgress(window: EgressWindow = "all") {
 // §D1 monitor-trust scorecard. 404 → null (self-hide). No poll — trust is a slow-moving audit view.
 export function useTrustReport(window: ReportWindow = "30d") {
   return useSWR(keys.trust(window), () => getTrustReport(window), {
-    revalidateOnFocus: false,
+    // fetch-once audit view (no poll). ★ Was the LEAST-fresh surface in the app — now revalidates on focus +
+    // shows a "fetched HH:MM" stamp + manual refresh so a tab left open doesn't silently show hour-old trust.
+    revalidateOnFocus: true,
     shouldRetryOnError: false,
   });
 }
@@ -536,7 +540,7 @@ export function useTrustDetail(checkId: number | null, window: ReportWindow = "3
   return useSWR(
     checkId ? keys.trustDetail(checkId, window) : null,
     () => getTrustDetail(checkId as number, window),
-    { revalidateOnFocus: false, shouldRetryOnError: false },
+    { revalidateOnFocus: true, shouldRetryOnError: false },
   );
 }
 
@@ -550,7 +554,8 @@ export function useStatus() {
 
 export function useMttrReport(window: ReportWindow, tags: Tag[] = []) {
   return useSWR(keys.mttrReport(window, tagKey(tags)), () => getMttrReport(window, tags), {
-    revalidateOnFocus: false,
+    // fetch-once aggregate (no poll). revalidateOnFocus + a "fetched HH:MM" stamp + manual refresh (see panel).
+    revalidateOnFocus: true,
     shouldRetryOnError: false,
   });
 }
