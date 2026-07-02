@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useTrustDetail, useTrustReport } from "@/lib/client";
 import { TONE_VAR } from "@/components/status-badge";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
+import { StalenessStamp, useFetchedAt } from "@/components/staleness";
 import { formatRelative } from "@/lib/format";
 import type { ReportWindow, TrustChip, TrustIncidents, TrustRetryPoint, TrustRow } from "@/lib/types";
 
@@ -204,7 +205,8 @@ function RetrySparkline({ series }: { series: TrustRetryPoint[] }) {
  * committed assertion code that ran — explicitly NOT a red-test).
  */
 export function TrustCard({ checkId, window = "30d" }: { checkId: number; window?: "7d" | "30d" | "90d" }) {
-  const { data, error } = useTrustDetail(checkId, window);
+  const { data, error, isValidating, mutate } = useTrustDetail(checkId, window);
+  const fetchedAt = useFetchedAt(isValidating, data != null); // before early returns (hooks rule)
   // ★ Loud-not-silent: a 500/network error shows a visible state; a 404 → data null → hide (feature absent).
   if (error) return <ErrorState testId="trust-card-error" message="Trust data failed to load — retry." />;
   if (!data) return null;
@@ -214,7 +216,10 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
   return (
     <section className="sw-panel p-4" data-testid="trust-card">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-[var(--color-ink)]">Trust</h3>
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-semibold text-[var(--color-ink)]">Trust</h3>
+          <StalenessStamp fetchedAt={fetchedAt} onRefresh={() => mutate()} refreshing={isValidating} testId="trust-card" />
+        </div>
         <div className="flex items-center gap-2">
           <TrustChipBadge chip={m.trust} />
           <RedTestStatus
@@ -292,7 +297,8 @@ const SCORECARD_TEMPLATE = "sm:grid-cols-[1fr_110px_130px_90px_110px_120px]";
  * shared window control. Null-safe: 404 → a quiet "unavailable" (legend still shows). Sorted worst-first.
  */
 export function TrustScorecard({ window }: { window: ReportWindow }) {
-  const { data, isLoading, error } = useTrustReport(window);
+  const { data, isLoading, error, isValidating, mutate } = useTrustReport(window);
+  const fetchedAt = useFetchedAt(isValidating, data != null);
 
   const sorted = [...(data?.monitors ?? [])].sort(
     (a, b) => TRUST_RANK[a.trust] - TRUST_RANK[b.trust] || a.check_name.localeCompare(b.check_name),
@@ -300,6 +306,13 @@ export function TrustScorecard({ window }: { window: ReportWindow }) {
 
   return (
     <div className="space-y-3" data-testid="trust-scorecard">
+      {/* ★ Staleness: this fetch-once audit view was the app's least-fresh surface — stamp its fetch time +
+          a manual refresh (it also revalidates on focus now). Only shown once data has landed. */}
+      {data && (
+        <div className="flex justify-end">
+          <StalenessStamp fetchedAt={fetchedAt} onRefresh={() => mutate()} refreshing={isValidating} testId="trust" />
+        </div>
+      )}
       <TrustLegend />
 
       {/* ★ Loud-not-silent: a 500/network error is a distinct, visible state — NOT the "unavailable" empty

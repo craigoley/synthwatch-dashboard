@@ -2,6 +2,7 @@
 
 import { useMttrReport } from "@/lib/client";
 import { ErrorState } from "@/components/states";
+import { StalenessStamp, useFetchedAt } from "@/components/staleness";
 import { formatDuration } from "@/lib/format";
 import type { ReportWindow, Tag, MttrFleet, MttrClassificationBucket, MttrTrendPoint } from "@/lib/types";
 
@@ -111,7 +112,8 @@ function TrendSparkline({ trend }: { trend: MttrTrendPoint[] }) {
 // (skew visible); classification bars; trend. ★ Null-safe throughout (the .tone-crash lesson): endpoint-absent
 // → hide; null mean/median → "—"; empty classification/trend → their panels hide; unknown classification → idle.
 export function FleetMttrReport({ window, tags = [] }: { window: ReportWindow; tags?: Tag[] }) {
-  const { data, error } = useMttrReport(window, tags);
+  const { data, error, isValidating, mutate } = useMttrReport(window, tags);
+  const fetchedAt = useFetchedAt(isValidating, data != null); // before early returns (hooks rule)
   // ★ Loud-not-silent: a 500/network error shows a visible state, never a blank that reads as "not deployed".
   if (error) return <ErrorState testId="fleet-mttr-error" message="Incident analytics failed to load — retry." />;
   if (!data) return null; // 404 → null → hide quietly (feature absent, correct)
@@ -142,8 +144,9 @@ export function FleetMttrReport({ window, tags = [] }: { window: ReportWindow; t
     <section className="space-y-3" data-testid="fleet-mttr">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold text-[var(--color-ink)]">Incident analytics — time to resolve</h2>
-        <span className="text-[11px] text-[var(--color-ink-faint)]">
+        <span className="flex items-center gap-3 text-[11px] text-[var(--color-ink-faint)]">
           MTTR over resolved incidents · {window} · open excluded from the mean
+          <StalenessStamp fetchedAt={fetchedAt} onRefresh={() => mutate()} refreshing={isValidating} testId="fleet-mttr" />
         </span>
       </div>
       <FleetTile fleet={fleet} />

@@ -3,6 +3,7 @@
 import { useSloReport } from "@/lib/client";
 import { TONE_VAR } from "@/components/status-badge";
 import { ErrorState } from "@/components/states";
+import { StalenessStamp, useFetchedAt } from "@/components/staleness";
 import { formatPct } from "@/lib/format";
 import type { ReportWindow, Tag, SloReportRow, SloReportFleet } from "@/lib/types";
 
@@ -132,7 +133,8 @@ function BurnPill({ state, burn }: { state?: SloReportRow["burn_state"] | null; 
 }
 
 export function FleetSloReport({ window, tags = [] }: { window: ReportWindow; tags?: Tag[] }) {
-  const { data, error } = useSloReport(window, tags);
+  const { data, error, isValidating, mutate } = useSloReport(window, tags);
+  const fetchedAt = useFetchedAt(isValidating, data != null); // called before early returns (hooks rule)
   // ★ Loud-not-silent: a real error (500/network/parse) shows a visible error state — a monitoring panel must
   // NEVER vanish on incident day looking like "not deployed". A 404 → data null → hide (feature absent, correct).
   if (error) return <ErrorState testId="fleet-slo-error" message="Error budget failed to load — retry." />;
@@ -163,8 +165,9 @@ export function FleetSloReport({ window, tags = [] }: { window: ReportWindow; ta
     <section className="space-y-3" data-testid="fleet-slo">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold text-[var(--color-ink)]">Error budget</h2>
-        <span className="text-[11px] text-[var(--color-ink-faint)]">
+        <span className="flex items-center gap-3 text-[11px] text-[var(--color-ink-faint)]">
           budget accounting over {window} · burn alerts live on each monitor
+          <StalenessStamp fetchedAt={fetchedAt} onRefresh={() => mutate()} refreshing={isValidating} testId="fleet-slo" />
         </span>
       </div>
       {data.fleet && <FleetRollup fleet={data.fleet} />}
