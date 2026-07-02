@@ -117,3 +117,57 @@ Three candidates, evaluated against *this* codebase:
 
 This keeps the existing adapter architecture intact (schemas validate the `Raw` layer; mappers stay), costs one seam function + ~8 schemas up front, and gives the dashboard the property a monitor must have: **when its own inputs break, it says so.**
 
+---
+
+## 3. SLO / ANALYTICS MATH VERIFICATION
+
+### 3.0 Where the math actually lives
+
+Independent re-derivation starts with a scoping fact: **the dashboard computes none of the core numbers.** Burn rate, error budget, MTTR, availability percentages, and percentiles all arrive precomputed from the C# API, which in turn reads the runner repo's SQL (`sla_availability_<window>` views, `types.ts:415`; the `slo_burn_status` table, `types.ts:473-475`; runner migrations referenced by number only, e.g. `0035`/`0048` at `types.ts:118,256`). **No SQL is vendored in this repo** (glob `**/*.sql` → zero files); the shared SQL's migration source lives in `craigoley/synthwatch`, which is outside this session's repository scope — so **dashboard-assumptions-vs-SQL agreement is cross-repo unverifiable here**, and is flagged as Open Question Q1 (§7). What *can* be verified here is (a) the dashboard's stated assumptions (the `types.ts` doc comments are the de-facto contract), (b) their internal algebraic consistency, and (c) every piece of arithmetic the client does perform. That is done below. One cross-repo control does exist and passes in CI: `scripts/check-enum-coverage.mjs` parses the runner's real `db/schema.sql` `CHECK` constraints and diffs them against `types.ts` unions (`.github/workflows/enum-coverage.yml` checks out `craigoley/synthwatch` for it) — enums are drift-guarded; formulas are not.
+
+### 3.1 Error budget & burn rate (P5) — derivation
+
+The contract stated at `types.ts:463-478`:
+
+```
+budget        = (1 − target) × completed          // allowed down-runs
+consumed      = down-runs
+remaining     = budget − consumed                  // negative = blown
+remaining_pct = remaining / budget                 // null when insufficient_data
+burn_rate     = (down / total) / (1 − target)      // pooled, informational
+burn_state    ∈ {fast, slow, none}                 // from slo_burn_status; the page verdict
+reported_burn = max at-floor burn of firing window
+```
+
+**Internal consistency check (derivation):** substituting, `remaining/budget = (budget − down)/budget = 1 − down/((1−target)·completed) = 1 − burn_rate` (when `total = completed`). So the two server fields are algebraically locked: `remaining_pct ≡ 1 − burn_rate`. The client never trusts `remaining_pct`; it recomputes the fraction itself — `remainingFraction = r.remaining / r.budget` guarded by `budget <= 0 → null` (`fleet-slo.tsx:23-25`) — which is consistent with the identity and immune to a drifted `remaining_pct`. ✓
+
+**Client-side arithmetic verified line-by-line:**
+- Tone bands: blown (`remaining < 0`) → fail; `remaining/budget ≤ 0.2` → warn; else pass; `insufficient_data || budget ≤ 0` → idle (`fleet-slo.tsx:17-21`). Same thresholds duplicated in the check-detail `SloPanel` (`sla.tsx:234-243`). ✓ consistent pair.
+- Bar width clamps to [0,100] (`fleet-slo.tsx:26`); a blown budget renders the word "blown", not a negative percent (`:56,93`). ✓
+- Burn thresholds **are labels, not math**: "1h ≥ 14.4×" and "6h + 30m ≥ 6×" appear only in strings (`fleet-slo.tsx:103,125`); the verdict is the server's `burn_state`. 14.4× and 6× are the standard Google-SRE multi-window constants (14.4 = 30d budget · 2% consumed in 1h; 6 = 5% in 6h) — *whether the SQL actually implements those windows is Q1*.
+- Division-by-zero: every division in the SLO path is guarded (`budget <= 0` at `fleet-slo.tsx:18,24`; `hasBudget = Number.isFinite(slo.budget) && slo.budget > 0` at `sla.tsx:235`). The MTTR sparkline seeds `Math.max(..., 1)` before dividing (`fleet-mttr.tsx:87`). No unguarded division exists in these files. ✓
+
+**Findings (each falsified against code before rating):**
+- **[M-1, Minor — silent-wrong class]** The fleet table's column header says **"Burn (pooled)"** (`fleet-slo.tsx:173`) but the pill in that column renders `row.reported_burn` (`fleet-slo.tsx:98`) — which `types.ts:475` defines as the *location-aware at-floor burn of the firing window*, explicitly **not** the pooled number (`types.ts:472` reserves "pooled" for `burn_rate`, which the UI no longer displays anywhere). The P5-PR2 comment (`fleet-slo.tsx:9-11`) confirms the pill was deliberately switched off the pooled value; the header wasn't. A reader doing capacity math from that column would attribute the wrong semantics to the multiplier.
+- **[M-2, Minor — stale contract doc]** `types.ts:459-461` still says burn pills "stay on the check-detail SloPanel … the follow-up PR", contradicting `types.ts:473-475` and `fleet-slo.tsx:97-98` where that follow-up landed. The doc comments are the closest thing to a cross-repo contract (§3.0) — they should not disagree with themselves.
+- **[M-3, Minor — drift-masking default]** A missing/unknown `burnState` degrades to `"none"` (`api-client.ts:1888-1889`) and the pill renders "—, within budget" (`fleet-slo.tsx:106-116`). Deliberate back-compat for older APIs, but it means a *renamed* field would silently display "no burn" during an actual fast burn — §2.b(B) instance.
+
+### 3.2 MTTR — derivation
+
+Contract (`types.ts:539-543`): MTTR = time-to-resolve over **resolved** incidents only; open incidents excluded from mean/median but surfaced as `open_count`; `mean_seconds`/`median_seconds` are `null` on insufficient data, never 0; `mttd_proxy_seconds = consecutive_failures × interval` is labeled a detection-lag **proxy**, not measured MTTD. The exclusion of open incidents biases MTTR *downward* during a long ongoing outage (the worst incident isn't in the average until it resolves) — inherent to the definition chosen, honest as documented, and visible because `open_count` is shown alongside (`fleet-mttr.tsx:48-50,163`).
+
+Client arithmetic, verified: seconds→ms once for the formatter (`fmtDur`, `fleet-mttr.tsx:19-20`, null → "—" never "0s" ✓); classification bar `pct(b.pct_of_total)` is `Math.round(fraction × 100)` (`:21,69`) — server supplies the fraction; trend bars normalize `mean/max×100` with the `max(...,1)` zero-guard and a ≥2-bucket requirement (`:83-97`). Empty-series: `!data → null`, `total_incidents === 0` → hide-or-honest-message (`:114-124`). ✓ All guards present.
+
+- **[M-4, Info — precision inconsistency]** MTTR percentages round to whole percent (`fleet-mttr.tsx:21`) while SLO uses 0–1 decimals (`fleet-slo.tsx:56,93`) and SLA availability uses 2 (`formatPct` default, `format.ts:95-98`). Cosmetic, but three precisions for sibling metrics on one reports page.
+
+### 3.3 Availability & status derivation
+
+`availability_pct` is server-computed (run-weighted views; `types.ts:437-448` explicitly says the fleet rollup "replaces the old client-side count summation"); `mapSla`/`mapFleet` pass it through with **zero arithmetic** (`api-client.ts:611-635`). The only client derivations are: tone bands at ≥99.9 pass / ≥99 warn / else fail, null/NaN → idle (`status.ts:69-74`); and the system rollup — any enabled check that is down+critical or has an open critical incident → major; any down/degraded/warning → partial; else operational (`status.ts:125-138`), with `infra_error` deliberately mapped to warn, not fail (`status.ts:21-24`). Logic verified sound; short-circuit on first critical is order-independent. ✓
+
+- **[M-5, Minor — rounding can overstate]** `formatPct` is bare `toFixed` (`format.ts:95-98`): availability 99.996% renders **"100.00%"**, and an SLO target of 0.9999 renders **"100.0%"** via the 0-or-1-digit rule at `fleet-slo.tsx:83`. A status page that prints 100.00% while the underlying window contains failures overstates health — the inverse of this codebase's own "never a fake %" principle (`types.ts:477`). Tone banding is computed on the unrounded value (`status.ts:70-73`), so only the printed number, not the color, is affected. Falsification: checked for a floor/clamp anywhere in the format path — none exists.
+- **[M-6, Info]** Timezone handling is clean by construction: SLA/SLO/MTTR windows are opaque server tokens (`"24h"|"7d"|"30d"|"90d"` — `api-client.ts:1703,1872,1913`); no `Date.now`/`toISOString` exists in any math path (grep-verified across `fleet-slo.tsx`, `fleet-mttr.tsx`, `sla.tsx`, `status.ts`). Client-clock windows exist only on cursor lists (`format.ts:18-23`, `date-range-control.tsx:22-24` — day boundaries pinned to UTC, documented). The MTTR trend labels slice the server ISO string (`fleet-mttr.tsx:95,102`), i.e. UTC calendar dates — a viewer west of UTC sees "tomorrow's" date label in the evening; display-only.
+
+### 3.4 Verdict
+
+The dashboard's own arithmetic is **correct and defensively guarded** — every division has a zero/insufficient-data guard, empty series degrade to honest states, and the client deliberately re-derives `remaining/budget` rather than trusting a redundant server field. The material risks are not miscalculation but **mislabeling** (M-1) and **provenance**: all load-bearing formulas live in SQL this repo can neither see nor test, with only enum drift (not formula drift) CI-guarded, and the burn thresholds existing here only as tooltip prose. A monitoring product whose math is subtly wrong is worse than no product — today the place that wrongness would enter is the unverified seam to `slo_burn_status` and the `sla_availability_*` views, not this codebase.
+
