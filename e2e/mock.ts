@@ -78,8 +78,11 @@ export interface World {
   suggestedKeys?: string[];
   /** Per-check tag sets (stateful across PUT). */
   checkTags?: Record<number, RawObj[]>;
-  /** Distinct in-use tags (GET /tags, for the 9b filter bar). */
+  /** Distinct in-use tags (GET /tags, for the 9b filter bar + the tag-editor suggestions). */
   tags?: RawObj[];
+  /** Force GET /tags to 500 → the tag-editor suggestions degrade but the editor stays free-text usable (+ a
+   *  quiet inline note); the render gate (/tags/suggested) is unaffected. */
+  tagsListError?: boolean;
   /** Reports served? false → /reports/* 404 (endpoint not deployed). Default true. */
   reportsServed?: boolean;
   /** Force report endpoints to 500 (a real error, not "absent") → panels must render a LOUD error state, never
@@ -566,7 +569,10 @@ export async function mockApi(
     if ((m = path.match(/^\/api\/checks\/(\d+)\/tags$/)) && method === "GET") {
       return json(route, world.checkTags?.[Number(m[1])] ?? []);
     }
-    if (path === "/api/tags" && method === "GET") return json(route, { tags: world.tags ?? [] });
+    if (path === "/api/tags" && method === "GET") {
+      if (world.tagsListError) return json(route, { error: "boom" }, 500); // GET /tags fails → suggestions degrade, editor still free-text
+      return json(route, { tags: world.tags ?? [] });
+    }
     // Narrative (Layer 3). Unset narratives → 404 → the card hides (graceful default).
     if (path === "/api/reports/narrative" && method === "GET") {
       const scope = url.searchParams.get("scope") ?? "fleet";
