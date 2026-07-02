@@ -14,7 +14,7 @@ import { runsDebug } from "@/lib/debug";
 import { TraceViewer } from "@/components/trace-viewer";
 import { AiInsightsPanel } from "@/components/ai-insights";
 import { BaselineDiffPanel } from "@/components/baseline-diff";
-import type { Run } from "@/lib/types";
+import type { Run, RunOutcome } from "@/lib/types";
 
 /**
  * Failure artifacts for a failed browser run: inline screenshot + trace download.
@@ -179,8 +179,16 @@ function RunRow({
  * button. The default window keeps the very first request BOUNDED — it never asks the API
  * for all-time history. Shares the cursor engine + date-range control with the incidents list.
  */
+const OUTCOMES: { value: RunOutcome; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "passed", label: "Passed" },
+  { value: "failed", label: "Failed" },
+  { value: "errored", label: "Errored" }, // infra_error = "didn't run", distinct from a failure
+];
+
 export function RunHistory({ checkId, live = false }: { checkId: number; live?: boolean }) {
   const dateRange = useDateRange("7d");
+  const [outcome, setOutcome] = useState<RunOutcome>("all");
   // ★ Frozen-`to` fix (the real run-history "not updating" root cause): a preset window's `to` is Date.now()
   //   captured ONCE at mount (useDateRange's memo deps exclude time), so the live list kept requesting
   //   [mount-7d, mount) on EVERY poll and the API correctly EXCLUDED every run with started_at >= mount — a
@@ -196,7 +204,7 @@ export function RunHistory({ checkId, live = false }: { checkId: number; live?: 
     checkId,
     effectiveRange,
     undefined,
-    { live },
+    { live, outcome }, // server-side ?outcome= (api #153); outcome is in the hook's cursor key → resets the walk
   );
 
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -285,6 +293,34 @@ export function RunHistory({ checkId, live = false }: { checkId: number; live?: 
           ariaLabel="run history date range"
           testIdPrefix="run-history"
         />
+      </div>
+
+      {/* Server-side outcome filter (api #153). Selecting a value re-fetches page 0 of the FILTERED set (the
+          outcome is in the hook's cursor key), so "Load more" pages the filter — no client-side false counts. */}
+      <div
+        className="mb-3 inline-flex rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5"
+        role="group"
+        aria-label="run outcome filter"
+      >
+        {OUTCOMES.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={o.value === outcome}
+            data-testid={`run-outcome-${o.value}`}
+            onClick={() => {
+              setOutcome(o.value);
+              setExpanded(null); // the new filter's page 0 has a different top run
+            }}
+            className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+              o.value === outcome
+                ? "bg-[var(--color-panel-2)] text-[var(--color-ink)]"
+                : "text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
       </div>
 
       {error ? (

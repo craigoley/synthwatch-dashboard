@@ -120,6 +120,10 @@ export interface TagInUse extends Tag {
 // = the runner couldn't fetch a check's spec — NEITHER up nor down, excluded from SLA + paging (see status.ts).
 export type RunStatus = "running" | "pass" | "warn" | "fail" | "error" | "infra_error";
 export type RunStepStatus = "pass" | "fail" | "error" | "running" | "skip";
+// Run-history outcome filter (GET /checks/{id}/runs?outcome=, synthwatch-api #153). passed=(pass,warn),
+// failed=(fail,error), errored=(infra_error — its OWN bucket, never folded into failed). "all" omits the param
+// (server default; sending an unknown value 400s). `running` only appears under "all".
+export type RunOutcome = "all" | "passed" | "failed" | "errored";
 export type IncidentSeverity = "warning" | "critical";
 export type IncidentStatus = "open" | "resolved";
 export type LighthouseFormFactor = "mobile" | "desktop";

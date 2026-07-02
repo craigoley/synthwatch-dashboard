@@ -88,6 +88,7 @@ import type {
   RunStatus,
   RunStep,
   RunStepStatus,
+  RunOutcome,
   RunsPage,
   Slo,
   SlaFleet,
@@ -642,6 +643,8 @@ export interface RunsQuery {
   /** Opaque next-cursor from the prior page (omit for the first page). */
   cursor?: string;
   pageSize?: number;
+  /** Server-side outcome filter (api #153). "all"/undefined omits the param; passed/failed/errored filter. */
+  outcome?: RunOutcome;
 }
 
 export interface DeleteCheckResult {
@@ -675,6 +678,8 @@ export async function getRuns(id: number, query: RunsQuery = {}): Promise<RunsPa
     to: query.to,
     cursor: query.cursor,
     pageSize: query.pageSize,
+    // "all"/undefined → omit (server default). Never send an unknown value — the API 400s on those.
+    outcome: query.outcome && query.outcome !== "all" ? query.outcome : undefined,
   });
   return {
     runs: (raw.items ?? []).map(mapRun),
