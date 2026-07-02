@@ -12,8 +12,7 @@ const NAV: { href: string; label: string; match: (p: string) => boolean; adminOn
   { href: "/monitors", label: "Monitors", match: (p: string) => p.startsWith("/monitors") },
   { href: "/specs", label: "Catalog", match: (p: string) => p.startsWith("/specs") },
   { href: "/notifications", label: "Notifications", match: (p: string) => p.startsWith("/notifications") },
-  { href: "/reports", label: "Reports", match: (p: string) => p.startsWith("/reports") },
-  { href: "/trust", label: "Trust", match: (p: string) => p.startsWith("/trust") },
+  { href: "/reports", label: "Reports", match: (p: string) => p.startsWith("/reports") || p.startsWith("/trust") },
   // Admin-only. Hiding it is UX; /api/editors is admin-gated server-side regardless (the real boundary).
   { href: "/users", label: "Users", match: (p: string) => p.startsWith("/users"), adminOnly: true },
 ];

@@ -1,9 +1,12 @@
 "use client";
 
-import { useTrustDetail } from "@/lib/client";
+import Link from "next/link";
+
+import { useTrustDetail, useTrustReport } from "@/lib/client";
 import { TONE_VAR } from "@/components/status-badge";
+import { EmptyState, Spinner } from "@/components/states";
 import { formatRelative } from "@/lib/format";
-import type { TrustChip, TrustIncidents, TrustRetryPoint, TrustRow } from "@/lib/types";
+import type { ReportWindow, TrustChip, TrustIncidents, TrustRetryPoint, TrustRow } from "@/lib/types";
 
 /**
  * §D1 monitor-trust — the "every green shown with its proof" surface. NO composite score: the chip is
@@ -265,5 +268,98 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
         </div>
       )}
     </section>
+  );
+}
+
+// ── fleet scorecard (the /reports "Trust" tab) ───────────────────────────────────────────────────────────
+
+// reds: real-outage vs everything-else (monitor-noise + env/perf/unclassified). ★ real is ONLY real_outage —
+// perf-regression + unclassified are NEVER folded into "real" (the honesty the scorecard exists for).
+function redsText(row: TrustRow): string {
+  if (row.incidents.total === 0) return "—";
+  const other = row.incidents.total - row.incidents.real_outage;
+  return `${row.incidents.real_outage} / ${other}`;
+}
+
+// mobile: 2-col wrap; sm+: the full scorecard template. Header (sm+ only) uses the template directly.
+const SCORECARD_TEMPLATE = "sm:grid-cols-[1fr_110px_130px_90px_110px_120px]";
+
+/**
+ * The fleet trust scorecard — the "every green with its proof" table + the rule legend. Rendered under the
+ * /reports "Trust" tab (D1 v2 relocated it from a top-level route). `window` comes from the reports page's
+ * shared window control. Null-safe: 404 → a quiet "unavailable" (legend still shows). Sorted worst-first.
+ */
+export function TrustScorecard({ window }: { window: ReportWindow }) {
+  const { data, isLoading } = useTrustReport(window);
+
+  const sorted = [...(data?.monitors ?? [])].sort(
+    (a, b) => TRUST_RANK[a.trust] - TRUST_RANK[b.trust] || a.check_name.localeCompare(b.check_name),
+  );
+
+  return (
+    <div className="space-y-3" data-testid="trust-scorecard">
+      <TrustLegend />
+
+      {isLoading && !data ? (
+        <div className="py-16"><Spinner label="Building trust scorecard…" /></div>
+      ) : !data ? (
+        <EmptyState title="Trust data unavailable." hint="The trust report endpoint isn’t reachable right now." />
+      ) : sorted.length === 0 ? (
+        <EmptyState title="No monitors to score yet." hint="Create a monitor to start collecting trust evidence." />
+      ) : (
+        <div className="sw-panel overflow-hidden" data-testid="trust-table">
+          <div className="hidden grid-cols-[1fr_110px_130px_90px_110px_120px] gap-3 border-b border-[var(--color-border)] px-4 py-2.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)] sm:grid">
+            <span>Monitor</span>
+            <span>Last green</span>
+            <span>Retry rate</span>
+            <span className="text-right">Reds r/n</span>
+            <span>Red-tested</span>
+            <span>Trust</span>
+          </div>
+          <div className="divide-y divide-[var(--color-border)]">
+            {sorted.map((row) => {
+              const neverGreen = row.last_green_at == null;
+              return (
+                <div
+                  key={row.check_id}
+                  data-testid={`trust-row-${row.check_id}`}
+                  className={`grid grid-cols-2 ${SCORECARD_TEMPLATE} items-center gap-x-3 gap-y-1 px-4 py-2.5`}
+                >
+                  <Link
+                    href={`/checks/${row.check_id}`}
+                    className="col-span-2 truncate text-[13px] font-medium text-[var(--color-ink)] hover:text-[var(--color-brand)] sm:col-span-1"
+                    title={row.check_name}
+                  >
+                    {row.check_name}
+                  </Link>
+                  <span
+                    className={`text-[12px] ${neverGreen ? "font-medium text-[var(--color-ink-dim)]" : "text-[var(--color-ink-dim)]"}`}
+                    data-testid={`trust-lastgreen-${row.check_id}`}
+                  >
+                    {lastGreenText(row.last_green_at)}
+                  </span>
+                  <span className="sw-mono text-[12px] text-[var(--color-ink-dim)]" data-testid={`trust-retry-${row.check_id}`}>
+                    {retryRateText(row)}
+                  </span>
+                  <span
+                    className="sw-mono text-right text-[12px] text-[var(--color-ink-dim)]"
+                    title="real outage / other (noise, env, perf, unclassified)"
+                    data-testid={`trust-reds-${row.check_id}`}
+                  >
+                    {redsText(row)}
+                  </span>
+                  <RedTestStatus
+                    captured={row.red_test_captured}
+                    testedAt={row.red_test_tested_at}
+                    method={row.red_test_method}
+                  />
+                  <TrustChipBadge chip={row.trust} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

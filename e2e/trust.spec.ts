@@ -8,10 +8,17 @@ import { mockApi, defaultWorld } from "./mock";
  * rate shows "—" not "0%", and perf/unclassified incidents are never folded into "real outage". Those prove
  * the honesty the scorecard exists for.
  */
-test.describe("trust scorecard — fleet page", () => {
-  test("renders the table with chips + the rule legend spelling the exact rules", async ({ page }) => {
+test.describe("trust scorecard — Reports 'Trust' tab", () => {
+  test("legacy /trust deep-link redirects to the Reports Trust tab (no 404)", async ({ page }) => {
     await mockApi(page, defaultWorld());
     await page.goto("/trust");
+    await expect(page).toHaveURL(/\/reports\?tab=trust/);
+    await expect(page.getByTestId("trust-table")).toBeVisible();
+  });
+
+  test("renders under the Reports Trust tab with chips + the rule legend spelling the exact rules", async ({ page }) => {
+    await mockApi(page, defaultWorld());
+    await page.goto("/reports?tab=trust");
 
     const table = page.getByTestId("trust-table");
     await expect(table).toBeVisible();
@@ -30,7 +37,7 @@ test.describe("trust scorecard — fleet page", () => {
 
   test("worst-first sort: unverified + flaky lead, proven-live last", async ({ page }) => {
     await mockApi(page, defaultWorld());
-    await page.goto("/trust");
+    await page.goto("/reports?tab=trust");
     const order = await page
       .getByTestId("trust-table")
       .locator('[data-testid^="trust-row-"]')
@@ -41,7 +48,7 @@ test.describe("trust scorecard — fleet page", () => {
 
   test("★ redTest is rendered as an honest GAP — 'not captured', never a checkmark/pass", async ({ page }) => {
     await mockApi(page, defaultWorld());
-    await page.goto("/trust");
+    await page.goto("/reports?tab=trust");
     const rt = page.getByTestId("trust-redtest").first();
     await expect(rt).toContainText("not captured");
     await expect(rt).not.toContainText("✓"); // ★ never a pass/checkmark
@@ -59,7 +66,7 @@ test.describe("trust scorecard — fleet page", () => {
       { ...base, checkId: 103, checkName: "mon-none", redTest: { captured: false } },
     ];
     await mockApi(page, w);
-    await page.goto("/trust");
+    await page.goto("/reports?tab=trust");
     // ★ both captured methods render — DISTINCTLY, not collapsed to a generic "tested"
     await expect(page.getByText(/red-tested · executed/)).toBeVisible();
     await expect(page.getByText(/red-tested · attested/)).toBeVisible();
@@ -69,7 +76,7 @@ test.describe("trust scorecard — fleet page", () => {
 
   test("★ never-green renders 'never verified' (a first-class state, not an error)", async ({ page }) => {
     await mockApi(page, defaultWorld());
-    await page.goto("/trust");
+    await page.goto("/reports?tab=trust");
     const cell = page.getByTestId("trust-lastgreen-4"); // checkId 4 = never run
     await expect(cell).toContainText("never verified");
     await expect(cell).not.toContainText("Error");
@@ -78,7 +85,7 @@ test.describe("trust scorecard — fleet page", () => {
 
   test("★ null retry rate shows '—', never '0%' (no fake zero)", async ({ page }) => {
     await mockApi(page, defaultWorld());
-    await page.goto("/trust");
+    await page.goto("/reports?tab=trust");
     const retry = page.getByTestId("trust-retry-4"); // checkId 4 = 0 runs → retryRate null
     await expect(retry).toContainText("—");
     await expect(retry).not.toContainText("0%");
@@ -86,7 +93,7 @@ test.describe("trust scorecard — fleet page", () => {
 
   test("★ perf/unclassified incidents are NOT folded into real-outage (reds = real / other)", async ({ page }) => {
     await mockApi(page, defaultWorld());
-    await page.goto("/trust");
+    await page.goto("/reports?tab=trust");
     // check 3: total 3 = realOutage 1 + perfRegression 1 + unclassified 1 → "1 / 2", NOT "3 / 0"
     const reds = page.getByTestId("trust-reds-3");
     await expect(reds).toContainText("1 / 2");
@@ -97,7 +104,7 @@ test.describe("trust scorecard — fleet page", () => {
     const w = defaultWorld();
     w.reportsServed = false; // /reports/trust 404s
     await mockApi(page, w);
-    await page.goto("/trust");
+    await page.goto("/reports?tab=trust");
     await expect(page.getByTestId("trust-table")).toHaveCount(0);
     await expect(page.getByText("Trust data unavailable.")).toBeVisible();
     // the legend still renders (static, always useful), and the page didn't crash

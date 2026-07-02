@@ -11,6 +11,7 @@ import { MonitorReportList } from "@/components/monitor-report-list";
 import { ReportWebVitals, ReportSeriesArea } from "@/components/charts";
 import { FleetSloReport } from "@/components/fleet-slo";
 import { FleetMttrReport } from "@/components/fleet-mttr";
+import { TrustScorecard } from "@/components/trust";
 import { TabBar, useTab, type TabDef } from "@/components/tabs";
 import { formatDuration } from "@/lib/format";
 import type { ReportWindow } from "@/lib/types";
@@ -24,6 +25,7 @@ const TABS: TabDef[] = [
   { id: "performance", label: "Performance" },
   { id: "reliability", label: "Reliability" },
   { id: "monitors", label: "Monitors" },
+  { id: "trust", label: "Trust" },
 ];
 const TAB_IDS = TABS.map((t) => t.id);
 
@@ -263,6 +265,14 @@ export default function ReportsPage() {
             perf={perf}
             groupBy={groupBy}
           />
+        </div>
+      )}
+
+      {/* §D1 monitor-trust scorecard — relocated from a top-level /trust route to a Reports sub-tab (v2). Uses
+          the page's shared window. Fleet-wide (no tag scoping — the trust API is not tag-filtered). */}
+      {tab === "trust" && (
+        <div data-testid="reports-panel-trust">
+          <TrustScorecard window={window} />
         </div>
       )}
     </div>
