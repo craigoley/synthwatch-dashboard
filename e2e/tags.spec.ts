@@ -38,13 +38,76 @@ test.describe("tags editor", () => {
     await expect(page.getByTestId("tag-editor-chips")).toHaveCount(0); // no chips left
   });
 
-  test("suggested keys are offered as autocomplete", async ({ page }) => {
+  test("key field suggests keys via the house combobox (a real dropdown, NOT the native datalist)", async ({ page }) => {
     await mockApi(page);
     await openNewMonitor(page);
-    const opts = page.locator("#sw-tag-keys option");
-    await expect(opts).toHaveCount(4);
-    await expect(opts.nth(0)).toHaveAttribute("value", "env");
-    await expect(page.locator('#sw-tag-keys option[value="criticality"]')).toHaveCount(1);
+    // ★ the old native <datalist> (which rendered as an unstyled tooltip-like popover) is gone
+    await expect(page.locator("#sw-tag-keys")).toHaveCount(0);
+
+    // focusing the key field opens the styled listbox with the fleet/curated keys
+    await page.getByTestId("tag-key-input").focus();
+    const list = page.getByTestId("tag-key-input-list");
+    await expect(list).toBeVisible();
+    await expect(list.getByRole("option")).toHaveCount(4); // env/service/team/criticality (curated ∪ in-use)
+    await expect(page.getByTestId("tag-key-input-option-criticality")).toBeVisible();
+
+    // prefix filter: typing "te" narrows to "team"
+    await page.getByLabel("tag key").fill("te");
+    await expect(page.getByTestId("tag-key-input-option-team")).toBeVisible();
+    await expect(page.getByTestId("tag-key-input-option-env")).toHaveCount(0);
+  });
+
+  test("★ value field suggests values used under the SELECTED key, and updates when the key changes", async ({ page }) => {
+    const world = defaultWorld();
+    world.tags = [
+      { key: "env", value: "prod", count: 3 },
+      { key: "env", value: "staging", count: 1 },
+      { key: "team", value: "sre", count: 2 },
+    ];
+    await mockApi(page, world);
+    await openNewMonitor(page);
+
+    // key = env → value suggestions are env's values
+    await page.getByLabel("tag key").fill("env");
+    await page.getByTestId("tag-value-input").focus();
+    let vlist = page.getByTestId("tag-value-input-list");
+    await expect(vlist).toBeVisible();
+    await expect(page.getByTestId("tag-value-input-option-prod")).toBeVisible();
+    await expect(page.getByTestId("tag-value-input-option-staging")).toBeVisible();
+    await expect(vlist.getByRole("option")).toHaveCount(2); // env's values only — NOT team's
+
+    // ★ change the key → the value suggestions change to that key's values
+    await page.getByLabel("tag key").fill("team");
+    await page.getByTestId("tag-value-input").focus();
+    vlist = page.getByTestId("tag-value-input-list");
+    await expect(page.getByTestId("tag-value-input-option-sre")).toBeVisible();
+    await expect(vlist.getByRole("option")).toHaveCount(1);
+    await expect(page.getByTestId("tag-value-input-option-prod")).toHaveCount(0); // env's value gone
+  });
+
+  test("free text still saves — a novel key/value not in any suggestion", async ({ page }) => {
+    await mockApi(page);
+    await openNewMonitor(page);
+    await page.getByLabel("tag key").fill("owner"); // not in the curated/in-use set
+    await page.getByLabel("tag value").fill("payments-team");
+    await page.getByRole("button", { name: "+ Add tag" }).click();
+    const chips = page.getByTestId("tag-editor-chips");
+    await expect(chips).toContainText("owner");
+    await expect(chips).toContainText("payments-team");
+  });
+
+  test("suggestions fetch fails → editor stays free-text usable + a quiet note (never silently absent)", async ({ page }) => {
+    const world = defaultWorld();
+    world.tagsListError = true; // GET /tags 500s (but /tags/suggested still responds → editor renders)
+    await mockApi(page, world);
+    await openNewMonitor(page);
+
+    await expect(page.getByTestId("tag-suggestions-error")).toBeVisible(); // the failure is visible, not silent
+    // ...and the editor still works: a tag can be added by free-text
+    await page.getByLabel("tag key").fill("env");
+    await page.getByLabel("tag value").fill("prod");
+    await page.getByRole("button", { name: "+ Add tag" }).click();
+    await expect(page.getByTestId("tag-editor-chips")).toContainText("prod");
   });
 
   test("one value per key — re-adding a key replaces its value", async ({ page }) => {

@@ -12,9 +12,11 @@ import {
   useLocations,
   useCheckLocations,
   useSuggestedKeys,
+  useTags,
   useCheckTags,
 } from "@/lib/client";
 import { ApiRequestError } from "@/lib/api-client";
+import { Combobox } from "@/components/combobox";
 import {
   AssertionBuilder,
   buildHttpConfigPayload,
@@ -218,17 +220,22 @@ function Toggle({
   );
 }
 
-/** key:value tag editor: existing tags as removable chips + a key/value add row.
-    Suggested keys (env/service/team/criticality) offered via a datalist, but any
-    key is allowed. One value per key — re-adding a key replaces its value. */
+/** key:value tag editor: existing tags as removable chips + a key/value add row. Two comboboxes (house
+    dropdown pattern, not a native datalist): the KEY field suggests distinct keys in use across the fleet; the
+    VALUE field suggests values already used under the CURRENTLY-TYPED key. Free text is always allowed — a new
+    key/value stays creatable. One value per key — re-adding a key replaces its value. */
 function TagEditor({
   tags,
-  suggestedKeys,
+  keyOptions,
+  valuesByKey,
+  suggestionsError,
   onAdd,
   onRemove,
 }: {
   tags: Tag[];
-  suggestedKeys: string[];
+  keyOptions: string[];
+  valuesByKey: Map<string, Set<string>>;
+  suggestionsError: boolean;
   onAdd: (key: string, value: string) => void;
   onRemove: (key: string) => void;
 }) {
@@ -240,12 +247,8 @@ function TagEditor({
     setKey("");
     setValue("");
   };
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      add();
-    }
-  };
+  // Values suggested under the typed key (normalized to how it's stored — lowercased). Empty → no popover.
+  const valueOptions = [...(valuesByKey.get(key.trim().toLowerCase()) ?? [])].sort();
   return (
     <div className="w-full">
       <span className="sw-label">Tags</span>
@@ -271,29 +274,29 @@ function TagEditor({
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          className="sw-input sw-mono w-32 text-[13px]"
-          list="sw-tag-keys"
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="key"
-          aria-label="tag key"
-        />
-        <datalist id="sw-tag-keys">
-          {suggestedKeys.map((k) => (
-            <option key={k} value={k} />
-          ))}
-        </datalist>
+        <div className="w-32">
+          <Combobox
+            value={key}
+            onChange={setKey}
+            options={keyOptions}
+            onEnter={add}
+            placeholder="key"
+            ariaLabel="tag key"
+            testId="tag-key-input"
+          />
+        </div>
         <span className="text-[var(--color-ink-faint)]">:</span>
-        <input
-          className="sw-input sw-mono w-40 text-[13px]"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="value"
-          aria-label="tag value"
-        />
+        <div className="w-40">
+          <Combobox
+            value={value}
+            onChange={setValue}
+            options={valueOptions}
+            onEnter={add}
+            placeholder="value"
+            ariaLabel="tag value"
+            testId="tag-value-input"
+          />
+        </div>
         <button
           type="button"
           onClick={add}
@@ -304,8 +307,13 @@ function TagEditor({
         </button>
       </div>
       <span className="mt-1 block text-[11px] text-[var(--color-ink-faint)]">
-        Lowercased on save. Suggested keys: env, service, team, criticality — or use your own.
+        Lowercased on save. Type your own, or pick from keys/values already in use.
       </span>
+      {suggestionsError && (
+        <span className="mt-1 block text-[11px]" style={{ color: "var(--color-warn)" }} data-testid="tag-suggestions-error">
+          Couldn’t load tag suggestions — you can still type keys/values freely.
+        </span>
+      )}
     </div>
   );
 }
@@ -443,8 +451,24 @@ export function MonitorForm({ initial, activation, prefill, prefillErrors, onDon
 
   // ─── tags (Phase 9a) ───────────────────────────────────────────────────────
   const { data: suggestedKeys } = useSuggestedKeys();
+  // Fleet-wide in-use tags (GET /tags) power the INTELLIGENT suggestions: distinct keys already in use, and the
+  // values seen under each key. Additive to suggestedKeys (the curated starters) — the editor still renders +
+  // works free-text if this fails (tagsError surfaces a quiet note; never a silent absence — #175 discipline).
+  const { data: fleetTags, error: tagsError } = useTags();
   const { data: currentTags } = useCheckTags(isEdit && initial ? initial.id : null);
   const [tagsSeeded, setTagsSeeded] = useState(false);
+
+  // key suggestions = curated starters ∪ keys already in use (deduped, sorted). value suggestions = values seen
+  // under a given key. Empty when the fleet has none → the combobox simply shows no popover (honest-empty).
+  const keyOptions = useMemo(() => {
+    const set = new Set<string>([...(suggestedKeys ?? []), ...(fleetTags ?? []).map((t) => t.key)]);
+    return [...set].sort();
+  }, [suggestedKeys, fleetTags]);
+  const valuesByKey = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const t of fleetTags ?? []) (m.get(t.key) ?? m.set(t.key, new Set()).get(t.key)!).add(t.value);
+    return m;
+  }, [fleetTags]);
 
   // Seed once the suggested-keys endpoint responds (and, on edit, the current tags).
   useEffect(() => {
@@ -743,7 +767,9 @@ export function MonitorForm({ initial, activation, prefill, prefillErrors, onDon
         <div>
           <TagEditor
             tags={form.tags}
-            suggestedKeys={suggestedKeys ?? []}
+            keyOptions={keyOptions}
+            valuesByKey={valuesByKey}
+            suggestionsError={Boolean(tagsError)}
             onAdd={addTag}
             onRemove={removeTag}
           />
