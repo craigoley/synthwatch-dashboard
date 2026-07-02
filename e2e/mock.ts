@@ -848,6 +848,15 @@ export async function mockApi(
       const to = url.searchParams.get("to");
       if (from) runs = runs.filter((r) => String(r.startedAt) >= from);
       if (to) runs = runs.filter((r) => String(r.startedAt) < to);
+      // ★ Server-side outcome filter (api #153): passed=(pass,warn), failed=(fail,error), errored=(infra_error,
+      // its OWN bucket — never folded into failed). Unknown → 400 (the client must never send an unknown value).
+      const outcome = url.searchParams.get("outcome");
+      if (outcome) {
+        const buckets: Record<string, string[]> = { passed: ["pass", "warn"], failed: ["fail", "error"], errored: ["infra_error"] };
+        const allowed = buckets[outcome];
+        if (!allowed) return json(route, { error: "unknown outcome" }, 400);
+        runs = runs.filter((r) => allowed.includes(String(r.status)));
+      }
       // Keyset order: DESC started_at, then DESC id (mirrors the API).
       runs.sort(
         (a, b) =>

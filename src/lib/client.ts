@@ -77,6 +77,7 @@ import type {
   IncidentWithCheck,
   ReportWindow,
   EgressWindow,
+  RunOutcome,
   Routing,
   Run,
   SlaWindow,
@@ -297,12 +298,15 @@ export function useRunHistory(
   pageSize = RUN_PAGE_SIZE,
   // ★ live: externally "a run is in-flight/expected" (Run now + the post-terminal settle window), so the
   // list + trace ride the SAME poll-while-running lifecycle as the status badge — no manual refresh.
-  opts: { live?: boolean } = {},
+  opts: { live?: boolean; outcome?: RunOutcome } = {},
 ) {
+  const outcome = opts.outcome ?? "all";
   const h = useCursorHistory<Run>(
-    id ? ["run-history", id, range.from ?? null, range.to ?? null] : null,
+    // ★ outcome is in the KEY → changing the filter starts a FRESH cursor walk (no stale cursor from the
+    // unfiltered set paged against the filtered one — api #153 is server-side, so the page must be re-fetched).
+    id ? ["run-history", id, range.from ?? null, range.to ?? null, outcome] : null,
     (cursor) =>
-      getRuns(id as number, { pageSize, from: range.from, to: range.to, cursor: cursor ?? undefined }).then(
+      getRuns(id as number, { pageSize, from: range.from, to: range.to, cursor: cursor ?? undefined, outcome }).then(
         (p) => ({ items: p.runs, nextCursor: p.next_cursor }),
       ),
     pageSize,
