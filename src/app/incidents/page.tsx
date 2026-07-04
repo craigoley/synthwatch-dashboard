@@ -39,7 +39,9 @@ function IncidentRow({ incident }: { incident: IncidentWithCheck }) {
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/checks/${incident.check_id}`}
-            className="relative z-10 truncate text-sm font-medium text-[var(--color-ink)] hover:text-[var(--color-brand)]"
+            // min-h-6 + flex centering = a ≥24px pointer target (WCAG 2.5.8, new in 2.2 — axe SERIOUS on
+            // these z-raised row links). Visual size is unchanged; only the hit area grows.
+            className="relative z-10 inline-flex min-h-6 items-center truncate text-sm font-medium text-[var(--color-ink)] hover:text-[var(--color-brand)]"
           >
             {incident.check_name}
           </Link>

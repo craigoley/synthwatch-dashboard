@@ -19,7 +19,10 @@
   /* ink */
   --color-ink: #e9eff4;
   --color-ink-dim: #94a3b0;
-  --color-ink-faint: #5d6b77;
+  /* ★ WCAG 1.4.3: faint TEXT must still clear 4.5:1 on every surface it sits on. #82909c measures
+     bg 5.99 / panel 5.40 / panel-2 4.97 (the old #5d6b77 was 2.97-3.58 — an axe SERIOUS on the 10px
+     eyebrow labels). Keep it visibly quieter than ink-dim, but never below the AA text floor. */
+  --color-ink-faint: #82909c;
 
   /* brand — phosphor teal */
   --color-brand: #45e3c2;

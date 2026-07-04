@@ -62,6 +62,9 @@ test.describe("read-gated GETs — anonymous 401 is a sign-in state, not noise",
     // a 401 must NOT read as "the notifications service isn't deployed" (that's the 404 state)
     await expect(page.getByTestId("setup-pending")).toHaveCount(0);
     await expect(page.getByTestId("channels-error")).toHaveCount(0);
+    // ONE coherent prompt (#185 review nit): the read-only "sign in to edit" banner is suppressed
+    // while the read itself is gated — never two stacked, contradictory sign-in prompts
+    await expect(page.getByTestId("sign-in-to-edit")).toHaveCount(0);
   });
 
   test("the sign-in affordance opens the login modal on demand", async ({ page }) => {

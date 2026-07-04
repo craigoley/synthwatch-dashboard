@@ -397,6 +397,10 @@ export interface IncidentDetail {
   rca: IncidentRca | null;
   per_location: LocationStatus[];
   timeline: IncidentTimelineRun[];
+  /** Total runs in the incident BEFORE the API's timeline cap (api-side bounded timeline). null = the API
+   *  predates the field / doesn't cap → render exactly as before (forward-compatible). When present and
+   *  > timeline.length the UI captions "showing newest N of M". */
+  timeline_total: number | null;
   recurrence: IncidentRecurrence[];
   // Deploys detected near this incident (empty when none — the UI renders absence, never a fabricated row).
   nearby_deploys: NearbyDeploy[];

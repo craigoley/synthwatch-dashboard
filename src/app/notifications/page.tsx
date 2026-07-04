@@ -440,7 +440,10 @@ export default function NotificationsPage() {
         )}
       </header>
 
-      <SignInToEdit />
+      {/* Suppressed while the channels read itself 401'd — SignInToView below is then the single,
+          coherent prompt ("sign in to view" beats a contradictory "you can view but not edit" banner
+          stacked above it — #185 review nit). */}
+      {!(channelsError instanceof ApiRequestError && channelsError.status === 401) && <SignInToEdit />}
 
       {/* ★ Read-gate aware (api read-gate sweep gates GET /channels at a session floor): an anonymous 401
           is NOT "setup pending" and NOT an error — the viewer just isn't signed in. A non-404 read error
