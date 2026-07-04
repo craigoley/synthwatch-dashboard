@@ -279,6 +279,15 @@ export async function mockApi(
   // Per-check cursor into world.runsSequence — advances each GET /checks/{id}/runs (the live run-history list).
   const runsSeqIdx = new Map<number, number>();
 
+  // ★ SAME-ORIGIN screenshot proxy (app/screenshot-proxy/[runId]). The app loads screenshots through its own
+  // origin (cookie→bearer, like /trace-proxy) — in the hermetic harness the Next route would fetch the mock
+  // host server-side (unreachable), so intercept the browser-side request and serve the same fixture the raw
+  // API endpoint used to. world.screenshot404 still simulates blob expiry/retention.
+  await page.route("**/screenshot-proxy/**", async (route) => {
+    if (world.screenshot404) return route.fulfill({ status: 404 });
+    return route.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 });
+  });
+
   await page.route(`${API_ORIGIN}/**`, async (route) => {
     const req = route.request();
     const url = new URL(req.url());

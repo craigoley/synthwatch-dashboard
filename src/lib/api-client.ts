@@ -178,12 +178,18 @@ export class ApiRequestError extends Error {
 type QueryValue = string | number | boolean | null | undefined | string[];
 
 /**
- * Resolve an origin-relative proxy path (e.g. "/api/runs/1/screenshot") to an
- * absolute URL — for direct browser loads like <img src> and download links that
- * bypass the typed request() helper. These paths already include the "/api"
- * segment, so they resolve against the API ORIGIN (not API_BASE, which itself
- * ends in "/api" — concatenating would double it). Already-absolute URLs pass
- * through; empty base = same-origin.
+ * Resolve an origin-relative proxy path to an absolute URL — for direct browser
+ * loads like <img src> and download links that bypass the typed request() helper.
+ * These paths already include the "/api" segment, so they resolve against the API
+ * ORIGIN (not API_BASE, which itself ends in "/api" — concatenating would double
+ * it). Already-absolute URLs pass through; empty base = same-origin.
+ *
+ * ★ NEVER use this for the bearer-gated artifact endpoints (/runs/{id}/trace,
+ * /runs/{id}/screenshot, /checks/{id}/success-trace, trace-signals): a bare
+ * <a href>/<img src> to the cross-origin API carries neither the bearer header
+ * nor the proxy cookie, so it 401s even for logged-in users (synthwatch-api #154).
+ * Those go through the same-origin proxies: /trace-proxy/{runId},
+ * /trace-proxy/check/{checkId}, /screenshot-proxy/{runId}.
  */
 export function apiUrl(path: string): string {
   if (/^https?:\/\//i.test(path)) return path;

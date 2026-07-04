@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { useIncident, useCheckTags } from "@/lib/client";
-import { apiUrl } from "@/lib/api-client";
 import { StatusBadge, ToneBadge, TONE_VAR } from "@/components/status-badge";
 import { RcaPanel } from "@/components/rca-panel";
 import { TagChips } from "@/components/tag-chips";
@@ -83,9 +82,13 @@ function Timeline({ runs }: { runs: IncidentTimelineRun[] }) {
                   </span>
                 )}
                 <span className="ml-auto flex items-center gap-3">
+                  {/* ★ SAME-ORIGIN proxies, never raw apiUrl(): the API gates artifacts behind a bearer
+                      (synthwatch-api #154), and a bare <a href> to the cross-origin API carries neither the
+                      bearer nor the proxy cookie → 401 even for logged-in users. The proxies forward the
+                      session cookie as the bearer. */}
                   {r.screenshot_url && (
                     <a
-                      href={apiUrl(r.screenshot_url)}
+                      href={`/screenshot-proxy/${r.run_id}`}
                       target="_blank"
                       rel="noreferrer"
                       className="sw-mono text-[11px] text-[var(--color-brand)] hover:underline"
@@ -95,7 +98,7 @@ function Timeline({ runs }: { runs: IncidentTimelineRun[] }) {
                   )}
                   {r.trace_url && (
                     <a
-                      href={apiUrl(r.trace_url)}
+                      href={`/trace-proxy/${r.run_id}`}
                       target="_blank"
                       rel="noreferrer"
                       className="sw-mono text-[11px] text-[var(--color-brand)] hover:underline"

@@ -89,7 +89,10 @@ test.describe("check detail", () => {
 
     const img = page.locator('img[alt="Failure screenshot for run 200"]');
     await expect(img).toBeVisible();
-    // the proxy served a real PNG and apiUrl() resolved the path → it decoded
+    // ★ SAME-ORIGIN: the screenshot loads through the dashboard's own /screenshot-proxy (cookie→bearer,
+    // the /trace-proxy sibling) — never the raw bearer-gated API endpoint, which 401s even signed-in.
+    await expect(img).toHaveAttribute("src", "/screenshot-proxy/200");
+    // the proxy served a real PNG → it decoded
     await expect
       .poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth))
       .toBeGreaterThan(0);
