@@ -6,11 +6,15 @@ name: Auto-merge
 # (currently "E2E / Playwright (hermetic)"). It never bypasses a check.
 #
 # ★ SECURITY (public repo): auto-merge fires ONLY for the explicit trusted-author
-# allowlist below — the operator, the agent, and dependabot. ANY other author's
-# PR is skipped here, so it can NEVER auto-merge even with all checks green.
+# allowlist below AND only for PRs whose BASE is main. Both conditions are the
+# single security boundary: the allowlist decides WHO, the base condition decides
+# WHERE. A stacked PR (base = another feature branch) is skipped entirely — feature
+# branches carry no protection/required checks, so a merge into one would be instant
+# and unreviewed (the July-4 runner #192 incident class). ANY other author's PR is
+# likewise skipped, so it can NEVER auto-merge even with all checks green.
 # "Checks passing" is NOT authorization to merge; the allowlist is. The trust gate
 # is a job-level `if:` evaluated by GitHub BEFORE the job runs, so an untrusted
-# author's job is skipped entirely — there is no merge step to reach.
+# author's (or non-main-base) job is skipped entirely — there is no merge step to reach.
 #
 # The merge is intentionally NOT performed by the Claude review action (which acts
 # on PR-supplied content); a prompt-injected untrusted diff therefore has no path
@@ -34,7 +38,11 @@ jobs:
     # ★ TRUST GATE — the single security boundary. Webhook user.login values:
     # operator craigoley / cao825, agent craigoleyagent, and dependabot[bot]
     # (the [bot] form is what pull_request webhooks send). Anyone else → skipped.
+    # ★ base == main required (July-4 runner #192: stacked PR + trusted author + unprotected base branch
+    # = instant unreviewed merge — here even WITHOUT auto-merge enablement, via the `|| gh pr merge`
+    # direct-merge fallback below, which fires on the job's FIRST run for an already-green stacked PR).
     if: >-
+      github.event.pull_request.base.ref == 'main' &&
       contains(fromJSON('["craigoley", "cao825", "craigoleyagent", "dependabot[bot]"]'),
       github.event.pull_request.user.login)
     steps:
