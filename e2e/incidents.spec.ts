@@ -84,6 +84,9 @@ test.describe("incident detail page", () => {
     const shot = page.getByRole("link", { name: /screenshot/ });
     await expect(shot).toHaveAttribute("href", "/screenshot-proxy/1001");
     await expect(page.getByRole("link", { name: /trace/ })).toHaveAttribute("href", "/trace-proxy/1001");
+    // ★ each timeline row deep-links into the check's run history — the #run-<id> anchor is where
+    // the funnel, AI insights, baseline-diff, and embedded trace viewer live
+    await expect(page.getByTestId("timeline-run-link-1001")).toHaveAttribute("href", "/checks/10#run-1001");
 
     // recurrence links to a sibling incident
     await expect(page.getByRole("heading", { name: "Recurrence" })).toBeVisible();
