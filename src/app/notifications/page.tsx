@@ -17,8 +17,8 @@ import { ApiRequestError } from "@/lib/api-client";
 import { Modal } from "@/components/modal";
 import { ChannelForm } from "@/components/channel-form";
 import { useAuth } from "@/components/auth-provider";
-import { SignInToEdit } from "@/components/write-gate";
-import { EmptyState, Spinner } from "@/components/states";
+import { SignInToEdit, SignInToView } from "@/components/write-gate";
+import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { useToasts, ToastStack } from "@/components/toast";
 import { TagChips } from "@/components/tag-chips";
 import type { DeliveryReadiness } from "@/lib/api-client";
@@ -152,7 +152,7 @@ function ChannelPicker({
 }
 
 export default function NotificationsPage() {
-  const { data: channels, isLoading: channelsLoading } = useChannels();
+  const { data: channels, isLoading: channelsLoading, error: channelsError } = useChannels();
   const { data: routingData } = useRouting();
   const { data: checks } = useChecks();
   const { data: inUseTags } = useTags();
@@ -442,7 +442,14 @@ export default function NotificationsPage() {
 
       <SignInToEdit />
 
-      {!apiAvailable ? (
+      {/* ★ Read-gate aware (api read-gate sweep gates GET /channels at a session floor): an anonymous 401
+          is NOT "setup pending" and NOT an error — the viewer just isn't signed in. A non-404 read error
+          goes LOUD per #175; a 404 (endpoint not deployed) falls through to the amber setup-pending copy. */}
+      {channelsError instanceof ApiRequestError && channelsError.status === 401 ? (
+        <SignInToView what="notification channels and routing" testId="channels-signin" />
+      ) : channelsError && !(channelsError instanceof ApiRequestError && channelsError.status === 404) ? (
+        <ErrorState message="Couldn't load notification channels — the channels read failed." testId="channels-error" />
+      ) : !apiAvailable ? (
         channelsLoading ? (
           <div className="py-16"><Spinner label="Loading notifications…" /></div>
         ) : (

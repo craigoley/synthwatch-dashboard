@@ -30,7 +30,10 @@ import {
   rejectReconcilePlan,
   applyReconcilePlans,
 } from "@/lib/client";
+import { ApiRequestError } from "@/lib/api-client";
 import { useAuth } from "@/components/auth-provider";
+import { SignInToView } from "@/components/write-gate";
+import { ErrorState } from "@/components/states";
 import { formatRelative } from "@/lib/format";
 import type { DriftRow, DriftType, ReconcileApplyPlanItem } from "@/lib/types";
 
@@ -229,7 +232,7 @@ export function ReconcileDriftSurface() {
   const { canWrite } = useAuth(); // editor/admin only — the API gates this write; it spends compute
   const [reconciling, setReconciling] = useState(false);
   const [triggerError, setTriggerError] = useState<string | null>(null);
-  const { data } = useReconcileDrift({ reconciling });
+  const { data, error } = useReconcileDrift({ reconciling });
   // The DRY-RUN apply plan (Phase 0), keyed by `${drift_type}:${source_key}` to attach to each drift row.
   const { data: planData } = useReconcilePlan({ reconciling });
   const planByKey = new Map((planData?.items ?? []).map((p) => [`${p.drift_type}:${p.source_key}`, p]));
@@ -325,7 +328,16 @@ export function ReconcileDriftSurface() {
     </div>
   ) : null;
 
-  if (!data) return null; // loading (undefined) or endpoint absent (null) → hide cleanly
+  // ★ Read-gate aware (api read-gate sweep gates GET /reconcile/* at a session floor): an anonymous
+  // 401 renders a calm "sign in to view" — the data is fine, the viewer just isn't signed in. Any other
+  // error goes LOUD per #175 (never a silent hide that reads as "in sync"/absent).
+  if (error instanceof ApiRequestError && error.status === 401) {
+    return <SignInToView what="configuration drift" testId="drift-signin" />;
+  }
+  if (error) {
+    return <ErrorState message="Couldn't load the drift snapshot — the reconcile read failed." testId="drift-error" />;
+  }
+  if (!data) return null; // loading (undefined) or endpoint absent (null 404) → hide cleanly
 
   const config = data.items.filter((r) => r.drift_type !== "orphan");
   const orphans = data.items.filter((r) => r.drift_type === "orphan");

@@ -41,3 +41,29 @@ export function SignInToEdit() {
     </div>
   );
 }
+
+/**
+ * Shown in place of a panel whose READ is session-gated by the API (read-gate sweep: /reconcile/*,
+ * /channels, …) when the viewer has no session (the GET 401'd without a bearer). Distinct from an
+ * error: the data is fine, the viewer just isn't signed in — so it renders calm brand-tinted copy
+ * with a sign-in affordance, never a red ErrorState and never an auto-popped modal.
+ */
+export function SignInToView({ what, testId }: { what: string; testId?: string }) {
+  const { promptLogin } = useAuth();
+
+  return (
+    <div
+      className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm"
+      style={{
+        background: "color-mix(in srgb, var(--color-brand) 8%, var(--color-panel))",
+        border: "1px solid color-mix(in srgb, var(--color-brand) 28%, var(--color-border))",
+      }}
+      data-testid={testId ?? "sign-in-to-view"}
+    >
+      <span className="text-[var(--color-ink-dim)]">Sign in to view {what}.</span>
+      <button type="button" onClick={promptLogin} className="sw-btn sw-btn-primary sw-btn-sm">
+        Sign in
+      </button>
+    </div>
+  );
+}

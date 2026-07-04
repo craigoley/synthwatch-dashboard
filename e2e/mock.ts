@@ -45,6 +45,13 @@ export interface World {
   createResponse?: { status: number; body: unknown };
   /** Make every GET fail (API-down → error-state test). */
   failAllReads?: boolean;
+  /**
+   * ★ api read-gate sweep: gate the session-floor GETs (/reconcile/drift, /reconcile/plan, /channels)
+   * behind a valid session — no/revoked bearer → 401, any valid session → normal response. Exercises the
+   * dashboard's forward-compatible behavior (bearer already sent; anonymous 401 → SignInToView, never a
+   * surprise modal; expired-session 401 → clear + re-login prompt).
+   */
+  readGate401?: boolean;
   /** Available run locations (selector options); undefined → endpoint 404s. */
   locations?: { name: string; enabled: boolean }[];
   /** Per-check location assignment (GET /checks/{id}/locations). */
@@ -540,6 +547,17 @@ export async function mockApi(
     }
 
     if (world.failAllReads) return route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"down"}' });
+
+    // ★ api read-gate sweep: session-floor 401 on the gated GETs. A valid session of ANY role passes
+    // (the floor is "signed in", not a role); no/revoked bearer → the API's 401 shape.
+    if (
+      world.readGate401 &&
+      method === "GET" &&
+      (path === "/api/reconcile/drift" || path === "/api/reconcile/plan" || path === "/api/channels") &&
+      roleOf() === null
+    ) {
+      return json(route, { message: "A session is required to read this resource." }, 401);
+    }
 
     if (path === "/api/checks" && method === "GET") return json(route, world.checks);
     // Monitors-as-code drift (Phase 6b). Unset → 404 (endpoint not deployed → surface hides);

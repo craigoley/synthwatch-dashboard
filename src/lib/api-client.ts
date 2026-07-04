@@ -273,12 +273,16 @@ async function request<T>(
       // 401/403 interceptor (slice 2's gate shapes). EXEMPT /auth/* — a 401 from /auth/me is the normal
       // "not signed in" probe and /verify's 400s are the login modal's to show; intercepting them would
       // loop the modal. Everywhere else:
-      //   401 (expired/invalid session) → drop the session + signal a re-login prompt.
+      //   401 WITH a session (we sent a bearer) → expired/revoked: drop it + signal a re-login prompt.
+      //   401 WITHOUT a session → a read-gated GET hit anonymously (api read-gate sweep): nothing to
+      //     clear, no modal to pop — the caller's panel renders "sign in to view" (SignInToView).
       //   403 (valid session, wrong role) → signal a permission message; do NOT clear (they ARE logged in).
       if (!path.startsWith("/auth/")) {
         if (res.status === 401) {
-          clearSession();
-          emitAuthEvent({ type: "unauthorized" });
+          if (token) {
+            clearSession();
+            emitAuthEvent({ type: "unauthorized" });
+          }
         } else if (res.status === 403) {
           emitAuthEvent({
             type: "forbidden",
