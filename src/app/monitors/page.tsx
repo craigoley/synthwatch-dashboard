@@ -119,8 +119,10 @@ export default function MonitorsPage() {
   const { data: inUseTags } = useTags();
   // For the demoted "Monitors as code" section below the active list (gated so it never shows an empty
   // labeled block when the reconcile endpoint is absent — mirrors ReconcileDriftSurface's own null guard).
-  // SWR-deduped with the component's own useReconcileDrift call (no extra fetch).
-  const { data: drift } = useReconcileDrift();
+  // SWR-deduped with the component's own useReconcileDrift call (no extra fetch). The error matters too:
+  // a read-gated 401 / a real failure must show the section so the surface's SignInToView/ErrorState is
+  // visible (hiding an errored section would be the silent-swallow #175 forbids).
+  const { data: drift, error: driftError } = useReconcileDrift();
   const { canWrite } = useAuth();
   const { selected, toggle, clear } = useTagFilter();
   const create = useCreateMonitor();
@@ -276,8 +278,9 @@ export default function MonitorsPage() {
       {/* ── Demoted below the active monitors: monitors-as-code drift (new/changed/missing vs Git) + the
           catalog cross-link. The manage page LEADS with current monitors; what differs from Git / isn't set
           up yet is secondary context (set-up lives on the Catalog page). Gated on `drift` so an absent
-          reconcile endpoint shows no empty labeled block. */}
-      {drift && (
+          reconcile endpoint shows no empty labeled block — but an ERROR (read-gate 401 / real failure)
+          keeps the section so the surface's SignInToView / ErrorState renders instead of vanishing. */}
+      {(drift || driftError) && (
         <section className="border-t border-[var(--color-border)] pt-6" aria-label="Monitors as code" data-testid="drift-section">
           <p className="sw-eyebrow mb-3">Monitors as code</p>
           <ReconcileDriftSurface />
