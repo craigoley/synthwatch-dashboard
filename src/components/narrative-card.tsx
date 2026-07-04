@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import { useNarrative } from "@/lib/client";
+import { StalenessStamp, useFetchedAt } from "@/components/staleness";
 import { formatRelative } from "@/lib/format";
 import type { NarrativeFact, ReportWindow } from "@/lib/types";
 
@@ -88,7 +89,8 @@ export function NarrativeCard({
   checkKey?: number;
   compact?: boolean;
 }) {
-  const { data } = useNarrative(scope, window, scope === "monitor" ? (checkKey ?? null) : null);
+  const { data, isValidating, mutate } = useNarrative(scope, window, scope === "monitor" ? (checkKey ?? null) : null);
+  const fetchedAt = useFetchedAt(isValidating, data != null); // called before early returns (hooks rule)
   if (!data) return null; // loading or absent → hide (graceful)
 
   const when = data.generatedAt ? formatRelative(data.generatedAt) : null;
@@ -128,7 +130,12 @@ export function NarrativeCard({
             </span>
           )}
         </div>
-        {when && <span className="sw-mono text-[10px] text-[var(--color-ink-faint)]">generated {when}</span>}
+        <span className="flex items-center gap-3">
+          {when && <span className="sw-mono text-[10px] text-[var(--color-ink-faint)]">generated {when}</span>}
+          {/* #178 regime: "generated" is the SERVER's compute time; the stamp is the CLIENT fetch time +
+              manual refresh — a tab left open shows both honestly. */}
+          <StalenessStamp fetchedAt={fetchedAt} onRefresh={() => mutate()} refreshing={isValidating} testId="narrative" />
+        </span>
       </div>
 
       <h2 className="text-base font-semibold tracking-tight text-[var(--color-ink)]">{data.headline}</h2>
