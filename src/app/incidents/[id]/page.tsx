@@ -51,12 +51,18 @@ function PerLocation({ locations }: { locations: LocationStatus[] }) {
  *  with links out to the screenshot + trace proxy when present — and a deep link into the
  *  check's run history (`/checks/{id}#run-{runId}`, the anchor run-history already serves),
  *  where the run's funnel, AI insights, baseline-diff, and embedded trace viewer live. */
-function Timeline({ runs, checkId }: { runs: IncidentTimelineRun[]; checkId: number }) {
+function Timeline({ runs, checkId, total }: { runs: IncidentTimelineRun[]; checkId: number; total: number | null }) {
+  // The API caps a long incident's timeline server-side (the 2,309-run/765KB payload lesson). When the
+  // cap bit and the API says so (timeline_total > rows served), caption it honestly; a pre-cap API sends
+  // no total (null) → the plain count renders exactly as before (forward-compatible).
+  const truncated = total != null && total > runs.length;
   return (
     <section>
       <div className="mb-3 flex items-center gap-2">
         <h2 className="text-sm font-semibold text-[var(--color-ink)]">Run timeline</h2>
-        <span className="sw-mono text-xs text-[var(--color-ink-faint)]">({runs.length})</span>
+        <span className="sw-mono text-xs text-[var(--color-ink-faint)]" data-testid="timeline-count">
+          {truncated ? `showing newest ${runs.length} of ${total}` : `(${runs.length})`}
+        </span>
       </div>
       {runs.length === 0 ? (
         <EmptyState title="No runs recorded for this incident." />
@@ -265,7 +271,7 @@ export default function IncidentDetailPage() {
       {/* rca null → no panel (graceful, exactly like the list) */}
       {incident.rca && <RcaPanel rca={incident.rca} />}
 
-      <Timeline runs={incident.timeline ?? []} checkId={incident.check_id} />
+      <Timeline runs={incident.timeline ?? []} checkId={incident.check_id} total={incident.timeline_total} />
 
       <Recurrence items={incident.recurrence ?? []} currentId={incident.id} />
     </div>

@@ -137,6 +137,26 @@ test.describe("incident detail page", () => {
     await expect(page.getByText("Root cause")).toHaveCount(0); // no RCA panel
   });
 
+  // ★ Forward-compatible timeline cap (api-side bounded timeline): when the API reports a total larger
+  // than the rows it served, the count captions "showing newest N of M" — honest truncation, never a
+  // silent partial list. Absent field (today's API) → the plain "(N)" renders exactly as before.
+  test("timeline cap: timelineTotal > rows served → 'showing newest N of M' caption", async ({ page }) => {
+    const w = defaultWorld();
+    const detail = w.incidentDetails[1] as { timeline?: unknown[] } & Record<string, unknown>;
+    const served = (detail.timeline ?? []).length;
+    detail.timelineTotal = served + 2306; // a long incident, capped server-side
+    await mockApi(page, w);
+    await page.goto("/incidents/1");
+
+    await expect(page.getByTestId("timeline-count")).toHaveText(`showing newest ${served} of ${served + 2306}`);
+  });
+
+  test("timeline cap: absent timelineTotal (pre-cap API) → the plain count, no caption", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/incidents/1");
+    await expect(page.getByTestId("timeline-count")).toHaveText(/^\(\d+\)$/);
+  });
+
   // ★ A NEW incident (always page 0) must appear on the steady poll WITHOUT a manual reload — page 0 stale =
   // a missed alert. Pre-fix (revalidateFirstPage:false) page 0 was skipped on every tick → invisible until
   // reload. ★★ DEFAULT TEETH: useIncidentHistory no longer passes revalidateFirstPage explicitly — it relies

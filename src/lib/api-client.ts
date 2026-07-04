@@ -1063,6 +1063,7 @@ interface RawIncidentDetail {
   rca: IncidentRca | null;
   perLocation: LocationStatus[] | null;
   timeline: RawTimelineRun[] | null;
+  timelineTotal?: number | null; // optional → tolerant of a pre-timeline-cap API (absent → null, UI unchanged)
   recurrence: RawRecurrence[] | null;
   nearbyDeploys?: RawNearbyDeploy[] | null; // optional → tolerant of the pre-#157 API (absent → [])
 }
@@ -1104,6 +1105,9 @@ export async function getIncident(id: number): Promise<IncidentDetail> {
       trace_url: t.traceUrl,
       location: t.location ?? null,
     })),
+    // null (absent/pre-cap API) preserved — NEVER 0 (a fake "0 of 0" caption); the UI only captions when
+    // the value is present and exceeds the rows served (the api-side bounded-timeline companion).
+    timeline_total: raw.timelineTotal ?? null,
     recurrence: (raw.recurrence ?? []).map((r) => ({
       id: r.id,
       opened_at: r.openedAt,
