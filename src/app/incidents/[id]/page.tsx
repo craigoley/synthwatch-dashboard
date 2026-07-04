@@ -48,8 +48,10 @@ function PerLocation({ locations }: { locations: LocationStatus[] }) {
 }
 
 /** ★ The evidence trail behind the RCA: each run, failed (red) vs recovery (green),
- *  with links out to the screenshot + trace proxy when present. */
-function Timeline({ runs }: { runs: IncidentTimelineRun[] }) {
+ *  with links out to the screenshot + trace proxy when present — and a deep link into the
+ *  check's run history (`/checks/{id}#run-{runId}`, the anchor run-history already serves),
+ *  where the run's funnel, AI insights, baseline-diff, and embedded trace viewer live. */
+function Timeline({ runs, checkId }: { runs: IncidentTimelineRun[]; checkId: number }) {
   return (
     <section>
       <div className="mb-3 flex items-center gap-2">
@@ -82,6 +84,16 @@ function Timeline({ runs }: { runs: IncidentTimelineRun[] }) {
                   </span>
                 )}
                 <span className="ml-auto flex items-center gap-3">
+                  {/* Deep link to this run in the check's run history — the richer per-run view
+                      (funnel, AI insights, baseline-diff, embedded trace viewer). The #run-<id>
+                      anchor expands + scrolls to the row when it's in the loaded window. */}
+                  <Link
+                    href={`/checks/${checkId}#run-${r.run_id}`}
+                    data-testid={`timeline-run-link-${r.run_id}`}
+                    className="sw-mono text-[11px] text-[var(--color-brand)] hover:underline"
+                  >
+                    view run #{r.run_id} →
+                  </Link>
                   {/* ★ SAME-ORIGIN proxies, never raw apiUrl(): the API gates artifacts behind a bearer
                       (synthwatch-api #154), and a bare <a href> to the cross-origin API carries neither the
                       bearer nor the proxy cookie → 401 even for logged-in users. The proxies forward the
@@ -253,7 +265,7 @@ export default function IncidentDetailPage() {
       {/* rca null → no panel (graceful, exactly like the list) */}
       {incident.rca && <RcaPanel rca={incident.rca} />}
 
-      <Timeline runs={incident.timeline ?? []} />
+      <Timeline runs={incident.timeline ?? []} checkId={incident.check_id} />
 
       <Recurrence items={incident.recurrence ?? []} currentId={incident.id} />
     </div>
