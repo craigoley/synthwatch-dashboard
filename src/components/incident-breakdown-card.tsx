@@ -1,6 +1,9 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { useIncidentBreakdown } from "@/lib/client";
+import { StalenessStamp, useFetchedAt } from "@/components/staleness";
 import type { ReportWindow, Tag } from "@/lib/types";
 
 // Status-color LAW (tokens, not hex): real-outage = a true red (the site genuinely broke); env/perf = genuine
@@ -26,12 +29,15 @@ function precisionTone(p: number): string {
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 
-function Shell({ window, children }: { window: ReportWindow; children: React.ReactNode }) {
+function Shell({ window, stamp, children }: { window: ReportWindow; stamp?: ReactNode; children: ReactNode }) {
   return (
     <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
       <div className="mb-3 flex items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold text-[var(--color-ink)]">Alert quality — were the reds real?</h2>
-        <span className="text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">{window}</span>
+        <span className="flex items-center gap-3 text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+          {window}
+          {stamp}
+        </span>
       </div>
       {children}
     </section>
@@ -39,11 +45,16 @@ function Shell({ window, children }: { window: ReportWindow; children: React.Rea
 }
 
 export function IncidentBreakdownCard({ window, tags = [] }: { window: ReportWindow; tags?: Tag[] }) {
-  const { data, isLoading } = useIncidentBreakdown(window, tags);
+  const { data, isLoading, isValidating, mutate } = useIncidentBreakdown(window, tags);
+  // #178 regime: fetch-once panel → honest "fetched HH:MM" + manual refresh (called before returns — hooks rule).
+  const fetchedAt = useFetchedAt(isValidating, data != null);
+  const stamp = (
+    <StalenessStamp fetchedAt={fetchedAt} onRefresh={() => mutate()} refreshing={isValidating} testId="incident-breakdown" />
+  );
 
   if (isLoading || !data) {
     return (
-      <Shell window={window}>
+      <Shell window={window} stamp={stamp}>
         <p className="text-sm text-[var(--color-ink-dim)]">{isLoading ? "Loading…" : "Couldn’t load the breakdown."}</p>
       </Shell>
     );
@@ -52,7 +63,7 @@ export function IncidentBreakdownCard({ window, tags = [] }: { window: ReportWin
   // ── Honest empty states (gaps, not fake zeros) ──
   if (data.total === 0) {
     return (
-      <Shell window={window}>
+      <Shell window={window} stamp={stamp}>
         <p className="text-sm text-[var(--color-ink-dim)]">No incidents opened in this window — nothing to grade.</p>
       </Shell>
     );
@@ -60,7 +71,7 @@ export function IncidentBreakdownCard({ window, tags = [] }: { window: ReportWin
   if (data.precision === null) {
     // incidents exist but none are RCA-classified yet → precision is genuinely unknown, NOT 0%.
     return (
-      <Shell window={window}>
+      <Shell window={window} stamp={stamp}>
         <p className="text-sm text-[var(--color-ink)]">
           <span className="font-semibold">{data.total}</span> incident{data.total === 1 ? "" : "s"} — none classified yet, so
           alert precision is unavailable.
@@ -75,7 +86,7 @@ export function IncidentBreakdownCard({ window, tags = [] }: { window: ReportWin
   const tone = precisionTone(data.precision);
 
   return (
-    <Shell window={window}>
+    <Shell window={window} stamp={stamp}>
       {/* ★ Lead with the alert-precision answer to "how many reds were real". */}
       <div className="flex items-baseline gap-2">
         <span className="text-3xl font-semibold tabular-nums" style={{ color: `var(--color-${tone})` }}>

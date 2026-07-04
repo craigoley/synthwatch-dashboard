@@ -481,21 +481,25 @@ const tagKey = (tags: Tag[]) => tags.map((t) => `${t.key}:${t.value}`).sort().jo
 
 export function useAvailabilityReport(window: ReportWindow, groupBy: string, tags: Tag[] = []) {
   return useSWR(keys.availabilityReport(window, groupBy, tagKey(tags)), () => getAvailabilityReport(window, groupBy, tags), {
-    revalidateOnFocus: false,
+    // fetch-once aggregate (no poll). revalidateOnFocus + a "fetched HH:MM" stamp + manual refresh (see panel)
+    // — #178's regime, extended so the /reports page has ONE freshness story, not two.
+    revalidateOnFocus: true,
     shouldRetryOnError: false,
   });
 }
 
 export function usePerformanceReport(window: ReportWindow, groupBy: string, tags: Tag[] = []) {
   return useSWR(keys.performanceReport(window, groupBy, tagKey(tags)), () => getPerformanceReport(window, groupBy, tags), {
-    revalidateOnFocus: false,
+    // fetch-once aggregate (no poll). revalidateOnFocus + stamp + manual refresh (see panel) — #178 regime.
+    revalidateOnFocus: true,
     shouldRetryOnError: false,
   });
 }
 
 export function useIncidentBreakdown(window: ReportWindow, tags: Tag[] = []) {
   return useSWR(keys.incidentBreakdown(window, tagKey(tags)), () => getIncidentBreakdown(window, tags), {
-    revalidateOnFocus: false,
+    // fetch-once aggregate (no poll). revalidateOnFocus + stamp + manual refresh (see card) — #178 regime.
+    revalidateOnFocus: true,
     shouldRetryOnError: false,
   });
 }
@@ -511,7 +515,9 @@ export function useSloReport(window: ReportWindow, tags: Tag[] = []) {
 
 export function useDeploys(host: string | null, window: ReportWindow = "30d") {
   return useSWR(host ? keys.deploys(host, window) : null, () => getDeploys(host as string, window), {
-    revalidateOnFocus: false,
+    // fetch-once overlay data (no poll). revalidateOnFocus so a tab left open picks up new deploy markers on
+    // return — the chart carries a caption, not a stamp (an overlay, not a panel; see charts.tsx).
+    revalidateOnFocus: true,
     shouldRetryOnError: false,
   });
 }
@@ -566,7 +572,8 @@ export function useNarrative(scope: "fleet" | "monitor", window: ReportWindow, k
   return useSWR(
     keys.narrative(scope, window, key),
     () => getNarrative(scope, window, scope === "monitor" ? (key ?? undefined) : undefined),
-    { revalidateOnFocus: false, shouldRetryOnError: false },
+    // fetch-once aggregate (no poll). revalidateOnFocus + stamp + manual refresh (see card) — #178 regime.
+    { revalidateOnFocus: true, shouldRetryOnError: false },
   );
 }
 

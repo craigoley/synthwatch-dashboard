@@ -13,6 +13,7 @@ import { FleetSloReport } from "@/components/fleet-slo";
 import { FleetMttrReport } from "@/components/fleet-mttr";
 import { TrustScorecard } from "@/components/trust";
 import { TabBar, useTab, type TabDef } from "@/components/tabs";
+import { StalenessStamp, useFetchedAt } from "@/components/staleness";
 import { formatDuration } from "@/lib/format";
 import type { ReportWindow } from "@/lib/types";
 
@@ -68,9 +69,13 @@ export default function ReportsPage() {
   // ★ groupBy is forwarded to the report endpoints, which GROUP BY the tag key server-side (one group per tag
   // VALUE). "none" → a single fleet/filtered aggregate (today). Composes with the tag filter (?tag= scopes the
   // set, groupBy buckets it).
-  const { data: avail } = useAvailabilityReport(window, groupBy, selected);
-  const { data: perf } = usePerformanceReport(window, groupBy, selected);
+  const { data: avail, isValidating: availValidating, mutate: mutateAvail } = useAvailabilityReport(window, groupBy, selected);
+  const { data: perf, isValidating: perfValidating, mutate: mutatePerf } = usePerformanceReport(window, groupBy, selected);
   const { data: inUseTags } = useTags();
+  // #178 regime for the fetch-once rollup PAIR that enriches every tab (availability + performance): one
+  // combined "fetched HH:MM · ↻" beside the global window control — refresh revalidates both together.
+  const reportsValidating = availValidating || perfValidating;
+  const reportsFetchedAt = useFetchedAt(reportsValidating, avail != null || perf != null);
 
   const rows = useMemo<ReportRow[]>(() => {
     if (!checks) return [];
@@ -145,6 +150,17 @@ export default function ReportsPage() {
               </button>
             ))}
           </div>
+          {/* Freshness of the fetch-once availability+performance rollups that enrich every tab — the same
+              #178 stamp the Reliability/Trust panels carry, so the page has ONE freshness regime. */}
+          <StalenessStamp
+            fetchedAt={reportsFetchedAt}
+            onRefresh={() => {
+              void mutateAvail();
+              void mutatePerf();
+            }}
+            refreshing={reportsValidating}
+            testId="reports-agg"
+          />
         </div>
       </header>
 
