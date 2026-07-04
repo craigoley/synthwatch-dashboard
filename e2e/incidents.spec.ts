@@ -77,12 +77,13 @@ test.describe("incident detail page", () => {
     await expect(page.getByText("Real outage")).toBeVisible();
     await expect(page.getByText("Observed · facts")).toBeVisible();
 
-    // ★ timeline centerpiece: rows + screenshot/trace links out
+    // ★ timeline centerpiece: rows + screenshot/trace links out — SAME-ORIGIN proxy paths, never the raw
+    // cross-origin API (bearer-gated per synthwatch-api #154 → a bare href would 401 even signed-in).
     await expect(page.getByRole("heading", { name: "Run timeline" })).toBeVisible();
     await expect(page.getByText("503 Service Unavailable from westus2")).toBeVisible();
     const shot = page.getByRole("link", { name: /screenshot/ });
-    await expect(shot).toHaveAttribute("href", /\/api\/runs\/1001\/screenshot$/);
-    await expect(page.getByRole("link", { name: /trace/ })).toHaveAttribute("href", /\/api\/runs\/1001\/trace$/);
+    await expect(shot).toHaveAttribute("href", "/screenshot-proxy/1001");
+    await expect(page.getByRole("link", { name: /trace/ })).toHaveAttribute("href", "/trace-proxy/1001");
 
     // recurrence links to a sibling incident
     await expect(page.getByRole("heading", { name: "Recurrence" })).toBeVisible();

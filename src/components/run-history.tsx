@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 
 import { useRunHistory } from "@/lib/client";
-import { apiUrl } from "@/lib/api-client";
 import { FunnelBar } from "@/components/funnel-bar";
 import { StatusDot, TONE_VAR } from "@/components/status-badge";
 import { DateRangeControl, useDateRange } from "@/components/date-range-control";
@@ -18,14 +17,18 @@ import type { Run, RunOutcome } from "@/lib/types";
 
 /**
  * Failure artifacts for a failed browser run: inline screenshot + trace download.
- * screenshot_url / trace_url are proxy PATHS, resolved against the API base via
- * apiUrl(). Both may be null (passing/non-browser runs → section hidden) or 404
- * (blob deleted after 90d retention while the DB url persists) — the <img>
- * onError shows a neutral "unavailable" instead of a broken-image icon.
+ * Both are served SAME-ORIGIN through the dashboard's own proxies — never raw
+ * apiUrl() — because the API gates artifacts behind a bearer (synthwatch-api #154)
+ * and a bare <img src>/<a href> to the cross-origin API carries neither the bearer
+ * header nor the proxy cookie (→ 401 even for logged-in users). Both may be null
+ * (passing/non-browser runs → section hidden) or 404 (blob deleted after 90d
+ * retention while the DB url persists) — the <img> onError shows a neutral
+ * "unavailable" instead of a broken-image icon.
  */
 function RunArtifacts({ run }: { run: Run }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const screenshot = run.screenshot_url ? apiUrl(run.screenshot_url) : null;
+  // ★ SAME-ORIGIN screenshot proxy (app/screenshot-proxy/[runId]) — cookie→bearer, the trace proxy's sibling.
+  const screenshot = run.screenshot_url ? `/screenshot-proxy/${run.id}` : null;
   // ★ Serve the trace SAME-ORIGIN via the dashboard's own proxy (app/trace-proxy/[id]).
   // The viewer fetch()es the trace, and fetching the cross-origin (API-origin) trace is
   // the documented-broken CORS trap (Playwright #38622); same-origin dodges it entirely
