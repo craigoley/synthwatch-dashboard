@@ -368,7 +368,10 @@ export default function CheckDetailPage() {
       </Link>
 
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+        {/* min-w-0: flex items default to min-width:auto, so any long unbreakable child (the target URL,
+            a long name) would blow this out past the viewport instead of shrinking — the mobile
+            horizontal-scroll bug. Letting it shrink is what makes the children's truncate engage. */}
+        <div className="min-w-0">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">{check.name}</h1>
             <span className="flex items-center gap-1.5">
@@ -396,11 +399,16 @@ export default function CheckDetailPage() {
             )}
             {check.flow_name && <span className="sw-mono">· {check.flow_name}</span>}
             {check.target_url && (
+              // min-w-0: as a flex item this defaults to min-width:auto, which pins its minimum to the
+              // full nowrap URL width — truncate (already present) never engaged and a long URL forced
+              // horizontal page scroll on mobile. min-w-0 lets it shrink → the ellipsis works; title
+              // carries the full URL on hover.
               <a
                 href={check.target_url}
                 target="_blank"
                 rel="noreferrer"
-                className="sw-mono truncate text-[var(--color-brand)] hover:underline"
+                title={check.target_url}
+                className="sw-mono min-w-0 truncate text-[var(--color-brand)] hover:underline"
               >
                 {check.target_url}
               </a>

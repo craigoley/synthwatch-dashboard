@@ -150,6 +150,34 @@ test.describe("check detail", () => {
     await expect(page.getByTestId("view-trace-100")).toHaveCount(0);
   });
 
+  // ★ Mobile containment: a long target_url must truncate INSIDE the header, never force horizontal page
+  // scroll. The trap was flex min-width:auto — the URL <a> (and its wrapper div, both flex items) refused
+  // to shrink below the nowrap URL's full width, so its `truncate` never engaged and the page scrolled
+  // sideways at phone widths. min-w-0 on both is the fix; this pins it (page overflow was 578px before).
+  test("mobile (390px): a long target_url truncates — no horizontal page scroll", async ({ page }) => {
+    const LONG_URL =
+      "https://wegapi.azure-api.net/kitting/stores/16/storefronts/1/menus?catering=true&radius=standard&api-version=2021-02-01";
+    await page.setViewportSize({ width: 390, height: 844 });
+    const w = defaultWorld();
+    w.details[1] = detail({ id: 1, name: "Long URL check", targetUrl: LONG_URL });
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+    await expect(page.getByRole("heading", { name: "Long URL check" })).toBeVisible();
+
+    // the URL renders (accessible name is the full text; visually ellipsized) and stays inside the viewport
+    const url = page.getByRole("link", { name: LONG_URL });
+    await expect(url).toBeVisible();
+    await expect(url).toHaveAttribute("title", LONG_URL); // full URL still reachable on hover
+    const box = await url.boundingBox();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+
+    // the must-not-regress guard: the page itself has NO horizontal overflow
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBe(0);
+  });
+
   test("ssl: shows the TLS certificate panel", async ({ page }) => {
     await mockApi(page);
     await page.goto("/checks/3");
