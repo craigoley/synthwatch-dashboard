@@ -52,6 +52,13 @@ the browser calls from (the Vercel origin in prod; a local browser on
 
 ---
 
+## Operations
+
+Accounts, OTP sign-in, adding/removing editors and admins, and the API-side
+auth-enforcement flag: **[docs/operations.md](docs/operations.md)**.
+
+---
+
 ## Local development
 
 ```bash
