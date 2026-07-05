@@ -103,6 +103,11 @@ export interface World {
   /** Egress regions (GET /reports/egress, raw camelCase DTO). Unset → DEFAULT_EGRESS (3 regions, 1 IP each =
    *  stable). Override with a region carrying distinctCount≥2 + multiple ips to exercise the rotation warning. */
   egressRegions?: RawObj[];
+  /** Region health rows (GET /reports/region-health, api #168 — raw camelCase: {region, lastRunAt, ageSeconds,
+   *  status}). Unset → endpoint 404s (pre-deploy → the F-4 alarm section self-hides). */
+  regionHealth?: RawObj[];
+  /** Force GET /reports/region-health to 500 — the alarm panel must render a LOUD error, never silently blank. */
+  regionHealth500?: boolean;
   /** §D1 trust rows (GET /reports/trust, raw camelCase). Unset → DEFAULT_TRUST (covers every chip + honest
    *  states). Detail (/reports/trust/{id}) resolves the row by id + serves trustSeries. */
   trustMonitors?: RawObj[];
@@ -746,6 +751,14 @@ export async function mockApi(
     if (path === "/api/reports/egress" && method === "GET") {
       if (world.reportsServed === false) return json(route, { error: "not_found" }, 404); // endpoint not deployed → section self-hides
       return json(route, { window: url.searchParams.get("window") ?? "all", regions: world.egressRegions ?? DEFAULT_EGRESS });
+    }
+
+    // Region health (api #168, the F-4 pair). Unset → 404 (endpoint not deployed → the section self-hides);
+    // regionHealth500 → a REAL error (the panel must go LOUD, never silently blank — it IS the F-4 alarm).
+    if (path === "/api/reports/region-health" && method === "GET") {
+      if (world.regionHealth500) return json(route, { error: "boom" }, 500);
+      if (!world.regionHealth) return json(route, { error: "not_found" }, 404);
+      return json(route, { regions: world.regionHealth });
     }
 
     // §D1 trust — fleet scorecard + per-check detail (with daily retry series).

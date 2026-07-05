@@ -64,6 +64,9 @@ import type {
   EgressReport,
   EgressWindow,
   EgressIp,
+  RegionHealthReport,
+  RegionHealthRow,
+  RegionHealthStatus,
   TrustReport,
   TrustDetail,
   TrustRow,
@@ -1797,6 +1800,34 @@ export async function getEgressReport(window: EgressWindow = "all"): Promise<Egr
     ips: ((r.ips as Record<string, unknown>[]) ?? []).map(mapIp),
   }));
   return { window: str(raw?.window ?? window), regions };
+}
+
+// GET /api/reports/region-health (api #168 — the F-4 pair): per-region run freshness, the visible alarm
+// for a silently-dead region. ★ 404 → null → the /status section self-hides (pre-deploy env); any other
+// error THROWS → loud ErrorState (an alarm panel going silently blank is the exact F-4 failure mode).
+const REGION_HEALTH_STATUSES: readonly RegionHealthStatus[] = ["fresh", "stale", "never_reported"];
+
+export async function getRegionHealth(): Promise<RegionHealthReport | null> {
+  let raw: Record<string, unknown>;
+  try {
+    raw = await request<Record<string, unknown>>("/reports/region-health");
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null; // absent → self-hide (correct)
+    throw err; // 500/network → surface loudly, never a silent blank
+  }
+  const nullable = (v: unknown) => (v == null ? null : Number(v));
+  const regions: RegionHealthRow[] = ((raw?.regions as Record<string, unknown>[]) ?? []).map((r) => ({
+    region: String(r.region ?? ""),
+    last_run_at: r.lastRunAt == null ? null : String(r.lastRunAt),
+    age_seconds: nullable(r.ageSeconds),
+    // ★ FAIL-SAFE-LOUD taxonomy coercion: an off-taxonomy/absent status must NEVER render as healthy —
+    // this panel IS the alarm, so unknown coerces to "stale" (alarm), the opposite direction of the
+    // trust chips' neutral fallback. A benign false alarm beats a silent dead region.
+    status: (REGION_HEALTH_STATUSES as readonly string[]).includes(String(r.status))
+      ? (r.status as RegionHealthStatus)
+      : "stale",
+  }));
+  return { regions };
 }
 
 // GET /api/reports/trust?window= (§D1 fleet scorecard) + /reports/trust/{id}?window= (detail + daily retry
