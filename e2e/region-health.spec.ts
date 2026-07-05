@@ -26,13 +26,13 @@ test.describe("region health — the F-4 alarm panel", () => {
     const fresh = page.getByTestId("region-health-eastus2");
     await expect(fresh).toHaveAttribute("data-status", "fresh");
     await expect(fresh).toContainText("fresh");
-    await expect(fresh).toContainText("last run");
+    await expect(fresh).toContainText("last run 1m ago"); // 60s → coarse span units
 
     // ★ stale IS the alarm — loud fail-toned banner text, not a chip demotion
     const stale = page.getByTestId("region-health-westus2");
     await expect(stale).toHaveAttribute("data-status", "stale");
     await expect(stale).toContainText("STALE — region silent");
-    await expect(stale).toContainText("no runs for");
+    await expect(stale).toContainText("no runs for 4h 0m"); // 14400s → hour-scale units, matching the "ago" suffix
     // the alarm styling: fail-toned left rail + tinted background (assert the inline style carries the token)
     await expect(stale).toHaveCSS("border-left-width", "4px");
     const bg = await stale.evaluate((el) => getComputedStyle(el).backgroundColor);

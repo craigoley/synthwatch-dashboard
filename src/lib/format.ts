@@ -121,6 +121,20 @@ export function formatCount(n: number | null | undefined): string {
   return n.toLocaleString();
 }
 
+/** Seconds → coarse human span, e.g. "42s", "5m", "4h 0m", "2d 4h" — the incidents-span vocabulary.
+ *  Use for hour-scale ages (region staleness); formatDuration is the ms-scale latency formatter. */
+export function formatSpanSeconds(sec: number | null | undefined): string {
+  if (sec === null || sec === undefined || Number.isNaN(sec)) return "—";
+  const s = Math.max(0, Math.round(sec));
+  if (s < 60) return `${s}s`;
+  const min = Math.floor(s / 60);
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h ${min % 60}m`;
+  const days = Math.floor(h / 24);
+  return `${days}d ${h % 24}h`;
+}
+
 /** Duration between two instants in human terms (for incidents). */
 export function formatSpan(
   startIso: string | null | undefined,
@@ -130,13 +144,5 @@ export function formatSpan(
   const start = parseDate(startIso);
   if (!start) return "—";
   const end = parseDate(endIso)?.getTime() ?? now;
-  const sec = Math.max(0, Math.round((end - start.getTime()) / 1000));
-  if (sec < 60) return `${sec}s`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m`;
-  const h = Math.floor(min / 60);
-  const remMin = min % 60;
-  if (h < 24) return `${h}h ${remMin}m`;
-  const days = Math.floor(h / 24);
-  return `${days}d ${h % 24}h`;
+  return formatSpanSeconds((end - start.getTime()) / 1000);
 }
