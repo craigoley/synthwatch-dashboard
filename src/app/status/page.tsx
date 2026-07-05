@@ -9,6 +9,7 @@ import { ErrorState, Spinner } from "@/components/states";
 import { componentStatus, deriveSystemStatus } from "@/lib/status";
 import { PropertyStatusSection } from "@/components/status-board";
 import { EgressStabilitySection } from "@/components/egress-stability";
+import { RegionHealthSection } from "@/components/region-health";
 import { formatLocalDateTime, formatRelative, formatSpan } from "@/lib/format";
 import type { CheckWithStatus, IncidentWithCheck, SlaWindow } from "@/lib/types";
 
@@ -144,6 +145,11 @@ export default function StatusPage() {
             {/* ★ By-property rollup (§A3) — the stakeholder-legible view (wegmans.com / meals2go up? uptime?),
                 above the per-check Components. Renders nothing when the /status endpoint or properties are absent. */}
             <PropertyStatusSection />
+
+            {/* ★ Region health (F-4 pair, api #168) — the visible alarm for a silently-dead probe region
+                (quorum keeps checks green when a region stops reporting; only freshness shows it). Above
+                egress: a dead region outranks IP-rotation info. Self-hides until the endpoint deploys. */}
+            <RegionHealthSection />
 
             {/* ★ Egress stability — the Wegmans allowlist artifact + a live SNAT-rotation early-warning.
                 Self-hides until GET /reports/egress is deployed (404 → null). */}

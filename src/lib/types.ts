@@ -720,6 +720,23 @@ export interface EgressReport {
   regions: EgressRegion[];
 }
 
+// ─── region health (GET /reports/region-health, api #168 — the F-4 pair) — per-region run FRESHNESS.
+// The visible alarm for a silently-dead region: quorum semantics hide a region that stopped reporting
+// (the remaining regions keep the checks green), so staleness must be surfaced on its own, at a glance.
+// Status is the API's verdict (its thresholds), rendered verbatim — the dashboard never re-derives it.
+export type RegionHealthStatus = "fresh" | "stale" | "never_reported";
+export interface RegionHealthRow {
+  region: string;
+  /** Last run seen from this region; null when never_reported (a configured region with NO data — never 0/now). */
+  last_run_at: string | null;
+  /** Seconds since last_run_at (server-computed); null when never_reported. */
+  age_seconds: number | null;
+  status: RegionHealthStatus;
+}
+export interface RegionHealthReport {
+  regions: RegionHealthRow[];
+}
+
 // ─── §D1 monitor-trust scorecard (GET /reports/trust, /reports/trust/{id}) — the "every green with its proof"
 // artifact. NO composite score: measured facts + an auditable, rule-derived chip (the rule is a named constant,
 // rendered as a legend). redTest is an explicit "not captured" gap. ──────────────────────────────────────────

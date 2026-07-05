@@ -49,6 +49,7 @@ import {
   getSloReport,
   getDeploys,
   getEgressReport,
+  getRegionHealth,
   getTrustReport,
   getTrustDetail,
   getStatus,
@@ -113,6 +114,7 @@ const keys = {
   sloReport: (w: string, t: string) => ["report-slo", w, t] as const,
   deploys: (h: string, w: string) => ["deploys", h, w] as const,
   egress: (w: string) => ["report-egress", w] as const,
+  regionHealth: () => ["report-region-health"] as const,
   trust: (w: string) => ["report-trust", w] as const,
   trustDetail: (id: number, w: string) => ["report-trust", id, w] as const,
   status: () => ["status-page"] as const,
@@ -526,6 +528,17 @@ export function useDeploys(host: string | null, window: ReportWindow = "30d") {
 // without a reload. 404 → null (self-hide); never retried on error.
 export function useEgress(window: EgressWindow = "all") {
   return useSWR(keys.egress(window), () => getEgressReport(window), {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+    refreshInterval: 60000,
+  });
+}
+
+// Region health (GET /reports/region-health, api #168 — the F-4 pair). A LIVE alarm for a silently-dead
+// region, so it polls on the egress cadence (the /status regional-ops precedent) — a region going stale
+// must surface without a reload. Polling panel → no staleness stamp (the #178 rule). 404 → null (self-hide).
+export function useRegionHealth() {
+  return useSWR(keys.regionHealth(), () => getRegionHealth(), {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
     refreshInterval: 60000,
