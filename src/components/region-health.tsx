@@ -2,7 +2,7 @@
 
 import { useRegionHealth } from "@/lib/client";
 import { ErrorState } from "@/components/states";
-import { formatDuration, formatRelative } from "@/lib/format";
+import { formatRelative, formatSpanSeconds } from "@/lib/format";
 import type { RegionHealthRow, RegionHealthStatus } from "@/lib/types";
 
 /**
@@ -24,17 +24,19 @@ const STATUS_META: Record<
   RegionHealthStatus,
   { label: string; tone: "pass" | "warn" | "fail"; blurb: (r: RegionHealthRow) => string }
 > = {
+  // Ages use formatSpanSeconds (coarse "4h 0m" / "2d 4h" — the incidents-span vocabulary), NOT the
+  // ms-scale formatDuration, so an hour-scale alarm never reads "240m 00s" beside a "4h ago" suffix.
   fresh: {
     label: "fresh",
     tone: "pass",
-    blurb: (r) => (r.age_seconds != null ? `last run ${formatDuration(r.age_seconds * 1000)} ago` : "reporting"),
+    blurb: (r) => (r.age_seconds != null ? `last run ${formatSpanSeconds(r.age_seconds)} ago` : "reporting"),
   },
   stale: {
     label: "STALE — region silent",
     tone: "fail",
     blurb: (r) =>
       r.age_seconds != null
-        ? `no runs for ${formatDuration(r.age_seconds * 1000)}${r.last_run_at ? ` (last ${formatRelative(r.last_run_at)})` : ""}`
+        ? `no runs for ${formatSpanSeconds(r.age_seconds)}${r.last_run_at ? ` (last ${formatRelative(r.last_run_at)})` : ""}`
         : "no recent runs",
   },
   never_reported: {
