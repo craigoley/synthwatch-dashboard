@@ -40,21 +40,32 @@ export interface ReportRow {
   incident_window_count: number | null;
   /** Signed days to TLS cert expiry (SSL checks only; null for everything else — never 0 as a sentinel). */
   last_cert_days_remaining: number | null;
+  /** Per-check cert warn threshold (days) — the badge warns exactly when the runner does; null → runner's ?? 30. */
+  cert_expiry_warn_days: number | null;
   spark: SparkPoint[];
 }
 
 /**
  * TLS cert runway badge. SSL checks only — `null` (non-cert) renders NOTHING (gaps-not-zeros: never a
  * misleading "0 days"). For a cert check, 0 = expires today, negative = already expired (both real, loud).
- * Thresholds use the status tokens: < 7d fail, < 14d warn, else pass.
+ *
+ * Tones MIRROR the runner's cert states so the dashboard never silently disagrees with it: the runner emits
+ * a `warn` run (and emails the alert) once days-remaining <= the per-check `cert_expiry_warn_days` (its own
+ * `?? 30` default), and a cert is only a hard fail once it has ACTUALLY expired — there is no separate runner
+ * "fail-soon" cert tier. So: expired (< 0) → fail, inside the per-check warn window → warn, else pass. We read
+ * the check's own `warnDays` (NOT a hardcoded 14) — otherwise a cert ~20d out would show green here while the
+ * runner had already warned+emailed (the #175/#177 false-green class). The exact day count stays in the label,
+ * so urgency is legible without inventing a red tier the runner doesn't have.
  */
-function CertRunway({ days }: { days: number | null }) {
+function CertRunway({ days, warnDays }: { days: number | null; warnDays: number | null }) {
   if (days == null) return null;
-  const tone = days < 7 ? "fail" : days < 14 ? "warn" : "pass";
+  const warnAt = warnDays ?? 30; // mirror the runner's `cert_expiry_warn_days ?? 30`
+  const tone = days < 0 ? "fail" : days <= warnAt ? "warn" : "pass";
   const label = days < 0 ? "cert expired" : days === 0 ? "cert expires today" : `cert ${days}d`;
   return (
     <span
       data-testid="cert-runway"
+      data-tone={tone}
       className="sw-mono inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px]"
       style={{
         color: `var(--color-${tone})`,
@@ -140,7 +151,7 @@ export function MonitorReportCard({
               <span className="block truncate text-sm font-medium text-[var(--color-ink)]">{row.name}</span>
               <span className="flex flex-wrap items-center gap-1.5">
                 <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">{row.kind}</span>
-                <CertRunway days={row.last_cert_days_remaining} />
+                <CertRunway days={row.last_cert_days_remaining} warnDays={row.cert_expiry_warn_days} />
                 <TagChips tags={row.tags} />
               </span>
             </span>
