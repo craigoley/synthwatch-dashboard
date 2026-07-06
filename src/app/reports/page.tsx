@@ -97,6 +97,7 @@ export default function ReportsPage() {
       return {
         check_id: c.id,
         last_cert_days_remaining: c.last_cert_days_remaining,
+        cert_expiry_warn_days: c.cert_expiry_warn_days,
         name: c.name,
         kind: c.kind,
         current_status: c.current_status,

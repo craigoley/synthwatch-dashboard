@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 import { mockApi, defaultWorld } from "./mock";
-import { slaResponse, slaRow, defaultChecks } from "./fixtures";
+import { slaResponse, slaRow, defaultChecks, listItem } from "./fixtures";
 
 // Reports: per-monitor report CARDS sourced from the live checks list + SLA (+ optional rollup-report
 // enrichment), so a monitor that has data always renders. ★ The old list bound only to /reports/availability
@@ -223,7 +223,7 @@ test.describe("reports — cert runway (P3, Monitors tab)", () => {
 
     const cert = page.getByTestId("report-3").getByTestId("cert-runway");
     await expect(cert).toBeVisible();
-    await expect(cert).toContainText("cert 12d"); // 12 < 14 → warn tone
+    await expect(cert).toContainText("cert 12d"); // 12 <= 30 (check 3's cert_expiry_warn_days) → warn tone
     // a non-cert check (id 1, http) renders NO cert badge — absence, never a misleading "0 days"
     await expect(page.getByTestId("report-1").getByTestId("cert-runway")).toHaveCount(0);
   });
@@ -237,6 +237,43 @@ test.describe("reports — cert runway (P3, Monitors tab)", () => {
     const cb = await page.getByTestId("report-3").boundingBox();
     const nb = await page.getByTestId("report-1").boundingBox();
     expect(cb!.y).toBeLessThan(nb!.y);
+  });
+
+  // ★ Cert-threshold divergence (the #175/#177 false-green class): the runner warns + emails when a cert has
+  // <= the per-check `cert_expiry_warn_days` (default 30) days remaining. The badge must warn EXACTLY then —
+  // reading the check's own warn_days, never a hardcoded number — so the dashboard never shows green while the
+  // runner already knows the cert is expiring. (Verified live: check 10 warned at 29-30d on 2026-06-23, which
+  // the old hardcoded-14d badge would have rendered green.)
+  //
+  // MUST-GO-RED: with the old `days < 14` hardcoded threshold, the 20d/warn-30 cert below renders "pass" (green)
+  // — this test reds. It only passes when the badge reads the per-check cert_expiry_warn_days.
+  test("cert badge warns exactly when the runner does — reads per-check cert_expiry_warn_days, not a hardcoded 14", async ({ page }) => {
+    const w = defaultWorld();
+    // Four SSL monitors that isolate the threshold logic:
+    w.checks = [
+      // ~20d out, default warn window (30): runner has WARNED → badge must be warn, NOT the old hardcoded-14 green.
+      listItem({ id: 40, name: "cert 20d / warn 30", kind: "ssl", currentStatus: "warn", certExpiryWarnDays: 30, lastCertDaysRemaining: 20 }),
+      // one day inside the window (warn_days - 1 = 29): warn.
+      listItem({ id: 41, name: "cert 29d / warn 30", kind: "ssl", currentStatus: "warn", certExpiryWarnDays: 30, lastCertDaysRemaining: 29 }),
+      // well outside the window (90d): healthy → pass (honest green — the runner is green here too).
+      listItem({ id: 42, name: "cert 90d / warn 30", kind: "ssl", currentStatus: "pass", certExpiryWarnDays: 30, lastCertDaysRemaining: 90 }),
+      // SAME 20d, but a CUSTOM narrow warn_days of 10: outside its window → pass. Same day count, opposite tone
+      // as #40 — only possible if the badge reads the PER-CHECK value (a hardcoded threshold would tie them).
+      listItem({ id: 43, name: "cert 20d / warn 10", kind: "ssl", currentStatus: "pass", certExpiryWarnDays: 10, lastCertDaysRemaining: 20 }),
+    ];
+    await mockApi(page, w);
+    await page.goto(MONITORS);
+
+    const tone = (id: number) => page.getByTestId(`report-${id}`).getByTestId("cert-runway");
+
+    // ~20d out with the default 30d warn window → WARN (the divergence the runner already flagged; old code: green).
+    await expect(tone(40)).toHaveAttribute("data-tone", "warn");
+    // warn_days - 1 (29d) → warn.
+    await expect(tone(41)).toHaveAttribute("data-tone", "warn");
+    // 90d out → healthy pass.
+    await expect(tone(42)).toHaveAttribute("data-tone", "pass");
+    // ★ same 20d but warn_days=10 → pass: proves the badge respects the per-check value, not any fixed number.
+    await expect(tone(43)).toHaveAttribute("data-tone", "pass");
   });
 });
 
