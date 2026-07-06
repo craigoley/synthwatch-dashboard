@@ -370,7 +370,9 @@ export default function CheckDetailPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         {/* min-w-0: flex items default to min-width:auto, so any long unbreakable child (the target URL,
             a long name) would blow this out past the viewport instead of shrinking — the mobile
-            horizontal-scroll bug. Letting it shrink is what makes the children's truncate engage. */}
+            horizontal-scroll bug. Letting it shrink is what makes the children's truncate engage.
+            THIS wrapper's min-w-0 is the load-bearing constraint — the target-URL <a>'s own min-w-0 is
+            redundant; e2e/detail.spec.ts:157-179 reds only if THIS one is removed, not the <a>'s. */}
         <div className="min-w-0">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">{check.name}</h1>
