@@ -29,12 +29,22 @@ import { dirname, join } from "node:path";
 /** Strip `-- line` and block comments so a commented-out CHECK / prose enum list is never falsely parsed. */
 export const stripSqlComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/--[^\n]*/g, "");
 
+/**
+ * Escape regex metacharacters so an interpolated identifier is matched LITERALLY. The interpolants below
+ * (table / column / union names, from the committed enum-coverage.json manifest) are meant to be literals,
+ * not patterns — this is defense-in-depth so a manifest entry containing a metachar (e.g. a `$` or `.`)
+ * can't corrupt the constructed regex. (Normal SQL identifiers / TS type names have no metachars, so this
+ * is a no-op for every current entry.)
+ */
+export const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /** The body of a `CREATE TABLE <table> ( ... \n);` block, or null if the table isn't found. */
 export function tableBody(schemaText, table) {
   const clean = stripSqlComments(schemaText);
   // Non-greedy up to the first `\n);` — a table's terminating close is on its own line, whereas a CHECK's `)`
-  // is inline, so this delimits the block without a full paren matcher.
-  const re = new RegExp(`CREATE TABLE\\s+(?:IF NOT EXISTS\\s+)?"?${table}"?\\s*\\(([\\s\\S]*?)\\n\\s*\\);`, "i");
+  // is inline, so this delimits the block without a full paren matcher. `table` is escaped (literal identifier).
+  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- CI-only guard; `table` is a committed enum-coverage.json identifier, escapeRegExp-escaped (literal). No user input.
+  const re = new RegExp(`CREATE TABLE\\s+(?:IF NOT EXISTS\\s+)?"?${escapeRegExp(table)}"?\\s*\\(([\\s\\S]*?)\\n\\s*\\);`, "i");
   const m = clean.match(re);
   return m ? m[1] : null;
 }
@@ -44,14 +54,16 @@ export function tableBody(schemaText, table) {
 export function checkValues(schemaText, table, column) {
   const body = tableBody(schemaText, table);
   if (body == null) return null;
-  const m = body.match(new RegExp(`\\b${column}\\s+IN\\s*\\(([^)]*)\\)`, "i"));
+  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- CI-only guard; `column` is a committed enum-coverage.json identifier, escapeRegExp-escaped (literal). No user input.
+  const m = body.match(new RegExp(`\\b${escapeRegExp(column)}\\s+IN\\s*\\(([^)]*)\\)`, "i"));
   if (!m) return null;
   return [...m[1].matchAll(/'([^']*)'/g)].map((x) => x[1]);
 }
 
 /** The members of a TS string union `type <Union> = "a" | "b" | ...;`, or null if the type isn't found. */
 export function unionValues(fileText, unionName) {
-  const m = fileText.match(new RegExp(`type\\s+${unionName}\\s*=\\s*([^;]*);`));
+  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- CI-only guard; `unionName` is a committed enum-coverage.json TS type name, escapeRegExp-escaped (literal). No user input.
+  const m = fileText.match(new RegExp(`type\\s+${escapeRegExp(unionName)}\\s*=\\s*([^;]*);`));
   if (!m) return null;
   return [...m[1].matchAll(/["']([^"']*)["']/g)].map((x) => x[1]);
 }
