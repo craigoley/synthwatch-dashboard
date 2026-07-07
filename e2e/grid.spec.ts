@@ -135,3 +135,92 @@ test.describe("status grid — tag filter", () => {
     await expect(page.locator('a[href="/checks/1"]')).toBeVisible();
   });
 });
+
+// ★ Settled-vs-running split: the rail + health pill read the last SETTLED outcome (from spark), NOT
+// current_status — so a generally-passing monitor stays GREEN while a run is in flight. The live run
+// shows via a separate pulsing indicator, and the incident/regional overrides still win over it.
+test.describe("status grid — settled outcome vs running", () => {
+  // check 1 (single-location "API health"): currently running, last settled run PASSED.
+  function runningButPassing() {
+    const w = defaultWorld();
+    w.checks = w.checks.map((c) =>
+      c.id === 1
+        ? {
+            ...c,
+            currentStatus: "running",
+            openIncidentCount: 0,
+            spark: [
+              { t: "2026-07-01T10:00:00Z", d: 210, s: "pass" }, // last settled outcome
+              { t: "2026-07-01T10:05:00Z", d: null, s: "running" }, // the in-flight run (newest)
+            ],
+          }
+        : c,
+    );
+    return w;
+  }
+
+  test("a running monitor keeps its GREEN rail + PASS pill, with a separate running indicator", async ({ page }) => {
+    await mockApi(page, runningButPassing());
+    await page.goto("/");
+
+    const card = page.locator('a[href="/checks/1"]');
+    await expect(card).toBeVisible();
+
+    // ★ rail stays green (settled pass), NOT running-blue. (Must-go-red: pre-fix the rail reads
+    //   current_status="running" → var(--color-running), so both assertions fail.)
+    const style = await card.getAttribute("style");
+    expect(style).toContain("var(--color-pass)");
+    expect(style).not.toContain("var(--color-running)");
+
+    // pill reads the settled PASS, never RUNNING
+    await expect(card.getByText("Pass", { exact: true })).toBeVisible();
+    await expect(card.getByText("Running", { exact: true })).toHaveCount(0);
+
+    // the live run shows via a SEPARATE affordance (does not recolor rail/pill)
+    await expect(card.getByTestId("card-running-indicator")).toBeVisible();
+  });
+
+  test("a running monitor WITH an open incident still shows RED (override preserved)", async ({ page }) => {
+    const w = runningButPassing();
+    w.checks = w.checks.map((c) =>
+      c.id === 1 ? { ...c, openIncidentCount: 1, maxOpenSeverity: "critical" } : c,
+    );
+    await mockApi(page, w);
+    await page.goto("/");
+
+    const card = page.locator('a[href="/checks/1"]');
+    const style = await card.getAttribute("style");
+    expect(style).toContain("var(--color-fail)"); // incident override wins over settled + running
+    expect(style).not.toContain("var(--color-running)");
+    await expect(card.getByTestId("card-running-indicator")).toBeVisible(); // still flagged as in-flight
+  });
+
+  test("a running monitor with NO settled run in the window falls back to idle (not a fake pass)", async ({ page }) => {
+    const w = defaultWorld();
+    w.checks = w.checks.map((c) =>
+      c.id === 1
+        ? { ...c, currentStatus: "running", openIncidentCount: 0, spark: [{ t: "2026-07-01T10:05:00Z", d: null, s: "running" }] }
+        : c,
+    );
+    await mockApi(page, w);
+    await page.goto("/");
+
+    const card = page.locator('a[href="/checks/1"]');
+    const style = await card.getAttribute("style");
+    expect(style).toContain("var(--color-idle)"); // no settled outcome yet → idle, never a fabricated green
+    expect(style).not.toContain("var(--color-running)");
+    await expect(card.getByTestId("card-running-indicator")).toBeVisible();
+  });
+
+  test("a NON-running settled check is unchanged: green rail + PASS pill even with empty spark (no regression)", async ({ page }) => {
+    // check 1 default is current_status "pass" with an empty spark window — must still read current_status,
+    // not fall back to idle. This locks the no-regression fast-path.
+    await mockApi(page, defaultWorld());
+    await page.goto("/");
+    const card = page.locator('a[href="/checks/1"]');
+    const style = await card.getAttribute("style");
+    expect(style).toContain("var(--color-pass)");
+    await expect(card.getByText("Pass", { exact: true })).toBeVisible();
+    await expect(card.getByTestId("card-running-indicator")).toHaveCount(0); // not running → no indicator
+  });
+});
