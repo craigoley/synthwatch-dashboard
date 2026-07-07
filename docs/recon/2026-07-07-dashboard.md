@@ -285,3 +285,98 @@ write seams, or count `getTrustReport`+`getTrustDetail` as one) and the totals s
 to anchor next does not. Anchored ≠ "cannot drift": a fixture is a point-in-time capture; several fixtures
 carry stale-snapshot risk if `capture:contracts` hasn't been re-run against live (the class `capture.mjs`
 comments call out for deploys/SLO).
+
+---
+
+## Q4 — Silent-wrong residue (session-4 sweep completeness)
+
+**ANSWER (ground truth): The specific #175/#177/#179 class — a fetch-fail or nullish read rendering
+healthy/empty/green WITHOUT a loud error/stale state — is FULLY SWEPT at the seam and render layers. No
+residue found there. The BROADER #195 class (a hardcoded dashboard threshold disagreeing with a
+per-check/runner-authoritative value) has TWO live instances beyond cert: `availabilityTone` (99.9/99 band
+vs a check's own SLO target) and `cwvTone` (web.dev CWV bands vs a check's `perf_budget_*`). Both are
+lower-severity than the cert case — they band REAL data rather than hide an outage — and both are
+contingent (INFERRED) on whether the runner treats SLO-target / perf-budget as authoritative.**
+
+### OBSERVED — the fetch-fail / nullish fake-quiet class is swept
+
+- **Every read-seam mapper uses the mandated 404-hide / else-throw shape.** Sampled 7 of the drift-risk
+  seams (`getStatus` `api-client.ts:1914`, `getRegionHealth` `:1814`, `getMttrReport` `:1992`,
+  `getTrustReport` `:1879`, `getEgressReport` `:1781`, `getReconcilePlan` `:1205`, `getAvailabilityReport`
+  `:1611`) — each is `catch (err) { if (ApiRequestError && status===404) return null; throw err; }`. Non-404
+  (500/network) THROWS → loud `ErrorState`, never a silent blank. Falsifier (run): `git grep -E
+  "catch\s*\{[^}]*return (null|\[\]|\{\})"` and `catch()\s*\{\s*\}` over `src/` → **no hits**. No mapper
+  swallows a non-404 into a healthy/empty value.
+- **The 4 bare `catch {}` sites are benign non-seam utilities:** perf-timing enrichment
+  (`api-client.ts:140`), `apiUrl` URL-parse fallback (`:202`), non-JSON error-body parse *inside* the error
+  path (`:272`, the error still throws after), best-effort `authLogout` (`:2131`). None render
+  healthy-on-failure.
+- **The flagship /status false-green is fixed AND page-guarded.** `src/app/status/page.tsx:109`:
+  `error && !checks ? <ErrorState testId="status-load-error" …>` — with a comment (`:111-112`) citing the
+  exact #175 lesson ("deriveSystemStatus([]) returns 'operational', so swallowing the error to [] [shows a
+  green banner]"). `deriveSystemStatus` (`src/lib/status.ts:125`) is computed but only RENDERED in the
+  post-guard branch, so the green banner cannot show on fetch error.
+- **`componentStatus` returns `{label:"No data", token:"idle"}` for a null status** (`status.ts:152-153`) —
+  never a fake green for a never-run check. And no verdict path coerces an unknown status to green:
+  falsifier (run) `git grep -E '\?\? "pass"|\|\| "pass"|default:.*pass'` → the only `"pass"` defaults are
+  token-table definitions + `api-client.ts:576` (a synthesized chart datapoint explicitly "not read by the
+  charts"), not verdict coercion. A new/unknown runner enum value cannot fake-green.
+
+### OBSERVED — one minor rollup residue (LOW)
+
+`deriveSystemStatus` (`status.ts:127-137`) only flips to `partial`/`major` on `down`/`degraded`/incidents; a
+check whose `current_status === null` (never ran) contributes nothing. So a fleet where EVERY enabled check
+has never run rolls up to **"All Systems Operational"** (green) even though per-component each shows "No
+data". Edge case (brand-new fleet), and null ≠ down — but the rollup banner is technically greener than the
+components it summarizes. Not the error-swallow class; a rollup-of-nulls gap.
+
+### OBSERVED — #195-class hardcoded-threshold residue (the explicit ask)
+
+The #195 cert fix removed a hardcoded `<14d` warn that disagreed with the runner's per-check
+`cert_expiry_warn_days`. Two more hardcoded threshold bands exist that can disagree with a per-check
+authoritative value:
+
+1. **`availabilityTone` — `status.ts:69-73`** (LIVE at `monitor-report-card.tsx:162`, `sla.tsx:21`):
+   ```
+   if (pct >= 99.9) return "pass";
+   if (pct >= 99)   return "warn";
+   return "fail";
+   ```
+   A GLOBAL hardcoded 99.9/99 band, independent of the check's own **SLO target** (`Slo.target`,
+   `types.ts:199`, a per-check fraction e.g. `0.99`). A check with `slo.target = 0.99` showing 99.5% 24h
+   availability renders **amber (warn)** on the card/SLA stat via `availabilityTone`, while its authoritative
+   `SloPanel`/`fleet-slo` (which use `slo.target`) read **green — meeting target**. Same page, two
+   availability representations, opposite tone. This is the #195 pattern (hardcoded band vs per-check
+   target). Falsifier: a check with `slo.target=0.99` + `availability_pct=99.5` → `availabilityTone`→"warn"
+   yet `budgetTone`/SLO→pass (deterministic from the code; no live call needed).
+   **Severity MED-LOW:** it colors a stat, it does not HIDE an outage (the run-status badge + incidents are
+   the primary, authoritative signals and are separate), so it is a threshold *inconsistency*, not a
+   fake-green concealing a known-down system.
+
+2. **`cwvTone` — `status.ts:85-101`** (standard web.dev CWV bands: LCP 2500/4000, CLS 0.1/0.25, …):
+   independent of the check's per-check **`perf_budget_lcp_ms` / `perf_budget_transfer_bytes`**
+   (`types.ts`, rendered as a config chip at `checks/[id]/page.tsx:477`). A browser check with a stricter
+   custom budget (`perf_budget_lcp_ms = 2000`) whose run measures LCP 2400ms shows **green** (≤2500 standard)
+   despite breaching its own configured budget. **Severity LOW:** the CWV bands are documented,
+   industry-standard, and sourced (`status.ts:78`); whether this is "wrong" depends on whether the runner
+   emits a warn/fail run on budget breach (if it does, the run-status badge already carries the authoritative
+   verdict and `cwvTone` is secondary coloring).
+
+### VERDICT
+
+- **#175/#177/#179 class (error/nullish → fake healthy without a loud state): FULLY SWEPT.** No residue at
+  the mapper or render layer; the flagship /status is fixed and page-guarded; unknown enums cannot
+  fake-green. One LOW rollup-of-nulls gap in `deriveSystemStatus`.
+- **#195 class (hardcoded threshold vs per-check authoritative value): NOT fully swept — two live
+  instances** (`availabilityTone` vs SLO target; `cwvTone` vs `perf_budget_*`), both lower-severity than
+  cert because they band real data rather than conceal an outage.
+
+**Caveat (INFERRED boundary).** Calling the two threshold bands "bugs" assumes the SLO target /
+`perf_budget_*` are meant to be the authoritative verdict for those stats. They may be *intentional*
+general-purpose heuristics (a calm fleet-wide availability hue; the industry CWV standard) that deliberately
+differ from an opt-in per-check target. Confirming requires the runner/API's rule: does the runner emit a
+warn/fail run when availability < SLO target, or when a metric breaches `perf_budget_*`? If yes, the
+run-status badge already carries the truth and these are secondary-coloring inconsistencies (fix = have the
+band read the per-check value where set, defaulting to the global band otherwise — the #195 shape). If no,
+they are pure display conventions and out of scope. **This is the one open question to resolve before
+treating either as a #195-class fix.**
