@@ -183,3 +183,105 @@ the primitive and would need it added (the tag machinery is reusable, but not cu
 **Caveat.** "Rides the tag machinery" is OBSERVED for filter + report group-by. Whether that is *sufficient*
 for the S1/S4 UX (esp. paired prod-vs-preprod drift and an env dimension on `/status`) is a design call,
 not a code fact — flagged as INFERRED above.
+
+---
+
+## Q3 — Contract-harness unanchored-seam count (plan T1.3/T5, numbers contradicted)
+
+**ANSWER (ground truth on `c3feb2b`): of 40 API READ seams, 19 are ANCHORED (a contract test runs the
+real mapper against a captured real fixture) and 21 are UNANCHORED. Neither plan figure matches: "~16
+unanchored" is stale-low; "37 unanchored / 50 total / 13 anchored" over-counts total (it folds in write
+seams and/or query-variants) and under-counts anchored (predates the extended/reports-tag-filter/slo/
+deploys/insight anchors). The true remaining read-seam backlog is 21, but ~8 of those reuse an
+already-anchored mapper or are flat/thin — the genuinely at-risk backlog is ~7 rich/nested seams.**
+
+### Method (how "read seam" is defined — OBSERVED)
+
+A **read seam** = an exported `api-client` function that FETCHES and MAPS an API response into a DTO the UI
+renders. That is exactly what the harness guards (mapper-vs-real-shape drift). Universe = all `GET`
+functions + the two read-like insight `POST`s (`getAiInsights`, `getBaselineDiff`). **Write/mutation seams
+are excluded** (create/update/delete/auth/trigger — 23 of them; they don't map a rendered DTO). Enumerated
+by parsing every `export async function` + its `request()` path in `src/lib/api-client.ts` (script output
+in this session). **Anchored** = the function is invoked in a `contract/*.contract.ts` test that runs it
+against a `contract/real/*.json` fixture.
+
+### OBSERVED — the 19 ANCHORED read seams (fn → contract test)
+
+```
+listChecks             seams                       getMetrics             high-risk-seams
+getCheck               extended-seams              getAvailabilitySeries  high-risk-seams
+getRuns                extended-seams              getSpecCatalog         high-risk-seams, seams
+getIncidents           seams                       listFlows              high-risk-seams
+getIncident            high-risk-seams             getReconcileDrift      seams
+getSla                 seams                       getDeploys             deploys
+getAvailabilityReport  seams, reports-tag-filter   getSloReport           slo-report
+getPerformanceReport   extended-seams, reports-…   getAiInsights          ai-insights
+getNarrative           extended-seams              getBaselineDiff        baseline-diff
+getIncidentBreakdown   reports-tag-filter
+```
+(Non-seam contract files — `enum-coverage`, `probe-echo`, `routing-write`, `run-status-render`,
+`screenshot-proxy`, `trace-proxy`, `breadcrumbs` — test behavior/derivation, not a mapper-vs-fixture seam.
+`getBreadcrumbs` is a client-side derivation in `src/lib/breadcrumbs.ts`, not an API seam. `getAll` in the
+reports tests is `URLSearchParams.getAll("tag")`, not an api-client call.)
+
+### OBSERVED — the 21 UNANCHORED read seams
+
+```
+getStatus            /status                     getTrustReport       /reports/trust
+getRegionHealth      /reports/region-health      getTrustDetail       /reports/trust/{id}
+getMttrReport        /reports/mttr               getEgressReport      /reports/egress
+getReconcilePlan     /reconcile/plan             getDeliveryReadiness /notifications/health
+getSteps             /runs/{id}/steps            getChannelTestStatus /channels/{id}/test/status
+listChannels         /channels                   getRouting           /routing
+getCheckTags         /checks/{id}/tags           getTags              /tags
+getSuggestedKeys     /tags/suggested             getLocations         /locations
+getCheckLocations    /checks/{id}/locations      listIncidents        (paginated /incidents wrapper)
+authMe               /auth/me                    listEditors          /editors
+listAccessRequests   /access-requests
+```
+
+### Reconciling the contradicted plan numbers (INFERRED)
+
+- **"~16 unanchored" (session-1):** stale. Anchoring has since grown to 19 and the read-seam surface to 40.
+- **"37 unanchored / 50 total / 13 anchored" (July-2):** does not match a read-only universe. Best-fit
+  hypothesis: it counted **reads + writes** (40 read + 23 write ≈ 63, or ~50 after collapsing auth/CRUD
+  variants) and predated the `extended-seams`, `reports-tag-filter`, `slo-report`, `deploys`,
+  `ai-insights`, `baseline-diff` anchors (which add ≥6 of today's 19). "13 anchored" is consistent with a
+  pre-those-PRs snapshot. **Falsifier for my number:** re-run the enumeration script on `c3feb2b`
+  (reproduced above) — 40/19/21 for read seams under the stated definition.
+
+### Top UNANCHORED by drift risk (ranked; nested/rich or already-burned first)
+
+1. **`getStatus` → `/status`** — HIGHEST. `StatusPage` is nested (`StatusProperty[]` + `StatusIncident[]`,
+   `types.ts:540-558`) and it powers the flagship `/status` board — the exact surface of the #175/#177/#179
+   false-green class. A shape drift here re-opens that class with no harness net.
+2. **`getRegionHealth` → `/reports/region-health`** — HIGH. NEW seam (api #168 F-4 pair, shipped #192/#193).
+   It is wired into `capture.mjs` SEAMS (`capture.mjs:40`) but its fixture is **not even captured yet**
+   (falsifier run: `ls contract/real/reports_region_health.json` → ABSENT) and there is no contract test.
+   Nested per-region rollup. Config-present, fixture-absent, unanchored.
+3. **`getMttrReport` → `/reports/mttr`** — HIGH. Nested (`MttrFleet` + `MttrClassificationBucket[]` +
+   `MttrCheckRow[]`, `types.ts:570-590`); classification buckets are enum-adjacent (drift class of the
+   RowStatus dup). No fixture, no test.
+4. **`getTrustReport` / `getTrustDetail` → `/reports/trust`** — MED-HIGH. Scored trust breakdown, nested
+   factors; two endpoints, zero coverage.
+5. **`getEgressReport` → `/reports/egress`** — MED. Per-IP nested series; powers the egress-stability panel.
+6. **`getReconcilePlan` → `/reconcile/plan`** — MED. Nested dry-run plan; sibling of the ANCHORED
+   `getReconcileDrift`, but the plan DTO is a distinct richer shape (`api-client.ts:1192`).
+7. **`getSteps` → `/runs/{id}/steps`** — MED. Nested `RunStep[]` (`types.ts:274`); the multistep chain panel.
+
+Lower risk (dedup / flat): `listIncidents` reuses the anchored `mapIncident` (its `/incidents` shape is
+covered via `getIncidents`); `getTags`/`getSuggestedKeys`/`getCheckTags`/`getCheckLocations`/`getLocations`
+are flat (`{key,value}` / `string[]`); `authMe`/`listEditors`/`listAccessRequests` are thin auth/admin lists.
+
+### VERDICT
+
+True remaining harness backlog = **21 unanchored read seams**, but the **actionable** backlog is the ~7
+rich/nested ones above — led by **`getStatus`** (flagship, prior false-green class) and **`getRegionHealth`**
+(new, fixture not even captured). Recommended next anchors, in order: `getStatus`, `getRegionHealth`
+(capture the fixture first), `getMttrReport`, `getTrustReport`/`getTrustDetail`, `getEgressReport`.
+
+**Caveat.** The 40/19/21 split is exact for the stated read-seam definition. Widen the definition (count
+write seams, or count `getTrustReport`+`getTrustDetail` as one) and the totals shift — the *ranking* of what
+to anchor next does not. Anchored ≠ "cannot drift": a fixture is a point-in-time capture; several fixtures
+carry stale-snapshot risk if `capture:contracts` hasn't been re-run against live (the class `capture.mjs`
+comments call out for deploys/SLO).
