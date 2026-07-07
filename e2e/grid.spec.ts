@@ -178,6 +178,12 @@ test.describe("status grid — settled outcome vs running", () => {
 
     // the live run shows via a SEPARATE affordance (does not recolor rail/pill)
     await expect(card.getByTestId("card-running-indicator")).toBeVisible();
+
+    // ★ AND a blue cell-bg highlight is present too — all four signals coexist (green rail + PASS pill +
+    //   dot + blue wash). Assert the ACTUAL rendered background contains the running blue (#5aa6f2).
+    await expect(card).toHaveAttribute("data-running", "true");
+    const bg = await card.evaluate((el) => getComputedStyle(el).backgroundImage);
+    expect(bg, "blue running wash present").toContain("0.352941 0.65098 0.94902");
   });
 
   test("a running monitor WITH an open incident still shows RED (override preserved)", async ({ page }) => {
@@ -193,6 +199,12 @@ test.describe("status grid — settled outcome vs running", () => {
     expect(style).toContain("var(--color-fail)"); // incident override wins over settled + running
     expect(style).not.toContain("var(--color-running)");
     await expect(card.getByTestId("card-running-indicator")).toBeVisible(); // still flagged as in-flight
+
+    // ★ precedence: the RED incident rail stays (above), AND the blue running wash still shows — the rail is
+    //   a left-edge pseudo-element painted over the background, so both are visible; blue never hides red.
+    await expect(card).toHaveAttribute("data-running", "true");
+    const bg = await card.evaluate((el) => getComputedStyle(el).backgroundImage);
+    expect(bg, "running wash coexists with the incident rail").toContain("0.352941 0.65098 0.94902");
   });
 
   test("a running monitor with NO settled run in the window falls back to idle (not a fake pass)", async ({ page }) => {
@@ -222,5 +234,11 @@ test.describe("status grid — settled outcome vs running", () => {
     expect(style).toContain("var(--color-pass)");
     await expect(card.getByText("Pass", { exact: true })).toBeVisible();
     await expect(card.getByTestId("card-running-indicator")).toHaveCount(0); // not running → no indicator
+
+    // ★ must-go-red: NO blue highlight when not running. A bug that always-highlights (or keys off the wrong
+    //   field) fails here — the rendered background must NOT contain the running blue.
+    await expect(card).not.toHaveAttribute("data-running", "true");
+    const bg = await card.evaluate((el) => getComputedStyle(el).backgroundImage);
+    expect(bg, "no running wash on a settled card").not.toContain("0.352941 0.65098 0.94902");
   });
 });

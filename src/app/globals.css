@@ -123,6 +123,20 @@
     transform: translateY(-1px);
     box-shadow: 0 8px 30px -16px rgba(0, 0, 0, 0.8);
   }
+  /* A monitor's grid cell WHILE a run is in flight: a low-opacity blue wash (same --color-running token as
+     the pulsing dot) LAYERED over the card gradient. It is additive — the settled left rail (.sw-rail::before,
+     painted on top of this background) and the PASS pill keep their color, so a running monitor reads as
+     "still green/passing, and currently running", never recolored. Composes with the incident/regional rail
+     color (red/amber rail stays visible over the wash). */
+  .sw-card.sw-running-cell {
+    background-image:
+      linear-gradient(
+        0deg,
+        color-mix(in srgb, var(--color-running) 14%, transparent),
+        color-mix(in srgb, var(--color-running) 14%, transparent)
+      ),
+      linear-gradient(180deg, var(--color-panel) 0%, var(--color-bg-elev) 100%);
+  }
 
   /* the colored left rail that encodes status on a card */
   .sw-rail {

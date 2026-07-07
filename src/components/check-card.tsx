@@ -71,7 +71,10 @@ export function CheckCard({
   return (
     <Link
       href={`/checks/${check.id}`}
-      className="sw-card sw-rail block p-4"
+      // ★ sw-running-cell: an ADDITIVE blue background wash while a run is in flight (complements the
+      // sw-dot-running dot at grid scale). It does NOT touch the settled rail/pill — green/pass stays green.
+      className={`sw-card sw-rail block p-4${isRunning ? " sw-running-cell" : ""}`}
+      data-running={isRunning ? "true" : undefined}
       style={{ ["--rail" as string]: rail, opacity: check.enabled ? 1 : 0.62 }}
     >
       <div className="flex items-start justify-between gap-3">
