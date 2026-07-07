@@ -1,0 +1,215 @@
+{
+  "window": "30d",
+  "monitor": {
+    "checkId": 343,
+    "checkName": "algolia-product-search-api",
+    "sensitive": false,
+    "lastGreenAt": "2026-07-07T18:21:12.887919+00:00",
+    "lastRunAt": "2026-07-07T18:21:12.815417+00:00",
+    "runCount": 2374,
+    "retryCount": 3,
+    "retryRate": 0.0013,
+    "retriedPasses": 0,
+    "incidents": {
+      "total": 0,
+      "realOutage": 0,
+      "flakyTransient": 0,
+      "selectorDrift": 0,
+      "environmentRegional": 0,
+      "perfRegression": 0,
+      "unclassified": 0
+    },
+    "redTest": {
+      "captured": false,
+      "testedAt": null,
+      "method": null
+    },
+    "specProvenance": {
+      "executedSha256": null,
+      "specPath": null
+    },
+    "trust": "proven-live"
+  },
+  "retrySeries": [
+    {
+      "day": "2026-06-08",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-09",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-10",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-11",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-12",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-13",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-14",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-15",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-16",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-17",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-18",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-19",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-20",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-21",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-22",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-23",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-24",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-25",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-26",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-27",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-28",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-29",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-06-30",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-07-01",
+      "runCount": 0,
+      "retryCount": 0,
+      "retryRate": null
+    },
+    {
+      "day": "2026-07-02",
+      "runCount": 115,
+      "retryCount": 3,
+      "retryRate": 0.0261
+    },
+    {
+      "day": "2026-07-03",
+      "runCount": 434,
+      "retryCount": 0,
+      "retryRate": 0
+    },
+    {
+      "day": "2026-07-04",
+      "runCount": 457,
+      "retryCount": 0,
+      "retryRate": 0
+    },
+    {
+      "day": "2026-07-05",
+      "runCount": 407,
+      "retryCount": 0,
+      "retryRate": 0
+    },
+    {
+      "day": "2026-07-06",
+      "runCount": 357,
+      "retryCount": 0,
+      "retryRate": 0
+    },
+    {
+      "day": "2026-07-07",
+      "runCount": 604,
+      "retryCount": 0,
+      "retryRate": 0
+    }
+  ]
+}

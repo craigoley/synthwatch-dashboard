@@ -1,0 +1,995 @@
+{
+  "window": "30d",
+  "monitors": [
+    {
+      "checkId": 343,
+      "checkName": "algolia-product-search-api",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:21:12.887919+00:00",
+      "lastRunAt": "2026-07-07T18:21:12.815417+00:00",
+      "runCount": 2374,
+      "retryCount": 3,
+      "retryRate": 0.0013,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 192,
+      "checkName": "Amore: menu page exposes a downloadable menu",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:16:18.250831+00:00",
+      "lastRunAt": "2026-07-07T18:16:18.218355+00:00",
+      "runCount": 1005,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "4b8617894d255663026581f8831f955c8cbe73b67b30e29336ce55129e159484",
+        "specPath": "monitors/amore/amore-menu.spec.ts"
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 193,
+      "checkName": "Amore: reservations OpenTable widget loads",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:26:02.827657+00:00",
+      "lastRunAt": "2026-07-07T18:26:02.794089+00:00",
+      "runCount": 540,
+      "retryCount": 2,
+      "retryRate": 0.0037,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "d2fcfd23a388f61c5108780f8d64072253300d40e6a59a887382a7f0bda00bd0",
+        "specPath": "monitors/amore/amore-reservations.spec.ts"
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 33,
+      "checkName": "API CORS preflight",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:21:15.584903+00:00",
+      "lastRunAt": "2026-07-07T18:21:15.515023+00:00",
+      "runCount": 5698,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 342,
+      "checkName": "kitting-catering-api",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:26:46.367858+00:00",
+      "lastRunAt": "2026-07-07T18:26:46.364295+00:00",
+      "runCount": 1648,
+      "retryCount": 270,
+      "retryRate": 0.1638,
+      "retriedPasses": 8,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "nominal"
+    },
+    {
+      "checkId": 341,
+      "checkName": "kitting-takeout-api",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:16:29.639886+00:00",
+      "lastRunAt": "2026-07-07T18:16:29.607071+00:00",
+      "runCount": 1681,
+      "retryCount": 151,
+      "retryRate": 0.0898,
+      "retriedPasses": 12,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 352,
+      "checkName": "Meals 2 Go: browse a catering menu (anon)",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:26:37.739272+00:00",
+      "lastRunAt": "2026-07-07T18:26:37.735692+00:00",
+      "runCount": 256,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "82ae9cf39f098a7913ff17698294086c7a2167b0fff9315e6d74c405a587e4e5",
+        "specPath": "monitors/wegmans/meals2go-catering-browse.spec.ts"
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 221,
+      "checkName": "Meals 2 Go: browse a cuisine menu (anon)",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:26:48.092683+00:00",
+      "lastRunAt": "2026-07-07T18:26:48.021305+00:00",
+      "runCount": 776,
+      "retryCount": 2,
+      "retryRate": 0.0026,
+      "retriedPasses": 1,
+      "incidents": {
+        "total": 1,
+        "realOutage": 0,
+        "flakyTransient": 1,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "74de19d25f1e3826201b230318fb05865b0d26b1c9f4f622e4ea865400baf706",
+        "specPath": "monitors/wegmans/meals2go-browse-menu.spec.ts"
+      },
+      "trust": "flaky"
+    },
+    {
+      "checkId": 306,
+      "checkName": "meals2go cert expiry",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T17:55:18.75039+00:00",
+      "lastRunAt": "2026-07-07T17:55:18.744715+00:00",
+      "runCount": 131,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 80,
+      "checkName": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:16:34.793626+00:00",
+      "lastRunAt": "2026-07-07T18:16:34.719161+00:00",
+      "runCount": 1741,
+      "retryCount": 4,
+      "retryRate": 0.0023,
+      "retriedPasses": 1,
+      "incidents": {
+        "total": 2,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 2,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "ec1fe9c3b9ab6f26293d32b8762b2dd8553a09113dd3040f5846defd40d695a1",
+        "specPath": "monitors/wegmans/meals2go-cheese-pizza-cart.spec.ts"
+      },
+      "trust": "flaky"
+    },
+    {
+      "checkId": 347,
+      "checkName": "meals2go-dns",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:21:16.968832+00:00",
+      "lastRunAt": "2026-07-07T18:21:16.898712+00:00",
+      "runCount": 2421,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 81,
+      "checkName": "Meals 2 Go: homepage load",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:21:17.526133+00:00",
+      "lastRunAt": "2026-07-07T18:21:17.45671+00:00",
+      "runCount": 3949,
+      "retryCount": 3,
+      "retryRate": 0.0008,
+      "retriedPasses": 1,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "d4fd5873a3c9d065928d1e00d77c28c26adf5bcdcaaa8807692e78a7cb88d02b",
+        "specPath": "monitors/wegmans/meals2go-homepage.spec.ts"
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 194,
+      "checkName": "Next Door: homepage location picker",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:27:14.438266+00:00",
+      "lastRunAt": "2026-07-07T18:27:14.40768+00:00",
+      "runCount": 1373,
+      "retryCount": 2,
+      "retryRate": 0.0015,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "204eb6cb12211dc25574109954dbd024a583f310e282eefbf93e8b014d819a48",
+        "specPath": "monitors/nextdoor/nextdoor-homepage.spec.ts"
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 195,
+      "checkName": "Next Door: reservations OpenTable widget loads",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:27:17.075687+00:00",
+      "lastRunAt": "2026-07-07T18:27:17.071241+00:00",
+      "runCount": 988,
+      "retryCount": 4,
+      "retryRate": 0.004,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "a2aa049c288524e433c91bf6e0a3a36b10d678cfb08f8d55c9efd21fa613d48b",
+        "specPath": "monitors/nextdoor/nextdoor-reservations.spec.ts"
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 59,
+      "checkName": "rca-demo",
+      "sensitive": false,
+      "lastGreenAt": null,
+      "lastRunAt": "2026-07-07T18:21:14.625952+00:00",
+      "runCount": 5621,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 11,
+        "realOutage": 6,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 5
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "unverified"
+    },
+    {
+      "checkId": 4,
+      "checkName": "SynthWatch API health",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:21:13.812668+00:00",
+      "lastRunAt": "2026-07-07T18:21:13.742867+00:00",
+      "runCount": 5937,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 2,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 2
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 222,
+      "checkName": "SynthWatch dashboard homepage",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:27:11.013672+00:00",
+      "lastRunAt": "2026-07-07T18:27:10.982369+00:00",
+      "runCount": 1973,
+      "retryCount": 1,
+      "retryRate": 0.0005,
+      "retriedPasses": 1,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "c3190c5c5c5f16aa1d5d792f204fc98390884681911d8eab102fffeffdcfb93b",
+        "specPath": "monitors/synthwatch/dashboard-homepage.spec.ts"
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 344,
+      "checkName": "wegmansamore-cert",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T17:55:18.997404+00:00",
+      "lastRunAt": "2026-07-07T17:55:18.993328+00:00",
+      "runCount": 93,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 348,
+      "checkName": "wegmansamore-dns",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:21:11.825038+00:00",
+      "lastRunAt": "2026-07-07T18:21:11.754521+00:00",
+      "runCount": 2371,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 350,
+      "checkName": "wegmans-cake-catering-handoff",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:27:19.851697+00:00",
+      "lastRunAt": "2026-07-07T18:27:19.84792+00:00",
+      "runCount": 1001,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 10,
+      "checkName": "Wegmans.com cert",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T17:55:19.148557+00:00",
+      "lastRunAt": "2026-07-07T17:55:19.143736+00:00",
+      "runCount": 523,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 351,
+      "checkName": "wegmans-delivery-pickup-landing",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:27:13.836343+00:00",
+      "lastRunAt": "2026-07-07T18:27:13.805328+00:00",
+      "runCount": 1444,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 346,
+      "checkName": "wegmans-dns",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:21:16.439261+00:00",
+      "lastRunAt": "2026-07-07T18:21:16.368799+00:00",
+      "runCount": 2406,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 2,
+      "checkName": "Wegmans homepage",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:26:09.703967+00:00",
+      "lastRunAt": "2026-07-07T18:26:09.672535+00:00",
+      "runCount": 1543,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 2,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 2
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 223,
+      "checkName": "Wegmans: homepage load",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:26:49.356945+00:00",
+      "lastRunAt": "2026-07-07T18:27:20.213148+00:00",
+      "runCount": 1374,
+      "retryCount": 1,
+      "retryRate": 0.0007,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "45a0646acfd34a3af109d82ca5954e1440b741dadac162b0a1715cee1edcb8ab",
+        "specPath": "monitors/wegmans/homepage-load.spec.ts"
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 345,
+      "checkName": "wegmansnextdoor-cert",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T17:55:19.296859+00:00",
+      "lastRunAt": "2026-07-07T17:55:19.290751+00:00",
+      "runCount": 94,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 349,
+      "checkName": "wegmansnextdoor-dns",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:21:12.350498+00:00",
+      "lastRunAt": "2026-07-07T18:21:12.280503+00:00",
+      "runCount": 2404,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 77,
+      "checkName": "Wegmans: recipe navigation",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:26:46.462925+00:00",
+      "lastRunAt": "2026-07-07T18:26:46.459502+00:00",
+      "runCount": 2149,
+      "retryCount": 1,
+      "retryRate": 0.0005,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 1,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 1,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "6a4ac54807cfd411badb702223924ffe463c07f61b616e0737d3b6521f19bf8c",
+        "specPath": "monitors/wegmans/recipe-nav.spec.ts"
+      },
+      "trust": "flaky"
+    },
+    {
+      "checkId": 220,
+      "checkName": "Wegmans: recipe search",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:26:14.348974+00:00",
+      "lastRunAt": "2026-07-07T18:26:14.277493+00:00",
+      "runCount": 763,
+      "retryCount": 2,
+      "retryRate": 0.0026,
+      "retriedPasses": 1,
+      "incidents": {
+        "total": 1,
+        "realOutage": 0,
+        "flakyTransient": 1,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "273907a03105709cacbc5f6ad1a87ce57a0766ed59d07199ccb8d96c7075e6b0",
+        "specPath": "monitors/wegmans/recipe-search.spec.ts"
+      },
+      "trust": "flaky"
+    },
+    {
+      "checkId": 224,
+      "checkName": "Wegmans: search autocomplete suggestions",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:25:49.970598+00:00",
+      "lastRunAt": "2026-07-07T18:25:49.900274+00:00",
+      "runCount": 753,
+      "retryCount": 38,
+      "retryRate": 0.0505,
+      "retriedPasses": 37,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "b667b94bfe0f2e6ff51fcc5063e42ebe45386e9ae1fc9fa525d7214bdd1fe799",
+        "specPath": "monitors/wegmans/search-autocomplete.spec.ts"
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 74,
+      "checkName": "Wegmans: search → product page",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:20:45.683297+00:00",
+      "lastRunAt": "2026-07-07T18:27:19.303517+00:00",
+      "runCount": 2738,
+      "retryCount": 3,
+      "retryRate": 0.0011,
+      "retriedPasses": 1,
+      "incidents": {
+        "total": 1,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 1,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "468aba87f9b18b65369f3e6319ccfaf08f2d5e095c8c27f981673192d7db689a",
+        "specPath": "monitors/wegmans/search-product.spec.ts"
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 197,
+      "checkName": "Wegmans: shop category browse",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:26:23.488493+00:00",
+      "lastRunAt": "2026-07-07T18:26:23.45654+00:00",
+      "runCount": 1507,
+      "retryCount": 1,
+      "retryRate": 0.0007,
+      "retriedPasses": 1,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "2acc7969dca43ab1044fdb49b0ffa800fcb0a751e37e2bc3775bc01d4ca2d149",
+        "specPath": "monitors/wegmans/shop-category-browse.spec.ts"
+      },
+      "trust": "proven-live"
+    },
+    {
+      "checkId": 196,
+      "checkName": "Wegmans: store locator",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-07T18:20:43.970817+00:00",
+      "lastRunAt": "2026-07-07T18:20:43.953621+00:00",
+      "runCount": 2123,
+      "retryCount": 2,
+      "retryRate": 0.0009,
+      "retriedPasses": 0,
+      "incidents": {
+        "total": 0,
+        "realOutage": 0,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "0aca91e722b4945571013df93778bb1a2d71c3099f55cc4f2a5d14fbf32fc398",
+        "specPath": "monitors/wegmans/store-locator.spec.ts"
+      },
+      "trust": "proven-live"
+    }
+  ]
+}

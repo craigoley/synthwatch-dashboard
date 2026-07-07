@@ -35,6 +35,12 @@ const SEAMS = {
   // etag-only host: the honest "deploy detected, no commit id" branch (sha=null, isSha=false) — real data.
   reports_deploys_meals2go: "/reports/deploys?host=www.meals2go.com&window=90d",
   reports_slo_30d: "/reports/slo?window=30d",
+  // Rich report seams anchored by mttr/trust/egress .contract.ts (recon Q3 — the remaining high-drift-risk
+  // unanchored rollups). Open GETs. trust_detail uses a real check id with monitor data (adjust on re-capture).
+  reports_mttr: "/reports/mttr?window=30d",
+  reports_trust: "/reports/trust?window=30d",
+  reports_trust_detail: "/reports/trust/343?window=30d",
+  reports_egress: "/reports/egress?window=all",
   // Region health (api #168, the F-4 pair) — open GET; the region-health panel's seam. Anchored by
   // region-health.contract.ts (the fail-safe-loud off-taxonomy→stale coercion + per-region rollup).
   reports_region_health: "/reports/region-health",
