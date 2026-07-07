@@ -11,6 +11,15 @@ Repo layout note: dashboard-side facts are OBSERVED and authoritative for *what 
 Claims about the live API's current wire shape are INFERRED from captured fixtures in `contract/real/`
 (which may lag the deployed API) and are flagged as such.
 
+### Verdicts at a glance
+
+| # | Question | Verdict |
+|---|----------|---------|
+| 1 | PerLocationPanel source | **Still on the buggy `runs` prop** (`checks/[id]/page.tsx:170,517`). T6.7 real + OPEN, and **cross-repo**: the detail endpoint + `mapCheck` don't carry `locations` (captured detail fixture omits it) — not a dashboard-only swap. |
+| 2 | Environment surface | **No dedicated env column/filter.** But `env` is already a first-class TAG key (`tag-chips.tsx:11`), `env:prod` the canonical filter example — S1/S4 ride the existing tag machinery, not a new surface. `/status` is the one view lacking the tag primitive. |
+| 3 | Harness seam count | **40 read seams · 19 anchored · 21 unanchored** on `c3feb2b`. Both plan figures are off. Top unanchored by drift risk: `getStatus`, `getRegionHealth` (fixture not even captured), `getMttrReport`, `getTrustReport/Detail`, `getEgressReport`. |
+| 4 | Silent-wrong residue | **Fetch-fail/nullish fake-quiet class FULLY SWEPT** (mappers 404-hide/else-throw; /status page-guarded). **#195 threshold class NOT fully swept:** `availabilityTone` (99.9/99 vs SLO target) + `cwvTone` (CWV std vs `perf_budget_*`) — lower severity; contingent on runner authority. |
+
 ---
 
 ## Q1 — PerLocationPanel consumption (plan T6.7, follow-up to api #178)
