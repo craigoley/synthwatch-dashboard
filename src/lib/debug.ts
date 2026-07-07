@@ -44,6 +44,7 @@ export function isDebugPanelOn(channel: string): boolean {
 /** Emit one [runs-debug] funnel line (no-op unless the "runs" debug channel is enabled). */
 export function runsDebug(stage: string, data?: Record<string, unknown>): void {
   if (!isDebugOn("runs")) return;
-  // intentional, gated diagnostic output
-  console.log(`[runs-debug] ${stage}`, data ?? {});
+  // intentional, gated diagnostic output. `stage` is passed as a SEPARATE argument (not interpolated
+  // into the format string) so a caller-built stage can never be read as a console format specifier.
+  console.log("[runs-debug]", stage, data ?? {});
 }
