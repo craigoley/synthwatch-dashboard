@@ -65,3 +65,84 @@ the current run state, and it overwrites green with blue.
 **Note (not a bug, but relevant):** the incident and regional/degraded overrides are already derived from
 `open_incident_count` / `locations`, i.e. they are already independent of `current_status`. Only the healthy
 branch collapses onto the live state.
+
+---
+
+## Q2 — What drives the status pill text/color, and is there a settled-vs-live split in the model?
+
+**ANSWER (OBSERVED): the pill is driven by the SAME single value as the border — `check.current_status`.
+There is NO distinction in the data model between "last settled status" and "current run state": `"running"`
+is simply one member of the `RunStatus` enum, and `current_status` takes it directly. Border and pill both
+collapse onto that one field, so both flip together when a run starts.**
+
+- `check-card.tsx:107` — the pill: `<StatusBadge status={check.current_status} />`. Same field the rail
+  reads at `:31`.
+- `src/components/status-badge.tsx:12-16` — `StatusBadge` maps `status` through `runStatusMeta` and colors
+  via `TONE_VAR[meta.token]`; `status === "running"` → label "Running", tone `var(--color-running)` (blue).
+- The enum collapses the two concepts — `src/lib/types.ts:121`:
+  ```
+  export type RunStatus = "running" | "pass" | "warn" | "fail" | "error" | "infra_error";
+  ```
+  `running` sits alongside the settled outcomes, so a field typed `RunStatus` cannot express "settled = pass
+  AND currently running" simultaneously — it holds one or the other.
+
+**Falsifier (run):** does the pill read a different field than the border? Both read `check.current_status`
+(`:107` pill, `:31`+`:45` border). Not separate. And is there any second run-status field to split them
+onto? Falsifier over the real payload (`checks.json`): the only run-status field on a check is
+`currentStatus`; the other `*status*` keys are `expectedStatus` and `lastHttpStatus` (both HTTP codes, not
+run states). No `lastSettledStatus` / `lastFinishedStatus`. Confirmed: one collapsed field.
+
+---
+
+## Q3 — Ground-truth data availability: does the card already receive both?
+
+**ANSWER: NO dedicated field. The card receives a single collapsed `current_status` that IS `"running"`
+mid-run — not a settled outcome plus a separate running flag. HOWEVER, the last-settled outcome is
+RECOVERABLE client-side today from `spark[]` (the most recent point whose `s !== "running"`), which is
+present in the real payload. So separating them is a DASHBOARD-ONLY change — no new API field is strictly
+required — subject to a heuristic caveat (spark is a capped recent window).**
+
+### OBSERVED — the DTO the card consumes
+
+The card takes `CheckWithStatus` (`check-card.tsx:3,27`). Its status-bearing fields
+(`src/lib/types.ts`, `CheckWithStatus`):
+```
+current_status: RunStatus | null;   // the collapsed field (→ "running" mid-run)
+last_started_at:  string | null;
+last_finished_at: string | null;    // a finished run exists, but its STATUS value is not carried
+last_error_message: string | null;
+spark: SparkPoint[];                 // per-run history: { t: ISO, d: ms|null, s: RunStatus }
+locations: LocationStatus[];         // per-location latest status (drives regional/degraded)
+```
+There is a `last_finished_at` timestamp but **no `last_finished_status`** — the settled *outcome value* is
+not a first-class field. The only carrier of prior settled outcomes is `spark[].s`.
+
+### OBSERVED — the running state is real, and spark carries the settled history
+
+Falsifier (run) over the captured real list (`contract/real/checks.json`, 21 checks):
+```
+distinct currentStatus: ['fail', 'pass', 'running']        # currentStatus really does take "running"
+sample spark point:     {'t': '2026-07-01T…', 'd': 7016, 's': 'pass'}
+any spark 's' == running anywhere: True                    # spark includes the in-flight run too
+status fields on a check: ['currentStatus','expectedStatus','lastHttpStatus']  # no settled-status field
+```
+So: (a) the API sets `currentStatus="running"` mid-run (this is the flip), and (b) `spark[]` includes
+running points — meaning **last-settled = the most recent `spark` point with `s !== "running"`**. The data
+to keep the border green while a healthy monitor runs is already in the payload the card receives.
+
+### INFERRED — feasibility + caveat
+
+A dashboard-only fix can derive `settledStatus` from `spark` and use `current_status === "running"` purely as
+the running-affordance trigger. Caveats (all INFERRED from the observed shape):
+- `spark` is a **capped recent window**; a brand-new monitor whose only runs are the in-flight one (spark
+  empty or all-`running`) has no settled outcome → the border falls back to idle/no-data. Acceptable (there
+  genuinely is no settled outcome yet), but it means "settled" is a best-effort client derivation, not an
+  authoritative field.
+- `spark` ordering must be confirmed (newest first vs last) before implementing — the fixture point is a
+  single sample; the derivation is "max by `t` where `s !== running`", which is order-independent and robust.
+
+An authoritative alternative is a new API field (Q4 option C) that removes the caveat.
+
+**Note (out of card scope, but adjacent):** the check-DETAIL page consumes `CheckDetail.recent_runs[]` (full
+run objects), so there the last-settled outcome is trivially `recent_runs.find(r => r.status !== "running")`
+without touching spark — the detail view has richer data than the card if the same treatment is wanted there.
