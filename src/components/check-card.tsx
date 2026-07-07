@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import type { CheckWithStatus } from "@/lib/types";
+import type { CheckWithStatus, RunStatus, SparkPoint } from "@/lib/types";
 import { StatusBadge, TONE_VAR } from "@/components/status-badge";
 import { Sparkline } from "@/components/sparkline";
 import { TagChips } from "@/components/tag-chips";
@@ -9,6 +9,26 @@ import { runStatusMeta } from "@/lib/status";
 import { formatCertExpiry, formatDuration, formatRelative } from "@/lib/format";
 
 const RAIL: Record<string, string> = TONE_VAR;
+
+/**
+ * Last SETTLED outcome for the rail + health pill (not current_status) so a generally-passing monitor
+ * stays green while a run is in flight — the live run shows via a separate affordance instead. Pure.
+ *
+ * When current_status is ALREADY settled (not "running") it IS the latest settled outcome — return it
+ * directly, identical to the prior behavior, so non-running cards are unchanged even if `spark` is empty
+ * (no regression). Only while running do we peel back to the most recent non-running `spark` point;
+ * ISO timestamps sort lexically. Null when nothing has settled (brand-new / short-history monitor) → the
+ * caller renders idle, never a fabricated pass.
+ */
+function lastSettledStatus(check: CheckWithStatus): RunStatus | null {
+  if (check.current_status && check.current_status !== "running") return check.current_status;
+  let latest: SparkPoint | null = null;
+  for (const p of check.spark) {
+    if (p.s === "running") continue;
+    if (!latest || p.t > latest.t) latest = p;
+  }
+  return latest?.s ?? null;
+}
 
 /** Compact target label for network checks (dns: "A host"; tcp/ping: "host:port"). */
 function netLabel(check: CheckWithStatus): string {
@@ -28,7 +48,11 @@ export function CheckCard({
   availability?: number | null;
   availabilityInsufficient?: boolean;
 }) {
-  const meta = runStatusMeta(check.current_status);
+  // ★ Rail + pill read the last SETTLED outcome, NOT current_status — so a passing monitor stays green
+  // mid-run. current_status is used only to flag that a run is in flight (a separate indicator below).
+  const settled = lastSettledStatus(check);
+  const isRunning = check.current_status === "running";
+  const meta = runStatusMeta(settled);
   // ★ Regional = some-but-not-all locations failing — a partial blip, visually
   // distinct (amber) from a full outage (red) or healthy (token color).
   const locs = check.locations ?? [];
@@ -99,12 +123,22 @@ export function CheckCard({
           )}
           <TagChips tags={check.tags} className="mt-2" />
         </div>
-        {/* Two distinct facts, labeled so they don't read as contradictory:
-            the badge is the LATEST run's state; the % is 24h historical uptime. */}
+        {/* Two distinct facts, labeled so they don't read as contradictory: the badge is the last
+            SETTLED outcome (a running dot flags an in-flight run); the % is 24h historical uptime. */}
         <div className="flex flex-col items-end gap-1.5">
           <span className="flex items-center gap-1.5">
             <span className="text-[9px] uppercase tracking-wider text-[var(--color-ink-faint)]">latest</span>
-            <StatusBadge status={check.current_status} />
+            {/* Separate running affordance: a pulsing dot that does NOT recolor the rail or the settled
+                pill — the health color stays put while this signals an in-flight run. */}
+            {isRunning && (
+              <span
+                className="sw-dot sw-dot-running"
+                data-testid="card-running-indicator"
+                title="A run is in progress"
+                aria-label="run in progress"
+              />
+            )}
+            <StatusBadge status={settled} />
           </span>
           <span className="flex items-center gap-1.5">
             <span className="text-[9px] uppercase tracking-wider text-[var(--color-ink-faint)]">24h avail</span>
