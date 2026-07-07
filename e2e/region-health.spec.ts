@@ -6,10 +6,11 @@ import { mockApi, defaultWorld } from "./mock";
 // alarm for a silently-dead region. Four honest states, none silent (#175/#177): fresh / stale /
 // never_reported / fetch-error. Absent endpoint (pre-deploy) → the section hides cleanly.
 
+// ★ Field name is `location` — the name the REAL API serves (matched to prod; see region-health.contract.ts).
 const REGIONS = [
-  { region: "eastus2", lastRunAt: "2026-07-05T13:59:00Z", ageSeconds: 60, status: "fresh" },
-  { region: "westus2", lastRunAt: "2026-07-05T10:00:00Z", ageSeconds: 14_400, status: "stale" },
-  { region: "centralus", lastRunAt: null, ageSeconds: null, status: "never_reported" },
+  { location: "eastus2", lastRunAt: "2026-07-05T13:59:00Z", ageSeconds: 60, status: "fresh" },
+  { location: "westus2", lastRunAt: "2026-07-05T10:00:00Z", ageSeconds: 14_400, status: "stale" },
+  { location: "centralus", lastRunAt: null, ageSeconds: null, status: "never_reported" },
 ];
 
 test.describe("region health — the F-4 alarm panel", () => {

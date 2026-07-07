@@ -103,7 +103,7 @@ export interface World {
   /** Egress regions (GET /reports/egress, raw camelCase DTO). Unset → DEFAULT_EGRESS (3 regions, 1 IP each =
    *  stable). Override with a region carrying distinctCount≥2 + multiple ips to exercise the rotation warning. */
   egressRegions?: RawObj[];
-  /** Region health rows (GET /reports/region-health, api #168 — raw camelCase: {region, lastRunAt, ageSeconds,
+  /** Region health rows (GET /reports/region-health, api #168 — raw camelCase: {location, lastRunAt, ageSeconds,
    *  status}). Unset → endpoint 404s (pre-deploy → the F-4 alarm section self-hides). */
   regionHealth?: RawObj[];
   /** Force GET /reports/region-health to 500 — the alarm panel must render a LOUD error, never silently blank. */
