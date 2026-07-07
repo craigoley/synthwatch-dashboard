@@ -146,3 +146,70 @@ An authoritative alternative is a new API field (Q4 option C) that removes the c
 **Note (out of card scope, but adjacent):** the check-DETAIL page consumes `CheckDetail.recent_runs[]` (full
 run objects), so there the last-settled outcome is trivially `recent_runs.find(r => r.status !== "running")`
 without touching spark — the detail view has richer data than the card if the same treatment is wanted there.
+
+---
+
+## Q4 — Minimal change options (scoped, NOT implemented)
+
+All options share one derivation: **`settledStatus` = the most recent `spark` point with `s !== "running"`**
+(fallback `current_status` when it is already settled; fallback idle/no-data when neither exists), and
+**`isRunning` = `current_status === "running"`**. Given Q1-Q3, the running state need not touch the border or
+the health pill — it can ride a separate affordance.
+
+### Option A — border (and pill) read the settled outcome; a running dot/spinner overlays
+
+- **Change:** in `check-card.tsx`, compute `settledStatus` from `spark`; feed the rail from
+  `runStatusMeta(settledStatus).token` instead of `current_status` (keeping the existing incident/regional
+  overrides at `:40-44` untouched). Render the health pill from `settledStatus` too. Add a small pulsing dot
+  when `isRunning` — reuse the existing `sw-dot-running` class (`status.ts:25`, already defined) placed by
+  the "latest" label or on the rail.
+- **Scope: DASHBOARD-ONLY.** No API change. Uses data already in the payload (Q3).
+- **Caveat:** settled is spark-derived (capped window); a never-yet-settled monitor shows idle border while
+  running — correct, but it means the border is a best-effort client derivation.
+
+### Option B — split the pill into a health chip + a separate running badge (border unchanged in this option)
+
+- **Change:** keep `StatusBadge` bound to `settledStatus` (health), and add a distinct small "RUNNING"
+  badge/spinner beside it only when `isRunning`. The "latest" label already exists (`check-card.tsx:106`) —
+  the running badge sits alongside it. Does not, by itself, change the border.
+- **Scope: DASHBOARD-ONLY.**
+- **Note:** A and B **compose** — A fixes the border, B fixes the pill; together they fully satisfy the ask
+  (border stays settled, pill stays health, running is a separate affordance). Recommended pairing.
+
+### Option C — authoritative settled field from the API (`last_settled_status` / `last_finished_status`)
+
+- **Change:** API adds the last *completed* run's status as a first-class field (it already exposes
+  `last_finished_at`, so the value is known server-side). Dashboard reads it directly for border + pill;
+  `current_status` is used only for `isRunning`.
+- **Scope: NEEDS AN API FIELD (cross-repo).** Removes the spark-window caveat from A/B; robust for
+  empty/short spark and independent of spark ordering/cap.
+- **Relationship to A/B:** same UI change as A/B, just sourced from an authoritative field instead of a
+  client derivation. A/B can ship first (dashboard-only) and swap the source to this field later with no UI
+  churn.
+
+### Option D (rejected) — remember the previous status in React state (`usePrevious`)
+
+- Keep border/pill at the last non-running value held in component state. **Rejected:** fragile — state is
+  lost on remount, navigation, list re-sort, or SWR key change, and the grid re-renders/polls frequently.
+  `spark` (A/B) is the robust client source; prefer it.
+
+### Recommendation (scoping only — not a decision to implement)
+
+**A + B, dashboard-only**, is the minimal change that satisfies the ask with no API dependency: border and
+health pill both read the spark-derived `settledStatus`; a `sw-dot-running` spinner shows the live run. If
+the spark-window caveat is unacceptable, layer **Option C** later by swapping the source field — no UI
+rework. Estimated blast radius: `check-card.tsx` only (plus the same treatment optionally mirrored on the
+detail page, which already has `recent_runs[]` for an exact settled value — see Q3 note). No behavior change
+is made in this PR.
+
+---
+
+### Falsifiers run (summary)
+
+- **Border source** — `check-card.tsx:31,40-45,51`: rail = `RAIL[runStatusMeta(current_status).token]`
+  except incident/regional overrides; `current_status` proven to take `"running"` in `checks.json`. ✔
+- **Pill source** — `check-card.tsx:107`: `StatusBadge status={check.current_status}` — same field. ✔
+- **No settled field** — `checks.json` status keys = `currentStatus`, `expectedStatus`, `lastHttpStatus`
+  only; no `lastSettledStatus`. ✔
+- **Settled recoverable from spark** — `checks.json`: `spark[].s` present and includes `"running"`, so
+  "latest `s !== running`" yields the settled outcome, client-side. ✔
