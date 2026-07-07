@@ -8,6 +8,10 @@ updates:
       day: monday
       time: "06:00"
       timezone: Etc/UTC
+    # Wait 7 days before proposing a newly published version — a freshly published
+    # package can be malicious or unstable (supply-chain hardening).
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
     groups:
       npm-minor-and-patch:
@@ -23,6 +27,10 @@ updates:
       day: monday
       time: "06:00"
       timezone: Etc/UTC
+    # Wait 7 days before proposing a newly published version — a freshly published
+    # action can be malicious or unstable (supply-chain hardening).
+    cooldown:
+      default-days: 7
     groups:
       actions-minor-and-patch:
         update-types:
