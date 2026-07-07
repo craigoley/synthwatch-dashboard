@@ -1,0 +1,176 @@
+{
+  "window": "30d",
+  "fleet": {
+    "resolvedCount": 20,
+    "openCount": 1,
+    "totalIncidents": 21,
+    "meanSeconds": 19204,
+    "medianSeconds": 8536,
+    "mttdProxySeconds": 1657,
+    "insufficientData": false
+  },
+  "items": [
+    {
+      "checkId": 80,
+      "checkName": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
+      "kind": "browser",
+      "resolvedCount": 2,
+      "openCount": 0,
+      "meanSeconds": 33561,
+      "medianSeconds": 33561,
+      "mttdProxySeconds": 1800,
+      "insufficientData": false
+    },
+    {
+      "checkId": 2,
+      "checkName": "Wegmans homepage",
+      "kind": "browser",
+      "resolvedCount": 2,
+      "openCount": 0,
+      "meanSeconds": 27910,
+      "medianSeconds": 27910,
+      "mttdProxySeconds": 5400,
+      "insufficientData": false
+    },
+    {
+      "checkId": 59,
+      "checkName": "rca-demo",
+      "kind": "http",
+      "resolvedCount": 10,
+      "openCount": 1,
+      "meanSeconds": 17325,
+      "medianSeconds": 4098,
+      "mttdProxySeconds": 655,
+      "insufficientData": false
+    },
+    {
+      "checkId": 4,
+      "checkName": "SynthWatch API health",
+      "kind": "http",
+      "resolvedCount": 2,
+      "openCount": 0,
+      "meanSeconds": 894,
+      "medianSeconds": 894,
+      "mttdProxySeconds": 600,
+      "insufficientData": false
+    },
+    {
+      "checkId": 221,
+      "checkName": "Meals 2 Go: browse a cuisine menu (anon)",
+      "kind": "browser",
+      "resolvedCount": 1,
+      "openCount": 0,
+      "meanSeconds": null,
+      "medianSeconds": null,
+      "mttdProxySeconds": 3600,
+      "insufficientData": true
+    },
+    {
+      "checkId": 77,
+      "checkName": "Wegmans: recipe navigation",
+      "kind": "browser",
+      "resolvedCount": 1,
+      "openCount": 0,
+      "meanSeconds": null,
+      "medianSeconds": null,
+      "mttdProxySeconds": 1800,
+      "insufficientData": true
+    },
+    {
+      "checkId": 220,
+      "checkName": "Wegmans: recipe search",
+      "kind": "browser",
+      "resolvedCount": 1,
+      "openCount": 0,
+      "meanSeconds": null,
+      "medianSeconds": null,
+      "mttdProxySeconds": 5400,
+      "insufficientData": true
+    },
+    {
+      "checkId": 74,
+      "checkName": "Wegmans: search → product page",
+      "kind": "browser",
+      "resolvedCount": 1,
+      "openCount": 0,
+      "meanSeconds": null,
+      "medianSeconds": null,
+      "mttdProxySeconds": 1200,
+      "insufficientData": true
+    }
+  ],
+  "classification": [
+    {
+      "classification": "real-outage",
+      "count": 6,
+      "pctOfTotal": 0.2857
+    },
+    {
+      "classification": "selector-drift",
+      "count": 3,
+      "pctOfTotal": 0.1429
+    },
+    {
+      "classification": "flaky-transient",
+      "count": 2,
+      "pctOfTotal": 0.0952
+    },
+    {
+      "classification": "environment-regional",
+      "count": 1,
+      "pctOfTotal": 0.0476
+    },
+    {
+      "classification": "unclassified",
+      "count": 9,
+      "pctOfTotal": 0.4286
+    }
+  ],
+  "trend": [
+    {
+      "bucketStart": "2026-06-20T00:00:00+00:00",
+      "resolvedCount": 1,
+      "meanSeconds": 49628
+    },
+    {
+      "bucketStart": "2026-06-21T00:00:00+00:00",
+      "resolvedCount": 1,
+      "meanSeconds": 6192
+    },
+    {
+      "bucketStart": "2026-06-22T00:00:00+00:00",
+      "resolvedCount": 1,
+      "meanSeconds": 1195
+    },
+    {
+      "bucketStart": "2026-06-23T00:00:00+00:00",
+      "resolvedCount": 4,
+      "meanSeconds": 20270
+    },
+    {
+      "bucketStart": "2026-06-24T00:00:00+00:00",
+      "resolvedCount": 6,
+      "meanSeconds": 15254
+    },
+    {
+      "bucketStart": "2026-06-25T00:00:00+00:00",
+      "resolvedCount": 1,
+      "meanSeconds": 1238
+    },
+    {
+      "bucketStart": "2026-06-26T00:00:00+00:00",
+      "resolvedCount": 2,
+      "meanSeconds": 27442
+    },
+    {
+      "bucketStart": "2026-06-29T00:00:00+00:00",
+      "resolvedCount": 2,
+      "meanSeconds": 33561
+    },
+    {
+      "bucketStart": "2026-06-30T00:00:00+00:00",
+      "resolvedCount": 2,
+      "meanSeconds": 15613
+    }
+  ]
+}

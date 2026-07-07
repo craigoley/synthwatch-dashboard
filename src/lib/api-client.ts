@@ -1790,15 +1790,26 @@ export async function getEgressReport(window: EgressWindow = "all"): Promise<Egr
     last_seen: str(d.lastSeen),
     run_count: num(d.runCount),
   });
-  const regions = ((raw?.regions as Record<string, unknown>[]) ?? []).map((r) => ({
-    location: str(r.location),
-    current_ips: ((r.currentIps as unknown[]) ?? []).map((x) => String(x)),
-    distinct_count: num(r.distinctCount),
-    first_seen: str(r.firstSeen),
-    last_seen: str(r.lastSeen),
-    run_count: num(r.runCount),
-    ips: ((r.ips as Record<string, unknown>[]) ?? []).map(mapIp),
-  }));
+  const regions = ((raw?.regions as Record<string, unknown>[]) ?? []).map((r) => {
+    const ips = ((r.ips as Record<string, unknown>[]) ?? []).map(mapIp);
+    // ★ The API sends first/last-seen + run counts PER IP, NOT at the region level (confirmed by the captured
+    // real fixture — region rows carry only location/currentIps/distinctCount/ips). Reading r.firstSeen /
+    // r.lastSeen / r.runCount produced ""/""/0 in prod, so the "N runs · stable since …" region summary was
+    // blank. Derive the rollup from the IPs — sum of runs, earliest first_seen, latest last_seen (ISO strings
+    // sort lexically). The e2e mock sets its region-level values to exactly these aggregates, so its output is
+    // unchanged. Anchored by egress.contract.ts.
+    const firsts = ips.map((x) => x.first_seen).filter(Boolean);
+    const lasts = ips.map((x) => x.last_seen).filter(Boolean);
+    return {
+      location: str(r.location),
+      current_ips: ((r.currentIps as unknown[]) ?? []).map((x) => String(x)),
+      distinct_count: num(r.distinctCount),
+      first_seen: firsts.length ? firsts.reduce((a, b) => (a < b ? a : b)) : "",
+      last_seen: lasts.length ? lasts.reduce((a, b) => (a > b ? a : b)) : "",
+      run_count: ips.reduce((s, x) => s + x.run_count, 0),
+      ips,
+    };
+  });
   return { window: str(raw?.window ?? window), regions };
 }
 
