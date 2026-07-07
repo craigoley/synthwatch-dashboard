@@ -1828,10 +1828,10 @@ export async function getRegionHealth(): Promise<RegionHealthReport | null> {
   }
   const nullable = (v: unknown) => (v == null ? null : Number(v));
   const regions: RegionHealthRow[] = ((raw?.regions as Record<string, unknown>[]) ?? []).map((r) => ({
-    // The API serves the region name as `location` (confirmed by the captured real fixture); `region` is a
-    // fallback for the e2e mock's legacy shape. Reading only `region` produced "" for every row in prod —
-    // blank labels + empty testids + duplicate React keys. Anchored by region-health.contract.ts.
-    region: String(r.location ?? r.region ?? ""),
+    // The API serves the region name as `location` (confirmed by the captured real fixture; the e2e mock now
+    // serves `location` too). Reading `region` produced "" for every row in prod — blank labels + empty
+    // testids + duplicate React keys. Anchored by region-health.contract.ts.
+    region: String(r.location ?? ""),
     last_run_at: r.lastRunAt == null ? null : String(r.lastRunAt),
     age_seconds: nullable(r.ageSeconds),
     // ★ FAIL-SAFE-LOUD taxonomy coercion: an off-taxonomy/absent status must NEVER render as healthy —
