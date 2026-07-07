@@ -35,9 +35,12 @@ const SEAMS = {
   // etag-only host: the honest "deploy detected, no commit id" branch (sha=null, isSha=false) — real data.
   reports_deploys_meals2go: "/reports/deploys?host=www.meals2go.com&window=90d",
   reports_slo_30d: "/reports/slo?window=30d",
-  // Region health (api #168, the F-4 pair) — open GET; the region-health panel's seam. Captured so the
-  // NEXT capture:contracts run mints the real fixture (never hand-mock the contract) for a contract test.
+  // Region health (api #168, the F-4 pair) — open GET; the region-health panel's seam. Anchored by
+  // region-health.contract.ts (the fail-safe-loud off-taxonomy→stale coercion + per-region rollup).
   reports_region_health: "/reports/region-health",
+  // Stakeholder /status board — the flagship nested seam (StatusProperty[] + StatusIncident[]); the prior
+  // false-green class. Anchored by status.contract.ts. Open GET.
+  status: "/status",
   specs: "/specs",
   reconcile_drift: "/reconcile/drift",
   // ★ Previously ORPHANED: flows.json is consumed by high-risk-seams.contract.ts (pins /flows is a BARE ARRAY)

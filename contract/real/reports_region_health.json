@@ -1,0 +1,24 @@
+{
+  "minIntervalSeconds": 300,
+  "stalenessThresholdSeconds": 900,
+  "regions": [
+    {
+      "location": "centralus",
+      "status": "fresh",
+      "lastRunAt": "2026-07-07T17:05:29.373246+00:00",
+      "ageSeconds": 96
+    },
+    {
+      "location": "eastus2",
+      "status": "fresh",
+      "lastRunAt": "2026-07-07T17:05:23.488573+00:00",
+      "ageSeconds": 102
+    },
+    {
+      "location": "westus2",
+      "status": "fresh",
+      "lastRunAt": "2026-07-07T17:05:26.686938+00:00",
+      "ageSeconds": 98
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "window": "30d",
+  "properties": [
+    {
+      "name": "meals2go",
+      "state": "up",
+      "checkCount": 8,
+      "upCount": 8,
+      "degradedCount": 0,
+      "downCount": 0,
+      "uptimePct": 95.611,
+      "buildingBaseline": false
+    },
+    {
+      "name": "restaurants",
+      "state": "up",
+      "checkCount": 8,
+      "upCount": 8,
+      "degradedCount": 0,
+      "downCount": 0,
+      "uptimePct": 99.8855,
+      "buildingBaseline": false
+    },
+    {
+      "name": "wegmans.com",
+      "state": "up",
+      "checkCount": 11,
+      "upCount": 11,
+      "degradedCount": 0,
+      "downCount": 0,
+      "uptimePct": 99.1797,
+      "buildingBaseline": false
+    }
+  ],
+  "recentIncidents": [
+    {
+      "property": "meals2go",
+      "title": "Check \"Meals 2 Go: browse a cuisine menu (anon)\" down (error) 1 consecutive times.",
+      "openedAt": "2026-06-30T19:31:02.349268+00:00",
+      "resolvedAt": "2026-06-30T21:51:08.362058+00:00",
+      "status": "resolved",
+      "severity": "critical"
+    },
+    {
+      "property": "wegmans.com",
+      "title": "Check \"Wegmans: recipe search\" down (error) 1 consecutive times.",
+      "openedAt": "2026-06-30T18:23:26.271894+00:00",
+      "resolvedAt": "2026-07-01T00:43:45.470021+00:00",
+      "status": "resolved",
+      "severity": "critical"
+    },
+    {
+      "property": "meals2go",
+      "title": "Check \"Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)\" down (error) from 2 of 2 locations (died at step: add cheese pizza to cart).",
+      "openedAt": "2026-06-29T18:58:02.359144+00:00",
+      "resolvedAt": "2026-06-29T21:22:29.208734+00:00",
+      "status": "resolved",
+      "severity": "critical"
+    },
+    {
+      "property": "meals2go",
+      "title": "Check \"Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)\" down (fail) from 2 of 2 locations (died at step: establish fulfillment: CARRY OUT -> Buffalo, NY -> McKinley).",
+      "openedAt": "2026-06-29T02:06:40.362225+00:00",
+      "resolvedAt": "2026-06-29T18:20:55.643654+00:00",
+      "status": "resolved",
+      "severity": "critical"
+    },
+    {
+      "property": "wegmans.com",
+      "title": "Check \"Wegmans: recipe navigation\" down (fail) from 2 of 2 locations (died at step: navigate Courses -> Dinner).",
+      "openedAt": "2026-06-26T13:41:29.379947+00:00",
+      "resolvedAt": "2026-06-26T17:00:51.886173+00:00",
+      "status": "resolved",
+      "severity": "critical"
+    },
+    {
+      "property": "wegmans.com",
+      "title": "Check \"Wegmans: search → product page\" down (error) from 2 of 2 locations.",
+      "openedAt": "2026-06-26T00:00:26.415975+00:00",
+      "resolvedAt": "2026-06-26T11:55:47.661661+00:00",
+      "status": "resolved",
+      "severity": "critical"
+    },
+    {
+      "property": "wegmans.com",
+      "title": "Check \"homepage search funnel\" failed 3 consecutive times (died at step: focus search box).",
+      "openedAt": "2026-06-21T13:51:04.229749+00:00",
+      "resolvedAt": "2026-06-21T15:34:16.20549+00:00",
+      "status": "resolved",
+      "severity": "critical"
+    },
+    {
+      "property": "wegmans.com",
+      "title": "Check \"homepage search funnel\" failed 3 consecutive times (died at step: focus search box).",
+      "openedAt": "2026-06-20T22:26:05.01733+00:00",
+      "resolvedAt": "2026-06-21T12:13:12.841259+00:00",
+      "status": "resolved",
+      "severity": "critical"
+    }
+  ]
+}
