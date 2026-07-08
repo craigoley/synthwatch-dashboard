@@ -351,7 +351,9 @@ export default function CheckDetailPage() {
     setRunning(true);
     setExpectRun(true);
     try {
-      await runCheckNow(check.id);
+      // A PAUSED monitor can only be run as a SANDBOX validation (a normal run on a disabled check 409s);
+      // an enabled monitor runs normally. The live view below renders the result + trace either way.
+      await runCheckNow(check.id, { sandbox: !check.enabled });
       await refreshRuns(); // immediate nudge; the scoped poll handles the run's lifecycle from here
     } catch {
       // 401/403 are handled globally by the api-client interceptor; the trigger didn't take → stop expecting.
@@ -420,16 +422,33 @@ export default function CheckDetailPage() {
           <TagChips tags={check.tags} className="mt-2" />
         </div>
         <div className="flex items-center gap-2">
-          {canWrite && check.enabled && (
+          {/* Run now is available for a PAUSED monitor too — but as a SANDBOX validation: distinct label +
+              blue (validation) accent + a tooltip stating it won't alert / count / resume. An ENABLED monitor
+              is unchanged. */}
+          {canWrite && (
             <button
               onClick={handleRunNow}
               disabled={running || expectRun || latestRunStatus === "running"}
               className="sw-btn"
-              title="Run this monitor now — don't wait for the timer"
+              style={check.enabled ? undefined : { borderColor: "var(--color-running)", color: "var(--color-running)" }}
+              title={
+                check.enabled
+                  ? "Run this monitor now — don't wait for the timer"
+                  : "Sandbox validation: run this PAUSED monitor once to inspect the result + trace. It won't alert, won't count toward SLO, and won't resume the monitor."
+              }
               data-testid="run-now"
+              data-sandbox={check.enabled ? undefined : "true"}
             >
-              {/* Pending (triggered, not yet started) → Running (live) → Run now (settled). */}
-              {latestRunStatus === "running" ? "Running…" : running || expectRun ? "Starting…" : "Run now"}
+              {/* Pending (triggered) → Running/Validating (live) → settled label. */}
+              {latestRunStatus === "running"
+                ? check.enabled
+                  ? "Running…"
+                  : "Validating…"
+                : running || expectRun
+                  ? "Starting…"
+                  : check.enabled
+                    ? "Run now"
+                    : "Sandbox validation"}
             </button>
           )}
           {/* Editor-only writes (mirror Run-now): a viewer sees read-only — these PATCH the check (and Edit's
@@ -580,6 +599,17 @@ export default function CheckDetailPage() {
 
       {/* Cursor-paginated run history: date-range control (default last 7d) + Load more.
           The default window keeps the first fetch BOUNDED — never an all-time scan. */}
+      {/* Honesty: while the monitor is PAUSED, on-demand runs are SANDBOX validations — a green result here
+          is a validation pass, NOT a real prod pass (it never alerted, counted toward SLO, or resumed the
+          monitor). Say so, so the run-history below isn't misread. */}
+      {!check.enabled && (
+        <p
+          className="sw-mono text-[11px] text-[var(--color-running)]"
+          data-testid="sandbox-runs-note"
+        >
+          Paused monitor — on-demand runs are sandbox validations (no alert · no SLO · no resume).
+        </p>
+      )}
       <RunHistory checkId={check.id} live={runLive} />
 
       <Modal open={editing} onClose={() => setEditing(false)} title={`Edit · ${check.name}`}>

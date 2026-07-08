@@ -619,3 +619,68 @@ test.describe("check detail — write gate", () => {
     await expect(page.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
   });
 });
+
+// ★ Sandbox validation for a PAUSED monitor (api #195 / runner #225): a paused check can be run on-demand
+// as a SANDBOX validation — the button is present but labeled distinctly, POSTs ?sandbox=true, and the
+// result/trace renders via the SAME live view. An enabled check is unchanged (normal Run now, no flag).
+test.describe("check detail — sandbox run for a paused monitor", () => {
+  test("paused: Run-now is a SANDBOX validation — distinct label, ?sandbox=true, result renders live, never resumes", async ({ page }) => {
+    const runPosts: string[] = [];
+    page.on("request", (r) => {
+      if (r.method() === "POST" && /\/checks\/1\/run(\?|$)/.test(r.url())) runPosts.push(r.url());
+    });
+
+    const w = defaultWorld();
+    // check 1 is PAUSED (enabled:false). The sandbox run goes running→pass; enabled stays false throughout.
+    w.detailSequence = {
+      1: [
+        detail({ id: 1, name: "Paused API", kind: "http", enabled: false, currentStatus: "paused" }, [run({ id: 6000, status: "pass" })]),
+        detail({ id: 1, name: "Paused API", kind: "http", enabled: false, currentStatus: "running" },
+          [run({ id: 6001, checkId: 1, status: "running", finishedAt: null, durationMs: null, httpStatus: null })]),
+        detail({ id: 1, name: "Paused API", kind: "http", enabled: false, currentStatus: "pass" }, [run({ id: 6001, status: "pass" })]),
+      ],
+    };
+    w.runsSequence = { 1: [[run({ id: 6000, status: "pass" })], [run({ id: 6001, status: "pass" })]] };
+    await mockApi(page, w); // seeded editor → the control is visible
+    await page.goto("/checks/1");
+
+    // ★ present for a PAUSED check, labeled a sandbox validation (NOT "Run now")
+    const btn = page.getByTestId("run-now");
+    await expect(btn).toHaveText("Sandbox validation");
+    await expect(btn).toHaveAttribute("data-sandbox", "true");
+    // ★ honesty caption so a green sandbox result isn't misread as a real pass
+    await expect(page.getByTestId("sandbox-runs-note")).toBeVisible();
+    await expect(page.getByTestId("sandbox-runs-note")).toContainText(/no alert.*no SLO.*no resume/i);
+
+    await btn.click();
+
+    // ★ the POST carried ?sandbox=true (a normal run on a paused check would 409)
+    await expect.poll(() => runPosts.length).toBeGreaterThan(0);
+    expect(runPosts.some((u) => /[?&]sandbox=true/.test(u)), "run POST carries ?sandbox=true").toBe(true);
+
+    // ★ the result renders live via the EXISTING view — running→pass, no new progress view
+    await expect(page.getByText("Running", { exact: true })).toBeVisible();
+    await expect(page.getByText("Pass", { exact: true })).toBeVisible();
+    // ★ never resumes: the control is still a sandbox validation after the run (enabled stayed false)
+    await expect(btn).toHaveText("Sandbox validation");
+  });
+
+  test("enabled: Run-now is unchanged — normal run, no ?sandbox, no sandbox caption", async ({ page }) => {
+    const runPosts: string[] = [];
+    page.on("request", (r) => {
+      if (r.method() === "POST" && /\/checks\/1\/run(\?|$)/.test(r.url())) runPosts.push(r.url());
+    });
+    await mockApi(page); // default world: check 1 enabled, seeded editor
+    await page.goto("/checks/1");
+
+    const btn = page.getByTestId("run-now");
+    await expect(btn).toHaveText("Run now");
+    await expect(btn).not.toHaveAttribute("data-sandbox", "true");
+    await expect(page.getByTestId("sandbox-runs-note")).toHaveCount(0); // no sandbox note for an enabled check
+
+    await btn.click();
+    await expect.poll(() => runPosts.length).toBeGreaterThan(0);
+    // ★ must-go-red: a normal run OMITS the flag (a bug that always-sends sandbox fails here)
+    expect(runPosts.every((u) => !/[?&]sandbox=/.test(u)), "normal run omits ?sandbox").toBe(true);
+  });
+});

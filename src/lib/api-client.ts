@@ -1505,11 +1505,16 @@ export async function sendChannelTest(
  * the API. 202 { requestId }; idempotent server-side (a second request while one is pending coalesces).
  * The run then appears in the check's run history.
  */
-export async function runCheckNow(id: number): Promise<{ requestId: number }> {
-  return request<{ requestId: number }>(`/checks/${id}/run`, undefined, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-  });
+export async function runCheckNow(id: number, opts?: { sandbox?: boolean }): Promise<{ requestId: number }> {
+  // ?sandbox=true lets a PAUSED (enabled=false) monitor be run out-of-band for VALIDATION: the runner writes
+  // a visible runs row + trace but skips evaluate() (no incident/alert/SLO) and never resumes the check
+  // (synthwatch-api #195 / runner #225). Omitted for an enabled check → a normal on-demand run (a paused
+  // check without the flag is a 409, unchanged). Query flag (not a body) so the normal POST stays identical.
+  return request<{ requestId: number }>(
+    `/checks/${id}/run`,
+    opts?.sandbox ? { sandbox: true } : undefined,
+    { method: "POST", headers: { "content-type": "application/json" } },
+  );
 }
 
 /**
