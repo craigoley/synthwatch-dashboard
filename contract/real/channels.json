@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "name": "ops-oncall-email",
+    "type": "email",
+    "config": { "to": ["oncall@wegmans.com", "sre@wegmans.com"] },
+    "enabled": true
+  },
+  {
+    "id": 2,
+    "name": "pagerduty-webhook",
+    "type": "webhook",
+    "config": { "url": "https://events.pagerduty.com/integration/abc/enqueue", "authHeader": "Authorization: Token token=xxxxx" },
+    "enabled": false
+  }
+]

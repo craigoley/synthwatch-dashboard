@@ -1,0 +1,31 @@
+{
+  "items": [
+    {
+      "sourceKey": "specs/wegmans/homepage-load.spec.ts",
+      "driftType": "changed",
+      "status": "pending",
+      "plan": {
+        "summary": "Update the homepage monitor's assertions to match the Git spec.",
+        "disposition": "apply",
+        "statements": [
+          { "purpose": "update-assertions", "text": "SET body_must_contain = 'Wegmans'", "values": ["Wegmans"] },
+          { "purpose": "reassign-regions", "text": "SET locations = {eastus2, westus2}", "regions": ["eastus2", "westus2"] }
+        ]
+      },
+      "computedAt": "2026-07-07T12:00:00Z"
+    },
+    {
+      "sourceKey": "orphan-check-9142",
+      "driftType": "orphan",
+      "status": "blocked",
+      "plan": {
+        "summary": "Live-only monitor with no Git spec; delete is forbidden (redaction-strip guard).",
+        "disposition": "blocked",
+        "statements": [],
+        "blockedReason": "would strip a sensitive-monitor redaction rule"
+      },
+      "computedAt": "2026-07-07T12:00:00Z"
+    }
+  ],
+  "computedAt": "2026-07-07T12:00:00Z"
+}
