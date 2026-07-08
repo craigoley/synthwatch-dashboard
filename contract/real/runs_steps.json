@@ -1,0 +1,5 @@
+[
+  { "id": 8801, "runId": 5000, "stepIndex": 0, "name": "login", "status": "pass", "durationMs": 420, "errorMessage": null, "startedAt": "2026-07-07T12:00:00Z" },
+  { "id": 8802, "runId": 5000, "stepIndex": 1, "name": "add-to-cart", "status": "pass", "durationMs": 880, "errorMessage": null, "startedAt": "2026-07-07T12:00:00.5Z" },
+  { "id": 8803, "runId": 5000, "stepIndex": 2, "name": "checkout", "status": "fail", "durationMs": 1200, "errorMessage": "selector '#place-order' not found", "startedAt": "2026-07-07T12:00:01Z" }
+]

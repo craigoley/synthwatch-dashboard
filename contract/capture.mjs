@@ -84,12 +84,30 @@ for (const [name, path] of Object.entries(SEAMS)) {
   }
 }
 
-// ─── gated seam: ai-insights (editor/admin only) ────────────────────────────────────────────────────
-// Unlike the open GETs above, POST /runs/{id}/ai-insights requires an authed call. The bearer comes from
-// SYNTHWATCH_API_TOKEN (a real admin token) — NEVER hardcoded/committed. Without it the seam is SKIPPED and
-// the committed fixture stands. Use a run that HAS a trace + insights (SYNTHWATCH_AI_RUN_ID, default 844515);
-// the body saves as ai_insights_ok.json (or ai_insights_not_configured.json if the API reports configured:false).
+// ─── gated GET seams: channels + reconcile/plan (session-floor auth — 401 unauthenticated) ───────────
+// These read seams require an authed GET (the SEAMS loop above is unauthenticated → they'd 401). The bearer
+// comes from SYNTHWATCH_API_TOKEN. Without it the seams are SKIPPED and the committed Option-B fixtures stand
+// (channels.json / reconcile_plan.json — derived from the authoritative server DTOs, anchored by
+// channels.contract.ts / reconcile-plan.contract.ts). A tokened run REPLACES them with the live shape.
+// (getSteps is NOT here: there are zero multistep checks in prod, so /runs/{id}/steps returns [] — its
+//  Option-B fixture runs_steps.json must be re-captured against a real multistep run once one exists.)
 const AI_TOKEN = process.env.SYNTHWATCH_API_TOKEN;
+if (AI_TOKEN) {
+  for (const [name, path] of Object.entries({ channels: "/channels", reconcile_plan: "/reconcile/plan" })) {
+    try {
+      const res = await fetch(BASE + path, { headers: { accept: "application/json", authorization: `Bearer ${AI_TOKEN}` } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      writeFileSync(join(dir, `${name}.json`), JSON.stringify(await res.json(), null, 2) + "\n");
+      console.log(`captured ${name.padEnd(26)} ${path} (authed)`);
+    } catch (e) {
+      failed += 1;
+      console.error(`FAILED   ${name.padEnd(26)} ${path}: ${e.message}`);
+    }
+  }
+} else {
+  console.log("skipped  channels + reconcile/plan (set SYNTHWATCH_API_TOKEN to replace the Option-B fixtures)");
+}
+
 const AI_RUN_ID = process.env.SYNTHWATCH_AI_RUN_ID ?? "844515";
 if (AI_TOKEN) {
   try {
