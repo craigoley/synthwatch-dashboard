@@ -529,6 +529,42 @@ export interface SloReport {
 }
 
 /**
+ * Estimated monthly ACA compute cost (GET /reports/cost, synthwatch-api #198; recon #220/#229). ★ NOT the
+ * Azure bill — a grounded projection: `projected = avg_duration_s × (2,592,000/interval_seconds) ×
+ * region_count × rate`; `measured_monthly_7d = Σ(duration_s, last 7d) × rate × 30/7`. Every input is REAL
+ * (measured duration / configured interval / assigned region count / a named rate the endpoint ECHOES).
+ */
+export interface CostCheck {
+  check_id: number;
+  source_key: string | null;
+  name: string;
+  kind: CheckKind;
+  interval_seconds: number;
+  region_count: number;
+  /** avg(duration_ms)/1000 over the last 7d; null = no runs in the window (→ projection can't be computed). */
+  avg_duration_s: number | null;
+  projected_monthly: number;
+  measured_monthly_7d: number;
+  /** measured/projected; null when projected is 0 / no runs. */
+  divergence_ratio: number | null;
+  /** measured/projected > 1.5 (server threshold) — retry-amplification / a failing flow costing more than config implies. */
+  divergence_flag: boolean;
+}
+
+export interface CostReport {
+  generated_at: string;
+  /** $/vCPU-second used for this response (echoed so the UI shows provenance, never hardcodes it). */
+  rate_used: number;
+  rate_source: string;
+  rate_set_date: string;
+  total_projected_monthly: number;
+  total_measured_monthly: number;
+  /** Top-N monitors by projected cost — #229's insight: WHICH monitors dominate is the actionable part. */
+  top_cost_drivers: CostCheck[];
+  checks: CostCheck[];
+}
+
+/**
  * Auto-detected deploy markers (GET /reports/deploys, deploy-markers v1) — overlaid as ReferenceLines on the
  * time-series charts. sha is null for a non-commit marker (etag/build-id): the UI labels it "deploy" honestly,
  * never a fake sha (is_sha drives that).

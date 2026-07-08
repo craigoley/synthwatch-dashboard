@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useChecks, useSla, useTags } from "@/lib/client";
 import { CheckCard } from "@/components/check-card";
 import { FleetSlaSummary } from "@/components/sla";
+import { FleetCostSummary } from "@/components/cost";
 import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { MonitorChatInput } from "@/components/monitor-chat-input";
@@ -133,6 +134,10 @@ function StatusGrid() {
       {canWrite && <MonitorChatInput onPrefill={create.openPrefilled} />}
 
       <FleetSlaSummary />
+
+      {/* Estimated monthly ACA compute cost — total + top drivers (#229: which monitors dominate). Self-hides
+          if the endpoint isn't deployed. */}
+      <FleetCostSummary />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-0.5">
