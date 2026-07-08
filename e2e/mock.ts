@@ -120,6 +120,8 @@ export interface World {
   /** Fleet SLO report: which check ids have an SLO target (default [1,3]); which are "building baseline". */
   sloCheckIds?: number[];
   sloBuildingIds?: number[];
+  /** GET /reports/cost body (raw camelCase CostReportResponseDto). Unset → endpoint 404s (section self-hides). */
+  costReport?: RawObj;
   /** Which checks have incidents in the MTTR report (§A5). Default [1, 2]. Empty scope → honest-empty. */
   mttrCheckIds?: number[];
   /** Successive GET /checks/{id} bodies for live-run polling tests: each poll advances; the last repeats.
@@ -776,6 +778,12 @@ export async function mockApi(
       return json(route, { window: url.searchParams.get("window") ?? "30d", monitor, retrySeries: world.trustSeries ?? DEFAULT_TRUST_SERIES });
     }
 
+    // Estimated monthly ACA compute cost (synthwatch-api #198). Unset → 404 (the cost UI self-hides).
+    if (path === "/api/reports/cost" && method === "GET") {
+      if (world.reports500) return json(route, { error: "boom" }, 500);
+      if (!world.costReport) return json(route, { error: "not_found" }, 404);
+      return json(route, world.costReport);
+    }
     if (path === "/api/reports/slo" && method === "GET") {
       if (world.reports500) return json(route, { error: "boom" }, 500); // real error → LOUD, not a silent hide
       if (world.reportsServed === false) return json(route, { error: "not_found" }, 404);

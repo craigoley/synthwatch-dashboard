@@ -60,6 +60,8 @@ import type {
   CheckDetail,
   CheckKind,
   SloReport,
+  CostReport,
+  CostCheck,
   DeploysReport,
   EgressReport,
   EgressWindow,
@@ -2003,6 +2005,48 @@ export async function getSloReport(window: ReportWindow, tags: Tag[] = []): Prom
       }
     : null;
   return { window, items, fleet };
+}
+
+// GET /api/reports/cost (synthwatch-api #198) — ESTIMATED monthly ACA compute cost per monitor + fleet.
+// Grounded projection (recon #220/#229), NOT the Azure bill. Every figure traces to a real input; the rate
+// is ECHOED (rateUsed/rateSource/rateSetDate) so the UI shows provenance instead of hardcoding a drifting rate.
+function mapCostCheck(r: Record<string, unknown>): CostCheck {
+  const num = (v: unknown) => Number(v ?? 0);
+  const nul = (v: unknown) => (v == null ? null : Number(v));
+  return {
+    check_id: num(r.checkId),
+    source_key: r.sourceKey == null ? null : String(r.sourceKey),
+    name: String(r.name ?? ""),
+    kind: (r.kind as CostCheck["kind"]) ?? "http",
+    interval_seconds: num(r.intervalSeconds),
+    region_count: num(r.regionCount),
+    avg_duration_s: nul(r.avgDurationS), // null = no runs in window → projection unavailable (never a fake 0)
+    projected_monthly: num(r.projectedMonthly),
+    measured_monthly_7d: num(r.measuredMonthly7d),
+    divergence_ratio: nul(r.divergenceRatio),
+    divergence_flag: Boolean(r.divergenceFlag),
+  };
+}
+
+export async function getCostReport(): Promise<CostReport | null> {
+  let raw: Record<string, unknown>;
+  try {
+    raw = await request<Record<string, unknown>>("/reports/cost");
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null; // absent → cost UI self-hides
+    throw err; // 500/network → a loud error, never a silent/blank cost figure
+  }
+  const arr = (v: unknown) => ((v as Record<string, unknown>[]) ?? []).map(mapCostCheck);
+  return {
+    generated_at: String(raw?.generatedAt ?? ""),
+    rate_used: Number(raw?.rateUsed ?? 0),
+    rate_source: String(raw?.rateSource ?? ""),
+    rate_set_date: String(raw?.rateSetDate ?? ""),
+    total_projected_monthly: Number(raw?.totalProjectedMonthly ?? 0),
+    total_measured_monthly: Number(raw?.totalMeasuredMonthly ?? 0),
+    top_cost_drivers: arr(raw?.topCostDrivers),
+    checks: arr(raw?.checks),
+  };
 }
 
 // GET /api/reports/mttr?window=&tag= (§A5, companion API PR). Fleet incident analytics — MTTR (mean+median

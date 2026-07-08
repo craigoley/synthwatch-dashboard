@@ -47,6 +47,7 @@ import {
   getPerformanceReport,
   getIncidentBreakdown,
   getSloReport,
+  getCostReport,
   getDeploys,
   getEgressReport,
   getRegionHealth,
@@ -112,6 +113,7 @@ const keys = {
   availabilityReport: (w: string, g: string, t: string) => ["report-availability", w, g, t] as const,
   incidentBreakdown: (w: string, t: string) => ["report-incident-breakdown", w, t] as const,
   sloReport: (w: string, t: string) => ["report-slo", w, t] as const,
+  costReport: () => ["report-cost"] as const,
   deploys: (h: string, w: string) => ["deploys", h, w] as const,
   egress: (w: string) => ["report-egress", w] as const,
   regionHealth: () => ["report-region-health"] as const,
@@ -510,6 +512,15 @@ export function useSloReport(window: ReportWindow, tags: Tag[] = []) {
   return useSWR(keys.sloReport(window, tagKey(tags)), () => getSloReport(window, tags), {
     // fetch-once aggregate (no poll — an expensive SLO rollup). revalidateOnFocus refreshes on tab-return; the
     // panel also shows a "fetched HH:MM" stamp + manual refresh so staleness is visible between focuses.
+    revalidateOnFocus: true,
+    shouldRetryOnError: false,
+  });
+}
+
+// Fleet cost report — fetch-once aggregate (the API caches 60s; recomputes from live runs). Shared key so the
+// overview summary and every monitor-detail cost panel dedupe onto one fetch.
+export function useCostReport() {
+  return useSWR(keys.costReport(), () => getCostReport(), {
     revalidateOnFocus: true,
     shouldRetryOnError: false,
   });

@@ -8,6 +8,7 @@ import { useCheck, useMetrics, updateCheck, revalidateChecks, runCheckNow, reval
 import { useAuth } from "@/components/auth-provider";
 import { AvailabilityChart, LatencyChart, MetricsCharts } from "@/components/charts";
 import { CheckSlaPanel, SloPanel } from "@/components/sla";
+import { MonitorCostPanel } from "@/components/cost";
 import { TrustCard } from "@/components/trust";
 import { RunHistory } from "@/components/run-history";
 import { LiveStepsChecklist } from "@/components/live-steps";
@@ -578,6 +579,10 @@ export default function CheckDetailPage() {
       <PerLocationPanel runs={recent_runs} />
 
       <CheckSlaPanel checkId={check.id} />
+
+      {/* Estimated monthly compute cost — projected + inspectable breakdown + measured + divergence flag.
+          Self-hides (null) until GET /reports/cost is reachable / the monitor has runs. */}
+      <MonitorCostPanel checkId={check.id} />
 
       {/* §D1 Trust drill-down — chip + honest red-test gap, retry sparkline, incident breakdown, spec
           integrity hash. Self-hides (404 → null) until GET /reports/trust/{id} is reachable. */}

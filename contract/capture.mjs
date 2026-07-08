@@ -35,6 +35,8 @@ const SEAMS = {
   // etag-only host: the honest "deploy detected, no commit id" branch (sha=null, isSha=false) — real data.
   reports_deploys_meals2go: "/reports/deploys?host=www.meals2go.com&window=90d",
   reports_slo_30d: "/reports/slo?window=30d",
+  // Estimated monthly ACA compute cost per monitor + fleet (#198) — open GET; anchored by cost.contract.ts.
+  reports_cost: "/reports/cost",
   // Rich report seams anchored by mttr/trust/egress .contract.ts (recon Q3 — the remaining high-drift-risk
   // unanchored rollups). Open GETs. trust_detail uses a real check id with monitor data (adjust on re-capture).
   reports_mttr: "/reports/mttr?window=30d",
