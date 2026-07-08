@@ -344,6 +344,7 @@ interface RawCheck {
   slo?: Slo | null;
   assertions?: Assertion[] | null;
   requestHeaders?: Record<string, string> | null;
+  secretHeaders?: Record<string, string> | null; // #197 refs-only { headerName -> ENV_VAR_NAME }; session-gated (null for anon)
   requestBody?: string | null;
   auth?: CheckAuth | null;
   tags?: Tag[] | null;
@@ -517,6 +518,7 @@ function mapCheck(raw: RawCheck): Check {
     // header dict), so pass them through unchanged.
     assertions: raw.assertions ?? [],
     request_headers: raw.requestHeaders ?? null,
+    secret_headers: raw.secretHeaders ?? null, // refs only; the API sends this to editors, null to anon/viewer
     request_body: raw.requestBody ?? null,
     auth: raw.auth ?? null,
     tags: raw.tags ?? [],

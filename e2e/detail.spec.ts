@@ -707,3 +707,40 @@ test.describe("check detail — sandbox run for a paused monitor", () => {
     expect(runPosts.every((u) => !/[?&]sandbox=/.test(u)), "normal run omits ?sandbox").toBe(true);
   });
 });
+
+// ★ Secret-headers viewer (synthwatch-api #197 projects check.secretHeaders = { header → ENV_VAR_NAME },
+// editor-gated + runner-owned so READ-ONLY). Refs only — the env-var NAME is shown, never a value; there is
+// no value input. The API nulls the field for anon/viewer, so the panel self-hides (gate respected on data).
+test.describe("check detail — secret headers (refs-only, read-only, editor-gated)", () => {
+  test("renders the secret-header REFS ({header → ENV_VAR_NAME}); refs only, no value input", async ({ page }) => {
+    const w = defaultWorld();
+    w.details[1] = detail(
+      { id: 1, name: "Wegmans API", kind: "http", secretHeaders: { Authorization: "WEGMANS_BEARER_ENV", "X-Api-Key": "WEGMANS_APIKEY_ENV" } },
+      [run({ id: 100, status: "pass" })],
+    );
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+
+    const panel = page.getByTestId("secret-headers-panel");
+    await expect(panel).toBeVisible();
+    // ★ header NAME → ENV VAR REF NAME (both non-secret references)
+    await expect(panel.getByTestId("secret-header-Authorization")).toContainText("Authorization");
+    await expect(panel.getByTestId("secret-header-Authorization")).toContainText("WEGMANS_BEARER_ENV");
+    await expect(panel.getByTestId("secret-header-X-Api-Key")).toContainText("WEGMANS_APIKEY_ENV");
+    // ★ REF NAMES ONLY — read-only viewer: NO value input anywhere (no <input>/<textarea>)
+    await expect(panel.locator("input")).toHaveCount(0);
+    await expect(panel.locator("textarea")).toHaveCount(0);
+    await expect(panel).toContainText(/reference names only/i);
+  });
+
+  test("no panel when the field is null (anon/viewer — API editor-gate nulls it, or the monitor has none)", async ({ page }) => {
+    const w = defaultWorld();
+    // The API session-gates the readback: an anonymous/viewer caller gets secret_headers = null → self-hide.
+    w.details[1] = detail({ id: 1, name: "Wegmans API", kind: "http", secretHeaders: null }, [run({ id: 100, status: "pass" })]);
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+
+    await expect(page.getByRole("heading", { name: "Wegmans API" })).toBeVisible();
+    await expect(page.getByTestId("secret-headers-panel")).toHaveCount(0);
+  });
+});
