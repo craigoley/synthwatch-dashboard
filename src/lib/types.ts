@@ -158,6 +158,14 @@ export interface Check {
   /** HTTP checks: rich assertions (empty = legacy expected_status/body_must_contain). */
   assertions: Assertion[];
   request_headers: Record<string, string> | null;
+  /**
+   * Per-monitor SECRET request-header REFERENCES (runner migration 0061; synthwatch-api #197):
+   * `{ headerName -> ENV_VAR_NAME }`. REFERENCES ONLY — the value lives in an ACA secret / env var the
+   * runner resolves at request time and is NEVER stored/returned here. Runner-written (the API only
+   * projects the refs; there is no dashboard write path). Session-gated on readback like request_headers:
+   * null for anonymous/viewer callers. null when the monitor uses none.
+   */
+  secret_headers: Record<string, string> | null;
   request_body: string | null;
   auth: CheckAuth | null;
   /** Multistep checks: ordered API-chain steps (null/empty otherwise). */
