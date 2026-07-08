@@ -98,6 +98,10 @@ function RunRow({
   // (the red status already says "down"), so it renders faint/neutral.
   const retried = run.retry_count != null && run.retry_count > 1;
   const degrading = retried && !failed;
+  // Sandbox (runner migration 0065): this run was a PAUSED monitor's on-demand validation — it skipped
+  // evaluate() (no incident/alert, and it does NOT count toward the SLO), so it is NOT a real health signal.
+  // Badge it so a resumed monitor's history reads honestly and these rows aren't mistaken for real runs.
+  const sandbox = run.sandbox === true;
   return (
     <>
       <button
@@ -109,6 +113,19 @@ function RunRow({
         <StatusDot status={run.status} />
         <div className="min-w-0">
           <span className="text-sm text-[var(--color-ink)]">{formatLocalDateTime(run.started_at)}</span>
+          {sandbox && (
+            <span
+              data-testid="sandbox-badge"
+              title="Sandbox validation of a paused monitor — skipped alerting and does not count toward the SLO"
+              className="sw-mono ml-2 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px]"
+              style={{
+                color: "var(--color-ink-dim)",
+                background: "color-mix(in srgb, var(--color-ink-dim) 12%, transparent)",
+              }}
+            >
+              ⧉ sandbox
+            </span>
+          )}
           {run.http_status !== null && (
             <span className="sw-mono ml-2 text-[11px] text-[var(--color-ink-faint)]">
               HTTP {run.http_status}

@@ -263,6 +263,12 @@ export interface Run {
    * the monitor only passes on retry — surfaced as a soft-warning in the run row.
    */
   retry_count: number | null;
+  /**
+   * True when this run was a PAUSED monitor's on-demand *sandbox* validation (runner migration 0065):
+   * it persisted a normal row but skipped evaluate() (no incident/alert/SLO). Badged in the run row so a
+   * resumed monitor's history stays honest. Optional/false-default — tolerant of pre-0065 API responses.
+   */
+  sandbox?: boolean;
 }
 
 /** Check detail payload: the check plus its most recent runs. */
