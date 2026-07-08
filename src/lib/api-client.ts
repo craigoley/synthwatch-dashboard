@@ -386,6 +386,7 @@ interface RawRun {
   traceUrl: string | null;
   certDaysRemaining: number | null;
   retryCount?: number | null; // runner 0048; optional → tolerant of pre-deploy API responses without it
+  sandbox?: boolean; // runner 0065; optional → tolerant of pre-deploy API responses without it
 }
 
 interface RawCheckDetail extends RawCheck {
@@ -565,6 +566,7 @@ function mapRun(raw: RawRun): Run {
     trace_url: raw.traceUrl ?? null,
     cert_days_remaining: raw.certDaysRemaining ?? null,
     retry_count: raw.retryCount ?? null, // null when the API predates 0048 → row shows nothing
+    sandbox: raw.sandbox ?? false, // false when the API predates 0065 → no badge
   };
 }
 

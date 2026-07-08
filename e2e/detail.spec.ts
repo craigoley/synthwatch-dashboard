@@ -548,6 +548,29 @@ test.describe("check detail", () => {
     await expect(page.getByTitle("Took 3 attempts")).toBeVisible();
   });
 
+  // ★ sandbox (runner 0065): a PAUSED monitor's on-demand validation persists a normal run row but skips
+  // evaluate() (no alert, no SLO). The row is badged so a resumed monitor's history isn't misread — a real
+  // run shows no badge. This is the per-row disambiguation the runs.sandbox → RunDto → badge chain delivers.
+  test("run-history: a sandbox run is badged; a real run is not", async ({ page }) => {
+    const w = defaultWorld();
+    const at = new Date(Date.now() - 60_000).toISOString(); // recent → inside the live (now-7d) window
+    const sandboxRun = run({ id: 610, checkId: 1, status: "pass", startedAt: at, sandbox: true });
+    const realRun = run({ id: 609, checkId: 1, status: "pass", startedAt: at }); // sandbox absent → no badge
+    w.details[1] = detail({ id: 1, name: "API health", kind: "http", currentStatus: "pass" }, [
+      sandboxRun,
+      realRun,
+    ]);
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+    await expect(page.getByTestId("run-history")).toBeVisible();
+
+    // exactly the one sandbox run is badged (the real run shows nothing)
+    await expect(page.getByTestId("sandbox-badge")).toHaveCount(1);
+    await expect(page.getByTestId("sandbox-badge")).toContainText(/sandbox/i);
+    // the honesty tooltip spells out why it's not a real health signal
+    await expect(page.getByTestId("sandbox-badge")).toHaveAttribute("title", /paused.*does not count.*SLO/i);
+  });
+
   // ★ RCA verdict badge (#118): the baseline-diff insight's verdict ("which layer failed") renders as an
   // at-a-glance badge — additive to the existing cause/summary; absent on legacy insights → no badge.
   function baselineDiffBody(verdict?: string) {
