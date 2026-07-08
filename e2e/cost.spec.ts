@@ -90,4 +90,18 @@ test.describe("cost projection — overview + monitor-detail (grounded, labeled 
     await page.goto("/");
     await expect(page.getByTestId("fleet-cost-summary")).toHaveCount(0);
   });
+
+  // ★ Honest-render: a 500 (broken) is LOUD, not silently absent — on BOTH surfaces (the #175/#177/#179 class).
+  test("500 → loud error on the overview AND the monitor-detail panel (never rendered as absent)", async ({ page }) => {
+    const w = costWorld([costCheck({ checkId: 1, name: "API health", kind: "http" })]);
+    w.reports500 = true; // GET /reports/cost 500s
+    await mockApi(page, w);
+
+    await page.goto("/");
+    await expect(page.getByTestId("fleet-cost-error")).toBeVisible();
+
+    await page.goto("/checks/1");
+    await expect(page.getByTestId("monitor-cost-error")).toBeVisible(); // broken, not a vanished panel
+    await expect(page.getByTestId("monitor-cost-projected")).toHaveCount(0); // no fabricated figure
+  });
 });

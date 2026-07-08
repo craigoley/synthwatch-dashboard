@@ -55,7 +55,12 @@ export function FleetCostSummary() {
     );
   }
   if (!data) return null; // loading or 404 (not deployed) → nothing
-  const drivers = data.top_cost_drivers.length > 0 ? data.top_cost_drivers : data.checks.slice(0, 5);
+  // Prefer the API's ranked top_cost_drivers; if it's ever empty, fall back to the checks list SORTED by
+  // projected cost (never fetch-order — the list is labeled "Top cost drivers").
+  const drivers =
+    data.top_cost_drivers.length > 0
+      ? data.top_cost_drivers
+      : [...data.checks].sort((a, b) => b.projected_monthly - a.projected_monthly).slice(0, 5);
 
   return (
     <div className="sw-panel p-4" data-testid="fleet-cost-summary">
@@ -109,7 +114,19 @@ export function FleetCostSummary() {
  */
 export function MonitorCostPanel({ checkId }: { checkId: number }) {
   const { data, error } = useCostReport();
-  if (error || !data) return null; // additive panel — self-hide when unavailable
+  // ★ Honest-render: split "broken" from "absent". A 500/network error is LOUD (getCostReport throws → SWR
+  // error); a 404 (getCostReport returns null) or loading is silent-hide. Never render a broken report as an
+  // absent panel (#175/#177/#179).
+  if (error) {
+    return (
+      <div className="sw-panel p-4" data-testid="monitor-cost-panel">
+        <p className="sw-mono text-[11px] text-[var(--color-fail)]" data-testid="monitor-cost-error">
+          Cost estimate unavailable (report error).
+        </p>
+      </div>
+    );
+  }
+  if (!data) return null; // loading / 404 (endpoint not deployed) → hide
   const c = data.checks.find((x) => x.check_id === checkId);
   if (!c) return null;
 
