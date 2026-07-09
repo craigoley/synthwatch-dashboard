@@ -67,6 +67,12 @@ const SEAMS = {
   metrics_check80: "/checks/80/metrics",
   availability_series_check80: "/checks/80/availability-series?window=7d",
   incident_detail_34: "/incidents/34",
+  // Two rich (divergence-class) notification seams — anon-200 GETs, previously unanchored (recon 2026-07-09).
+  // routing: nested `severity.{critical,warning}.channelIds` (RoutingRule) — the nesting the mapper reads.
+  // notifications/health: 4 multi-word camel fields incl. the null-preserving `transportConfigured`.
+  // Anchored by routing.contract.ts / delivery-readiness.contract.ts.
+  routing: "/routing",
+  notifications_health: "/notifications/health",
 };
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "real");

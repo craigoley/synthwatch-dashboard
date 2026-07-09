@@ -1,0 +1,16 @@
+{
+  "severity": {
+    "critical": {
+      "channelIds": [
+        1
+      ]
+    },
+    "warning": {
+      "channelIds": [
+        1
+      ]
+    }
+  },
+  "perCheck": null,
+  "tagRules": null
+}
