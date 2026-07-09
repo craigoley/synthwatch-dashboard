@@ -3,105 +3,88 @@ import { test, expect } from "@playwright/test";
 import { mockApi, defaultWorld } from "./mock";
 import type { RawObj } from "./fixtures";
 
-// Estimated monthly ACA compute cost (GET /reports/cost, synthwatch-api #198; recon #220/#229). Every figure
-// traces to a real endpoint field — measured avg duration, configured interval, region count, the ECHOED rate.
-// No hardcoded rate, no client-side complexity guessing.
+// Cost UI rework: fleet summary lives on the reports "Cost" sub-tab (gone from home); each monitor card shows
+// its own projected $/mo (read from /reports/cost per-check data — no API change); the edit modal recomputes
+// the projection LIVE as interval/regions change (avg duration held constant, measured). Every figure traces
+// to a real endpoint field; the rate is the endpoint's echoed rate, never hardcoded.
 
 const RATE = 0.00003;
 const costCheck = (o: RawObj): RawObj => ({
   checkId: 0, sourceKey: null, name: "monitor", kind: "browser", intervalSeconds: 900, regionCount: 3,
   avgDurationS: 20, projectedMonthly: 5, measuredMonthly7d: 5, divergenceRatio: 1.0, divergenceFlag: false, ...o,
 });
-
 function costWorld(checks: RawObj[], agg: RawObj = {}) {
   const w = defaultWorld();
   w.costReport = {
-    generatedAt: "2026-07-08T12:00:00Z",
-    rateUsed: RATE,
+    generatedAt: "2026-07-08T12:00:00Z", rateUsed: RATE,
     rateSource: "ACA Consumption vCPU-second (cpu=1.0 vCPU / mem=2 GiB, main.bicep:528-529)",
-    rateSetDate: "2026-07-08",
-    totalProjectedMonthly: 67.42,
-    totalMeasuredMonthly: 71.1,
-    topCostDrivers: checks,
-    checks,
-    ...agg,
+    rateSetDate: "2026-07-08", totalProjectedMonthly: 67.42, totalMeasuredMonthly: 71.1,
+    topCostDrivers: checks, checks, ...agg,
   };
   return w;
 }
 
-test.describe("cost projection — overview + monitor-detail (grounded, labeled estimate)", () => {
-  test("overview: total projected headline + top-N drivers; a measured≫projected driver is flagged; label reads the endpoint rate", async ({ page }) => {
-    const checks = [
-      costCheck({ checkId: 77, name: "wegmans-recipe-nav", projectedMonthly: 9.63, divergenceFlag: false }),
-      costCheck({ checkId: 74, name: "wegmans-search-product", intervalSeconds: 600, projectedMonthly: 9.55, measuredMonthly7d: 18.2, divergenceRatio: 1.9, divergenceFlag: true }),
-    ];
-    await mockApi(page, costWorld(checks));
-    await page.goto("/");
+test.describe("cost UI rework — Cost tab + card cost + modal live recompute", () => {
+  test("fleet summary is on the reports Cost tab and GONE from the home page", async ({ page }) => {
+    await mockApi(page, costWorld([costCheck({ checkId: 77, name: "wegmans-recipe-nav", projectedMonthly: 9.63 })]));
 
-    await expect(page.getByTestId("fleet-cost-summary")).toBeVisible();
-    await expect(page.getByTestId("fleet-cost-total-projected")).toContainText("$67.42");
-    await expect(page.getByTestId("fleet-cost-total-measured")).toContainText("$71.10");
-    // ★ top-N drivers (which monitors dominate — #229's insight)
-    await expect(page.getByTestId("cost-driver-77")).toContainText("wegmans-recipe-nav");
-    await expect(page.getByTestId("cost-driver-77")).toContainText("$9.63");
-    // ★ a driver whose measured ≫ projected (>1.5×) is flagged
-    await expect(page.getByTestId("cost-divergence-74")).toBeVisible();
-    await expect(page.getByTestId("cost-divergence-74")).toContainText(/costing 1.9× projected/i);
-    await expect(page.getByTestId("cost-divergence-77")).toHaveCount(0); // a healthy driver is NOT flagged
-    // ★ estimate label reads the endpoint's echoed rate/date (never hardcoded)
-    const label = page.getByTestId("fleet-cost-estimate-label");
-    await expect(label).toContainText("$0.00003/vCPU-s");
-    await expect(label).toContainText("set 2026-07-08");
-    await expect(label).toContainText(/Azure bill is ground truth/i);
-  });
-
-  test("monitor-detail: projected + INSPECTABLE breakdown + measured + divergence>1.5 flag", async ({ page }) => {
-    // check 1 (the default detail check): 300s interval, 3 regions → runs/mo = 2,592,000/300 = 8,640.
-    const checks = [
-      costCheck({ checkId: 1, name: "API health", kind: "http", intervalSeconds: 300, regionCount: 3, avgDurationS: 0.9, projectedMonthly: 0.7, measuredMonthly7d: 1.5, divergenceRatio: 2.1, divergenceFlag: true }),
-    ];
-    await mockApi(page, costWorld(checks));
-    await page.goto("/checks/1");
-
-    await expect(page.getByTestId("monitor-cost-panel")).toBeVisible();
-    await expect(page.getByTestId("monitor-cost-projected")).toContainText("$0.70");
-    await expect(page.getByTestId("monitor-cost-measured")).toContainText("$1.50");
-    // ★ every factor of the breakdown is a real endpoint number, not a magic figure
-    await expect(page.getByTestId("monitor-cost-breakdown")).toContainText(
-      "0.90s avg × 8,640 runs/mo × 3 regions × $0.00003/vCPU-s",
-    );
-    // ★ divergence > 1.5 flags (retry/failure amplification)
-    await expect(page.getByTestId("monitor-cost-divergence")).toBeVisible();
-    await expect(page.getByTestId("monitor-cost-divergence")).toContainText(/2.1× the projection/i);
-    // ★ labeled an estimate (tooltip carries the rate provenance)
-    await expect(page.getByTestId("monitor-cost-estimate-label")).toBeVisible();
-  });
-
-  test("monitor-detail: no runs in the window → 'projection unavailable', never a fake $0", async ({ page }) => {
-    const checks = [costCheck({ checkId: 1, name: "API health", kind: "http", avgDurationS: null, projectedMonthly: 0, measuredMonthly7d: 0, divergenceRatio: null, divergenceFlag: false })];
-    await mockApi(page, costWorld(checks));
-    await page.goto("/checks/1");
-    await expect(page.getByTestId("monitor-cost-panel")).toContainText(/projection unavailable/i);
-    await expect(page.getByTestId("monitor-cost-projected")).toHaveCount(0); // no $ figure at all
-  });
-
-  test("overview: endpoint absent (404) → the cost summary self-hides (no broken/blank panel)", async ({ page }) => {
-    await mockApi(page); // default world: costReport unset → /reports/cost 404s
-    await page.goto("/");
+    await page.goto("/"); // ★ moved OFF home
     await expect(page.getByTestId("fleet-cost-summary")).toHaveCount(0);
+
+    await page.goto("/reports?tab=cost"); // ★ now here
+    await expect(page.getByTestId("reports-panel-cost")).toBeVisible();
+    await expect(page.getByTestId("fleet-cost-total-projected")).toContainText("$67.42");
+    await expect(page.getByTestId("cost-driver-77")).toContainText("wegmans-recipe-nav");
+    await expect(page.getByTestId("fleet-cost-estimate-label")).toContainText("$0.00003/vCPU-s");
   });
 
-  // ★ Honest-render: a 500 (broken) is LOUD, not silently absent — on BOTH surfaces (the #175/#177/#179 class).
-  test("500 → loud error on the overview AND the monitor-detail panel (never rendered as absent)", async ({ page }) => {
-    const w = costWorld([costCheck({ checkId: 1, name: "API health", kind: "http" })]);
-    w.reports500 = true; // GET /reports/cost 500s
-    await mockApi(page, w);
-
+  test("monitor card shows its own projected $/mo (est.); a check with no cost row shows none", async ({ page }) => {
+    await mockApi(page, costWorld([costCheck({ checkId: 1, name: "API health", kind: "http", projectedMonthly: 0.7 })]));
     await page.goto("/");
-    await expect(page.getByTestId("fleet-cost-error")).toBeVisible();
+    await expect(page.getByTestId("card-cost-1")).toContainText("~$0.70/mo est."); // per-check figure on the card
+    await expect(page.getByTestId("card-cost-2")).toHaveCount(0); // check 2 absent from the report → no cost line
+  });
 
+  test("edit modal recomputes LIVE: interval 5→15 min drops cost ~3×; regions 3→2 drops ~⅓", async ({ page }) => {
+    const w = costWorld([costCheck({ checkId: 1, name: "API health", kind: "http", intervalSeconds: 300, regionCount: 3, avgDurationS: 2.0, projectedMonthly: 1.56 })]);
+    w.checkLocations = { 1: ["eastus2", "centralus", "westeurope"] }; // 3 regions assigned → seeds region_count=3
+    await mockApi(page, w);
     await page.goto("/checks/1");
-    await expect(page.getByTestId("monitor-cost-error")).toBeVisible(); // broken, not a vanished panel
-    await expect(page.getByTestId("monitor-cost-projected")).toHaveCount(0); // no fabricated figure
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+
+    const projected = page.getByTestId("modal-cost-projected");
+    // baseline: 2.0s × (2,592,000/300) × 3 regions × $0.00003 = ~$1.56/mo (avg is MEASURED, held constant)
+    await expect(projected).toContainText("~$1.56/mo");
+    // ★ interval 5 → 15 min: runs/mo ÷3 → cost ÷3 → ~$0.52
+    await page.getByLabel("Interval (minutes)").fill("15");
+    await expect(projected).toContainText("~$0.52/mo");
+    // ★ back to 5 min, drop westeurope (3 → 2 regions): cost ×2/3 → ~$1.04
+    await page.getByLabel("Interval (minutes)").fill("5");
+    await expect(projected).toContainText("~$1.56/mo");
+    await page.getByRole("checkbox", { name: "westeurope" }).click();
+    await expect(projected).toContainText("~$1.04/mo");
+    // the breakdown reflects the live regions + the endpoint's rate (not hardcoded)
+    await expect(page.getByTestId("modal-cost-breakdown")).toContainText("2 regions × $0.00003/vCPU-s");
+  });
+
+  test("no run history (never-run monitor) → 'no duration history yet', never a fake $0", async ({ page }) => {
+    const w = costWorld([]); // check 1 has NO cost row → no measured avg_duration
+    w.checkLocations = { 1: ["eastus2"] };
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(page.getByTestId("modal-cost-no-history")).toBeVisible();
+    await expect(page.getByTestId("modal-cost-no-history")).toContainText(/no duration history yet/i);
+    await expect(page.getByTestId("modal-cost-projected")).toHaveCount(0); // no $ figure at all
+  });
+
+  test("honest-render: 500 is loud on the reports Cost tab AND the monitor-detail panel (never absent)", async ({ page }) => {
+    const w = costWorld([costCheck({ checkId: 1, name: "API health", kind: "http" })]);
+    w.reports500 = true;
+    await mockApi(page, w);
+    await page.goto("/reports?tab=cost");
+    await expect(page.getByTestId("fleet-cost-error")).toBeVisible();
+    await page.goto("/checks/1");
+    await expect(page.getByTestId("monitor-cost-error")).toBeVisible();
   });
 });
