@@ -11,15 +11,21 @@ import { run } from "./fixtures";
  */
 const CID = 1;
 
+// ★ Seed timestamps RELATIVE to now, never a hardcoded calendar date. The run-history list defaults to a
+// 7d window (useDateRange("7d") → lookbackRange(7) = [now-7d, now]) and the API filters runs to that window,
+// so fixed 2026-07-02 seeds fell OUT of range once the wall clock passed +7d and every row vanished (count 0)
+// — the frozen-window-vs-advancing-now drift class. Minutes-ago always lands inside the window; mirrors the
+// NOW derivation in fixtures.ts. newest-first (descending), one run per bucket.
+const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+
 function mixedWorld() {
   const w = defaultWorld();
-  // one run per bucket, newest-first (the mock sorts DESC started_at anyway)
   const runs = [
-    run({ id: 5, checkId: CID, status: "pass", startedAt: "2026-07-02T10:05:00Z" }),
-    run({ id: 4, checkId: CID, status: "warn", startedAt: "2026-07-02T10:04:00Z" }),
-    run({ id: 3, checkId: CID, status: "fail", startedAt: "2026-07-02T10:03:00Z" }),
-    run({ id: 2, checkId: CID, status: "error", startedAt: "2026-07-02T10:02:00Z" }),
-    run({ id: 1, checkId: CID, status: "infra_error", startedAt: "2026-07-02T10:01:00Z" }),
+    run({ id: 5, checkId: CID, status: "pass", startedAt: minutesAgo(1) }),
+    run({ id: 4, checkId: CID, status: "warn", startedAt: minutesAgo(2) }),
+    run({ id: 3, checkId: CID, status: "fail", startedAt: minutesAgo(3) }),
+    run({ id: 2, checkId: CID, status: "error", startedAt: minutesAgo(4) }),
+    run({ id: 1, checkId: CID, status: "infra_error", startedAt: minutesAgo(5) }),
   ];
   w.details[CID] = { ...w.details[CID], recentRuns: runs };
   return w;
