@@ -4,7 +4,7 @@
  * Returns CSS-variable-backed token names defined in globals.css.
  */
 
-import type { CheckWithStatus, IncidentSeverity, RunStatus, RunStepStatus } from "@/lib/types";
+import type { CheckWithStatus, IncidentSeverity, RunStatus, RunStepStatus, SparkPoint } from "@/lib/types";
 
 export interface StatusMeta {
   label: string;
@@ -117,6 +117,29 @@ const SYSTEM_META: Record<SystemStatus, SystemStatusMeta> = {
 };
 
 /**
+ * Last SETTLED outcome for a check (not current_status) so a generally-passing monitor stays green
+ * while a run is in flight — the live run shows via a separate affordance instead. Pure.
+ *
+ * When current_status is ALREADY settled (not "running") it IS the latest settled outcome — return it
+ * directly, identical to the prior behavior, so non-running checks are unchanged even if `spark` is empty
+ * (no regression). Only while running do we peel back to the most recent non-running `spark` point;
+ * ISO timestamps sort lexically. Null when nothing has settled (brand-new / short-history monitor) → the
+ * caller renders idle, never a fabricated pass.
+ *
+ * ★ SHARED (the #201/#206 card contract, hoisted from check-card.tsx): the card's rail/pill and the
+ * header roll-up (deriveSystemStatus) must read the SAME settled value — two local copies would drift.
+ */
+export function lastSettledStatus(check: CheckWithStatus): RunStatus | null {
+  if (check.current_status && check.current_status !== "running") return check.current_status;
+  let latest: SparkPoint | null = null;
+  for (const p of check.spark) {
+    if (p.s === "running") continue;
+    if (!latest || p.t > latest.t) latest = p;
+  }
+  return latest?.s ?? null;
+}
+
+/**
  * Roll enabled checks into an overall system status for the public status page:
  *   major   — an open critical incident, or a critical service currently down
  *   partial — an open warning incident, a non-critical service down, or degraded
@@ -125,13 +148,19 @@ const SYSTEM_META: Record<SystemStatus, SystemStatusMeta> = {
  * ★ PROD-ONLY: non-prod (staging/preview) checks are excluded — the public banner is the PROD promise, and a
  * staging fail must never flip it (display-side pollution the API's aggregation exclude can't fix, since this
  * rolls up the raw /checks list). Env comes from the authoritative `checks.environment` column, not the tag.
+ *
+ * ★ RUNNING ≠ "no status": the tally reads lastSettledStatus (the #201/#206 card contract), so an in-flight
+ * run neither drops a monitor from the banner nor clears a known-bad status — the banner only moves when a
+ * run COMPLETES with a different settled result. A check that has NEVER settled (null) contributes nothing,
+ * exactly as it did before it started running — never flipped green (the null-vs-green trap).
  */
 export function deriveSystemStatus(checks: CheckWithStatus[]): SystemStatusMeta {
   let partial = false;
   for (const c of checks) {
     if (!c.enabled || (c.environment ?? "prod") !== "prod") continue;
-    const down = c.current_status === "fail" || c.current_status === "error";
-    const degraded = c.current_status === "warn";
+    const settled = lastSettledStatus(c);
+    const down = settled === "fail" || settled === "error";
+    const degraded = settled === "warn";
     const openCritical = c.open_incident_count > 0 && c.max_open_severity === "critical";
     const openWarning = c.open_incident_count > 0 && c.max_open_severity === "warning";
 
