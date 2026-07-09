@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { test, expect } from "@playwright/test";
 
 import { mockApi, defaultWorld } from "./mock";
@@ -127,6 +129,21 @@ test.describe("check detail", () => {
     // the same-origin trace proxy route is wired (server-side; upstream is unreachable
     // in the hermetic mock → 502, NOT 404 — proving the route exists and proxies).
     expect((await page.request.get("/trace-proxy/200")).status()).not.toBe(404);
+  });
+
+  // ★ Resilience patch (scripts/vendor-trace-viewer.mjs): the vendored viewer must SKIP an
+  // unparseable NDJSON line instead of failing the whole load with the opaque "Could not load
+  // trace". A sensitive-monitor REDACTED trace can carry exactly one such line (runner
+  // traceRedact.ts non-escape-aware header scrub) — the zip is valid + downloadable but wouldn't
+  // render inline without this. Guards against a `node scripts/vendor-trace-viewer.mjs` re-vendor
+  // being committed with the patch dropped (the vendor script itself exits non-zero if the target
+  // codegen moved; this pins that the committed bundle actually carries the patch).
+  test("the vendored trace-viewer bundle carries the skip-unparseable-line resilience patch", () => {
+    const sw = readFileSync("public/trace-viewer/sw.bundle.js", "utf8");
+    // the resilient form is present …
+    expect(sw).toContain("skipped an unparseable trace line");
+    // … and the original throw-on-any-line form is gone (a bare JSON.parse feeding _modernize).
+    expect(sw).not.toContain("const e=this._modernize(JSON.parse(t));for(const n of e)");
   });
 
   // ★ The vendored viewer forces html,body{min-width:550px;min-height:450px;overflow:auto}, so an embed
