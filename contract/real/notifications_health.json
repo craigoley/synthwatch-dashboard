@@ -1,0 +1,6 @@
+{
+  "channelsConfigured": true,
+  "routingConfigured": true,
+  "transportConfigured": null,
+  "detail": "Email transport (ACS) is configured in runner infrastructure; the API can't verify it from here."
+}
