@@ -94,8 +94,17 @@ for (const [name, path] of Object.entries(SEAMS)) {
 // (getSteps is NOT here: there are zero multistep checks in prod, so /runs/{id}/steps returns [] — its
 //  Option-B fixture runs_steps.json must be re-captured against a real multistep run once one exists.)
 const AI_TOKEN = process.env.SYNTHWATCH_API_TOKEN;
+// check_detail_creds: the model-B masked credential read ({ name -> "set" }) is EDITOR-gated AND only present
+// on a check that HAS credentials set — so it needs a tokened GET on that check. SYNTHWATCH_CRED_CHECK_ID is
+// the b2c check (the one with a real login_credentials v1). Until a tokened run replaces it, the committed
+// Option-B fixture stands (derived from the authoritative api DTO Dtos/CheckDtos.cs CredMask.Of).
+const CRED_CHECK_ID = process.env.SYNTHWATCH_CRED_CHECK_ID ?? "353";
 if (AI_TOKEN) {
-  for (const [name, path] of Object.entries({ channels: "/channels", reconcile_plan: "/reconcile/plan" })) {
+  for (const [name, path] of Object.entries({
+    channels: "/channels",
+    reconcile_plan: "/reconcile/plan",
+    check_detail_creds: `/checks/${CRED_CHECK_ID}`,
+  })) {
     try {
       const res = await fetch(BASE + path, { headers: { accept: "application/json", authorization: `Bearer ${AI_TOKEN}` } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -107,7 +116,7 @@ if (AI_TOKEN) {
     }
   }
 } else {
-  console.log("skipped  channels + reconcile/plan (set SYNTHWATCH_API_TOKEN to replace the Option-B fixtures)");
+  console.log("skipped  channels + reconcile/plan + check_detail_creds (set SYNTHWATCH_API_TOKEN to replace the Option-B fixtures)");
 }
 
 const AI_RUN_ID = process.env.SYNTHWATCH_AI_RUN_ID ?? "844515";

@@ -708,39 +708,68 @@ test.describe("check detail — sandbox run for a paused monitor", () => {
   });
 });
 
-// ★ Secret-headers viewer (synthwatch-api #197 projects check.secretHeaders = { header → ENV_VAR_NAME },
-// editor-gated + runner-owned so READ-ONLY). Refs only — the env-var NAME is shown, never a value; there is
-// no value input. The API nulls the field for anon/viewer, so the panel self-hides (gate respected on data).
-test.describe("check detail — secret headers (refs-only, read-only, editor-gated)", () => {
-  test("renders the secret-header REFS ({header → ENV_VAR_NAME}); refs only, no value input", async ({ page }) => {
+// ★ Model-B credential EDITOR (Step C). The API stores ENCRYPTED VALUES (write-only) and masks every
+// configured slot to "set" on read ({ name → "set" }), session-gated to editors. This panel lets an editor
+// SET values (secret_headers + login_credentials) via PUT /checks/{id}/credentials; the value is never read
+// back. NO real secret in these tests — dummy values only.
+test.describe("check detail — credential editor (model B, write-only, editor-gated)", () => {
+  test("editor sees value inputs + current slots masked as 'set' (never a value)", async ({ page }) => {
     const w = defaultWorld();
     w.details[1] = detail(
-      { id: 1, name: "Wegmans API", kind: "http", secretHeaders: { Authorization: "WEGMANS_BEARER_ENV", "X-Api-Key": "WEGMANS_APIKEY_ENV" } },
+      // masked read shape: { name → "set" } for a configured slot (the API never serves the value)
+      { id: 1, name: "Wegmans API", kind: "http", secretHeaders: { "X-Api-Key": "set" }, loginCredentials: { username: "set" } },
       [run({ id: 100, status: "pass" })],
     );
-    await mockApi(page, w);
+    await mockApi(page, w); // default seeds an EDITOR session → canWrite
     await page.goto("/checks/1");
 
-    const panel = page.getByTestId("secret-headers-panel");
+    const panel = page.getByTestId("credentials-panel");
     await expect(panel).toBeVisible();
-    // ★ header NAME → ENV VAR REF NAME (both non-secret references)
-    await expect(panel.getByTestId("secret-header-Authorization")).toContainText("Authorization");
-    await expect(panel.getByTestId("secret-header-Authorization")).toContainText("WEGMANS_BEARER_ENV");
-    await expect(panel.getByTestId("secret-header-X-Api-Key")).toContainText("WEGMANS_APIKEY_ENV");
-    // ★ REF NAMES ONLY — read-only viewer: NO value input anywhere (no <input>/<textarea>)
-    await expect(panel.locator("input")).toHaveCount(0);
-    await expect(panel.locator("textarea")).toHaveCount(0);
-    await expect(panel).toContainText(/reference names only/i);
+    // configured slots render masked "set", never a value/ciphertext
+    await expect(panel.getByTestId("cred-slot-secretHeaders-X-Api-Key")).toContainText("set");
+    await expect(panel.getByTestId("cred-slot-loginCredentials-username")).toContainText("set");
+    // it's an EDITOR now: value inputs exist for both columns
+    await expect(panel.getByTestId("cred-value-secretHeaders-0")).toBeVisible();
+    await expect(panel.getByTestId("cred-value-loginCredentials-0")).toBeVisible();
+    // honesty caption: encrypted + write-only
+    await expect(panel.getByTestId("credentials-honesty")).toContainText(/encrypted/i);
+    await expect(panel.getByTestId("credentials-honesty")).toContainText(/write-only/i);
   });
 
-  test("no panel when the field is null (anon/viewer — API editor-gate nulls it, or the monitor has none)", async ({ page }) => {
+  test("non-editor sees NOTHING (inherited gate — API nulls the fields, panel canWrite-gated)", async ({ page }) => {
     const w = defaultWorld();
-    // The API session-gates the readback: an anonymous/viewer caller gets secret_headers = null → self-hide.
-    w.details[1] = detail({ id: 1, name: "Wegmans API", kind: "http", secretHeaders: null }, [run({ id: 100, status: "pass" })]);
-    await mockApi(page, w);
+    w.details[1] = detail({ id: 1, name: "Wegmans API", kind: "http", secretHeaders: null, loginCredentials: null }, [run({ id: 100, status: "pass" })]);
+    await mockApi(page, w, { seedSession: false }); // anonymous → not canWrite
     await page.goto("/checks/1");
 
     await expect(page.getByRole("heading", { name: "Wegmans API" })).toBeVisible();
-    await expect(page.getByTestId("secret-headers-panel")).toHaveCount(0);
+    await expect(page.getByTestId("credentials-panel")).toHaveCount(0);
+  });
+
+  test("★ writing a secret PUTs the right body (dummy value) and refreshes the masked state", async ({ page }) => {
+    const w = defaultWorld();
+    w.details[1] = detail({ id: 1, name: "Wegmans API", kind: "http", secretHeaders: null, loginCredentials: null }, [run({ id: 100, status: "pass" })]);
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+
+    const panel = page.getByTestId("credentials-panel");
+    await expect(panel).toBeVisible();
+    // no slot yet
+    await expect(panel.getByTestId("cred-slot-secretHeaders-X-Api-Key")).toHaveCount(0);
+
+    // capture the outbound PUT — assert it carries the plaintext body we typed (a DUMMY, never a real secret)
+    const putP = page.waitForRequest(
+      (r) => r.method() === "PUT" && /\/checks\/1\/credentials$/.test(r.url()),
+    );
+    await panel.getByTestId("cred-name-secretHeaders-0").fill("X-Api-Key");
+    await panel.getByTestId("cred-value-secretHeaders-0").fill("dummy-not-a-real-secret");
+    await panel.getByTestId("cred-save-secretHeaders").click();
+
+    const put = await putP;
+    expect(JSON.parse(put.postData() || "{}")).toEqual({ secretHeaders: { "X-Api-Key": "dummy-not-a-real-secret" } });
+
+    // after the write the mock re-GETs and the slot now shows masked "set" — the value is NOT round-tripped
+    await expect(panel.getByTestId("cred-slot-secretHeaders-X-Api-Key")).toContainText("set");
+    await expect(panel).not.toContainText("dummy-not-a-real-secret");
   });
 });
