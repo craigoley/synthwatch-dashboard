@@ -335,6 +335,7 @@ interface RawCheck {
   failureThreshold: number;
   severity: string;
   enabled: boolean;
+  environment?: string | null; // authoritative checks.environment column (api #205); absent → default "prod"
   lighthouseEnabled: boolean;
   lighthouseIntervalSeconds?: number | null;
   lighthouseFormFactor?: string | null;
@@ -506,6 +507,7 @@ function mapCheck(raw: RawCheck): Check {
     failure_threshold: raw.failureThreshold,
     severity: raw.severity,
     enabled: raw.enabled,
+    environment: raw.environment ?? "prod", // authoritative column (api #205); default prod when absent
     created_at: raw.createdAt,
     lighthouse_enabled: raw.lighthouseEnabled,
     lighthouse_interval_seconds: raw.lighthouseIntervalSeconds ?? null,

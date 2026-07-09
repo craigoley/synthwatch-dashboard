@@ -123,7 +123,11 @@ export default function StatusPage() {
             >
               <StatusGlyph token={system.token} />
               <div>
-                <h1 className="text-xl font-semibold tracking-tight" style={{ color: TONE_VAR[system.token] }}>
+                <h1
+                  className="text-xl font-semibold tracking-tight"
+                  style={{ color: TONE_VAR[system.token] }}
+                  data-testid="system-status-label"
+                >
                   {system.label}
                 </h1>
                 <p className="mt-0.5 text-sm text-[var(--color-ink-dim)]">
