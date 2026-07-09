@@ -145,6 +145,12 @@ export interface Check {
   failure_threshold: number;
   severity: string;
   enabled: boolean;
+  /**
+   * Deployment environment from the authoritative `checks.environment` column (api #205), NOT the user-mutable
+   * `env:` tag. "prod" | "staging" | "preview" | … ; defaults to "prod" when the API omits it. Non-prod checks
+   * are badged, filterable, and excluded from the fleet status banner (a staging fail must not flip it).
+   */
+  environment: string;
   created_at: string;
   lighthouse_enabled: boolean;
   lighthouse_interval_seconds: number | null;

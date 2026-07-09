@@ -33,6 +33,17 @@ const TABS: TabDef[] = [
 ];
 const TAB_IDS = TABS.map((t) => t.id);
 
+/** Caption for the SLO/MTTR/trust panels: these aggregates server-EXCLUDE non-prod checks (api #188), so a
+ *  staging check is intentionally absent, not missing. Renders nothing when the fleet is all prod. */
+function NonProdExcludedNote({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <p className="text-[11px] text-[var(--color-ink-faint)]" data-testid="nonprod-excluded-note">
+      {count} non-prod monitor{count === 1 ? "" : "s"} excluded (prod-only report).
+    </p>
+  );
+}
+
 /** URL-synced group-by tag KEY (?groupBy=team). "none" = no grouping (the no-querystring default). Mirrors the
  *  tag filter's history.replaceState approach (shareable/restorable, no Suspense needed). */
 function useGroupBy() {
@@ -66,6 +77,9 @@ export default function ReportsPage() {
   // availability (computed from up/down counts). The rollup reports, when present, ENRICH each row with
   // windowed latency percentiles + downtime/incident counts; when empty they simply don't override.
   const { data: checks, isLoading, error: checksError } = useChecks();
+  // Non-prod checks are server-excluded from the SLO/MTTR/trust aggregates (api #188). Count them so the
+  // panels can say so — otherwise a staging check silently absent reads as missing data, not intentional.
+  const nonProdCount = (checks ?? []).filter((c) => (c.environment ?? "prod") !== "prod").length;
   const { data: sla } = useSla(window);
   // ★ The aggregate tiles (CWV / trend / verdict-breakdown) take the SAME tag filter as the monitor list,
   // server-scoped via ?tag= — so a filtered view shows the SUBSET's numbers, never the fleet's. Empty → fleet.
@@ -255,6 +269,7 @@ export default function ReportsPage() {
 
       {tab === "reliability" && (
         <div className="space-y-5" data-testid="reports-panel-reliability">
+          <NonProdExcludedNote count={nonProdCount} />
           {/* P6 — alert-quality breakdown: how many reds were real vs monitor-bug vs transient. */}
           <IncidentBreakdownCard window={window} tags={selected} />
           {/* ★ Fleet error budget (P5 v1) — per-check budget rows + a fleet rollup, tag-scoped. */}
@@ -303,7 +318,8 @@ export default function ReportsPage() {
       {/* §D1 monitor-trust scorecard — relocated from a top-level /trust route to a Reports sub-tab (v2). Uses
           the page's shared window. Fleet-wide (no tag scoping — the trust API is not tag-filtered). */}
       {tab === "trust" && (
-        <div data-testid="reports-panel-trust">
+        <div className="space-y-3" data-testid="reports-panel-trust">
+          <NonProdExcludedNote count={nonProdCount} />
           <TrustScorecard window={window} />
         </div>
       )}

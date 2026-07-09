@@ -17,6 +17,10 @@ import type { CheckWithStatus, Tag } from "@/lib/types";
 
 type StatusFilter = "all" | "attention" | "pass" | "paused";
 type KindFilter = "all" | "http" | "browser" | "ssl";
+type EnvFilter = "all" | "prod" | "nonprod";
+
+/** Env facet from the authoritative checks.environment column (not the env: tag). */
+const isNonProd = (check: CheckWithStatus) => (check.environment ?? "prod") !== "prod";
 
 function matches(
   check: CheckWithStatus,
@@ -24,8 +28,11 @@ function matches(
   kind: KindFilter,
   q: string,
   tags: Tag[],
+  env: EnvFilter,
 ): boolean {
   if (kind !== "all" && check.kind !== kind) return false;
+  if (env === "prod" && isNonProd(check)) return false;
+  if (env === "nonprod" && !isNonProd(check)) return false;
   if (!matchesTags(check.tags, tags)) return false; // AND across selected tags (reuses the shared logic)
   if (q && !`${check.name} ${check.flow_name ?? ""} ${check.target_url ?? ""}`.toLowerCase().includes(q))
     return false;
@@ -94,6 +101,7 @@ function StatusGrid() {
 
   const status = (params.get("status") as StatusFilter) || "all";
   const kind = (params.get("kind") as KindFilter) || "all";
+  const env = (params.get("env") as EnvFilter) || "all";
   const q = (params.get("q") || "").toLowerCase();
   // Tags reuse the shared useTagFilter (useState + history.replaceState, same `?tags=env:prod` format as the
   // /monitors + /reports filters). Its clear() resets via state — reliable, unlike router.replace("/") which
@@ -116,9 +124,12 @@ function StatusGrid() {
   };
 
   const filtered = useMemo(
-    () => (data ?? []).filter((c) => matches(c, status, kind, q, selectedTags)),
-    [data, status, kind, q, selectedTags],
+    () => (data ?? []).filter((c) => matches(c, status, kind, q, selectedTags, env)),
+    [data, status, kind, q, selectedTags, env],
   );
+  // The env facet only appears when the fleet actually HAS a non-prod check — a pure-prod fleet's grid is
+  // visually unchanged (no extra control). Env is the authoritative column, never the user-mutable env: tag.
+  const hasNonProd = useMemo(() => (data ?? []).some(isNonProd), [data]);
 
   return (
     <div className="space-y-6">
@@ -173,6 +184,20 @@ function StatusGrid() {
             SSL
           </FilterTab>
         </div>
+        {/* Env facet — only when a non-prod check exists (a pure-prod fleet sees no extra control). */}
+        {hasNonProd && (
+          <div className="flex rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-0.5" data-testid="env-filter">
+            <FilterTab active={env === "all"} onClick={() => setParam("env", "all")}>
+              All envs
+            </FilterTab>
+            <FilterTab active={env === "prod"} onClick={() => setParam("env", "prod")}>
+              Prod
+            </FilterTab>
+            <FilterTab active={env === "nonprod"} onClick={() => setParam("env", "nonprod")}>
+              Non-prod
+            </FilterTab>
+          </div>
+        )}
         <input
           className="sw-input sm:max-w-xs"
           placeholder="Search name, url, flow…"

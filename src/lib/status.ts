@@ -121,11 +121,15 @@ const SYSTEM_META: Record<SystemStatus, SystemStatusMeta> = {
  *   major   — an open critical incident, or a critical service currently down
  *   partial — an open warning incident, a non-critical service down, or degraded
  *   operational — otherwise
+ *
+ * ★ PROD-ONLY: non-prod (staging/preview) checks are excluded — the public banner is the PROD promise, and a
+ * staging fail must never flip it (display-side pollution the API's aggregation exclude can't fix, since this
+ * rolls up the raw /checks list). Env comes from the authoritative `checks.environment` column, not the tag.
  */
 export function deriveSystemStatus(checks: CheckWithStatus[]): SystemStatusMeta {
   let partial = false;
   for (const c of checks) {
-    if (!c.enabled) continue;
+    if (!c.enabled || (c.environment ?? "prod") !== "prod") continue;
     const down = c.current_status === "fail" || c.current_status === "error";
     const degraded = c.current_status === "warn";
     const openCritical = c.open_incident_count > 0 && c.max_open_severity === "critical";

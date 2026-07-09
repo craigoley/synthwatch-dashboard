@@ -60,6 +60,9 @@ const SEAMS = {
   narrative_fleet_7d: "/reports/narrative?scope=fleet&window=7d",
   runs_check4: "/checks/4/runs?pageSize=10",
   check_detail_10: "/checks/10",
+  // Staging check (api #205 projects the authoritative checks.environment column). Anchors that the dashboard
+  // reads `environment` from the real DTO — check 354 is the Wegmans PREVIEW monitor, environment='staging'.
+  check_detail_staging: "/checks/354",
   // ★ Previously orphaned: these fixtures are consumed by high-risk-seams.contract.ts but were missing here,
   // so capture:contracts never refreshed them — the drift-detection net silently didn't run for the seams
   // with FABRICATED/derived fields (getMetrics derives started_at + hardcodes status; getAvailabilitySeries;
