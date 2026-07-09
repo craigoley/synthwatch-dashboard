@@ -378,19 +378,26 @@ export default function CheckDetailPage() {
             THIS wrapper's min-w-0 is the load-bearing constraint — the target-URL <a>'s own min-w-0 is
             redundant; e2e/detail.spec.ts:157-179 reds only if THIS one is removed, not the <a>'s. */}
         <div className="min-w-0">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{check.name}</h1>
-            <span className="flex items-center gap-1.5">
-              <span className="text-[9px] uppercase tracking-wider text-[var(--color-ink-faint)]">latest run</span>
-              <StatusBadge status={recent_runs[0]?.status ?? null} />
-            </span>
-            {!check.enabled && (
-              <span className="sw-mono text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">
-                paused
+          {/* ★ MOBILE: stack title above the status cluster (this row had NO wrap/breakpoint, so at phone
+              width a long name wrapped ~6 lines in a narrow column with the status squeezed beside it).
+              Single column + a stepped-down title on mobile; the original side-by-side row from sm: up. */}
+          <div className="flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{check.name}</h1>
+            {/* Grouped so the status cluster is ONE wrapping row below the title on mobile (not three
+                stacked lines), and inline beside the title from sm: up — content/order unchanged. */}
+            <span className="flex flex-wrap items-center gap-3">
+              <span className="flex items-center gap-1.5">
+                <span className="text-[9px] uppercase tracking-wider text-[var(--color-ink-faint)]">latest run</span>
+                <StatusBadge status={recent_runs[0]?.status ?? null} />
               </span>
-            )}
-            {/* B10: a sensitive-but-unredacted monitor is flagged loudly right in the header. */}
-            <RedactionBadge health={check.redaction_health} />
+              {!check.enabled && (
+                <span className="sw-mono text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+                  paused
+                </span>
+              )}
+              {/* B10: a sensitive-but-unredacted monitor is flagged loudly right in the header. */}
+              <RedactionBadge health={check.redaction_health} />
+            </span>
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-[var(--color-ink-dim)]">
             <span className="sw-mono uppercase">{check.kind}</span>
