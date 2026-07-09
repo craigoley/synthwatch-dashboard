@@ -38,6 +38,21 @@ test.describe("cost UI rework — Cost tab + card cost + modal live recompute", 
     await expect(page.getByTestId("fleet-cost-estimate-label")).toContainText("$0.00003/vCPU-s");
   });
 
+  test("★ NO CLIENT CAP: all top_cost_drivers render — the API ranks/limits (topN=50), the dashboard never slices", async ({ page }) => {
+    // The API returns the ranked+capped list; the dashboard must render every row it's handed (no `.slice()`
+    // below the API's N). Serve 12 drivers — well past the old 5-row fallback cap — and assert all 12 show.
+    const drivers = Array.from({ length: 12 }, (_, i) =>
+      costCheck({ checkId: 100 + i, name: `driver-${i}`, projectedMonthly: 12 - i })
+    );
+    await mockApi(page, costWorld(drivers));
+    await page.goto("/reports?tab=cost");
+
+    const rows = page.getByTestId("fleet-cost-drivers").getByRole("listitem");
+    await expect(rows).toHaveCount(12); // every returned driver, not a client-capped subset
+    await expect(page.getByTestId("cost-driver-100")).toBeVisible(); // first
+    await expect(page.getByTestId("cost-driver-111")).toBeVisible(); // 12th (past the old 5-cap)
+  });
+
   test("monitor card shows its own projected $/mo (est.); a check with no cost row shows none", async ({ page }) => {
     await mockApi(page, costWorld([costCheck({ checkId: 1, name: "API health", kind: "http", projectedMonthly: 0.7 })]));
     await page.goto("/");

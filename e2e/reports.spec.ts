@@ -156,7 +156,7 @@ test.describe("reports — per-monitor cards + tag filter (Monitors tab)", () =>
 test.describe("reports — fleet CWV + trend (P1/P2, Performance tab)", () => {
   test("fleet Core Web Vitals (p75) card renders LCP/CLS/FCP/TTFB + INP + resource count (P9 Stage 3)", async ({ page }) => {
     await mockApi(page, world());
-    await page.goto("/reports");
+    await page.goto("/reports?tab=performance");
 
     const cwv = page.getByTestId("report-cwv");
     await expect(cwv).toBeVisible();
@@ -180,7 +180,7 @@ test.describe("reports — fleet CWV + trend (P1/P2, Performance tab)", () => {
     const w = world();
     w.vitalsNoInp = true; // webVitals present, but inpP75Ms/inpCount absent
     await mockApi(page, w);
-    await page.goto("/reports");
+    await page.goto("/reports?tab=performance");
 
     const inp = page.getByTestId("report-cwv-inp");
     await expect(inp).toContainText("INP");
@@ -194,7 +194,7 @@ test.describe("reports — fleet CWV + trend (P1/P2, Performance tab)", () => {
 
   test("fleet trend renders from the report series (availability + avg latency)", async ({ page }) => {
     await mockApi(page, world());
-    await page.goto("/reports");
+    await page.goto("/reports?tab=performance");
 
     const trend = page.getByTestId("report-fleet-trend");
     await expect(trend).toBeVisible();
@@ -206,7 +206,7 @@ test.describe("reports — fleet CWV + trend (P1/P2, Performance tab)", () => {
     const w = world();
     w.checks = w.checks.filter((c) => c.kind !== "browser"); // http-only fleet → no web vitals
     await mockApi(page, w);
-    await page.goto("/reports");
+    await page.goto("/reports?tab=performance");
 
     await expect(page.getByTestId("reports-panel-performance")).toBeVisible(); // the tab still renders
     await expect(page.getByTestId("report-cwv")).toHaveCount(0); // but no vitals card (none captured)
@@ -284,7 +284,7 @@ test.describe("reports — cert runway (P3, Monitors tab)", () => {
 test.describe("reports — tag-scoped aggregates", () => {
   test("a tag filter scopes the tiles + shows a scope banner (obvious subset)", async ({ page }) => {
     await mockApi(page, world());
-    await page.goto("/reports?tags=team:web"); // only check 2 (browser) carries team:web
+    await page.goto("/reports?tab=performance&tags=team:web"); // only check 2 (browser) carries team:web
 
     const banner = page.getByTestId("report-scope-banner");
     await expect(banner).toBeVisible();
@@ -299,7 +299,7 @@ test.describe("reports — tag-scoped aggregates", () => {
 
   test("a tag with no matching monitors → honest empty (no fake 0%), banner shows 0", async ({ page }) => {
     await mockApi(page, world());
-    await page.goto("/reports?tags=team:none");
+    await page.goto("/reports?tab=performance&tags=team:none");
 
     await expect(page.getByTestId("report-scope-banner")).toContainText("0 of");
     // Performance tab: the aggregate tiles vanish (no data) rather than showing a fabricated number…

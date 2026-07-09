@@ -70,10 +70,28 @@ test.describe("reporting layer 3 — narrative card", () => {
 
   test("graceful: no narrative served → card hidden (no error, no empty box)", async ({ page }) => {
     await mockApi(page, defaultWorld()); // no narratives → /reports/narrative 404s
-    await page.goto("/reports");
+    await page.goto("/reports"); // Summary is the default tab
 
-    await expect(page.getByTestId("reports-panel-performance")).toBeVisible(); // page/tab itself fine
-    await expect(page.getByTestId("narrative-card")).toHaveCount(0); // card hidden
+    await expect(page.getByTestId("reports-panel-summary")).toHaveCount(1); // the tab/panel mounted (empty is fine)
+    await expect(page.getByTestId("reports-tab-summary")).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId("narrative-card")).toHaveCount(0); // card hidden — no error, no empty box
+  });
+
+  test("Summary tab under a tag filter → fleet-only note, not a fleet story read as the subset", async ({ page }) => {
+    const w = worldWithNarrative();
+    w.tags = [{ key: "env", value: "prod", count: 1 }]; // in-use tag → the global TagFilter renders
+    await mockApi(page, w);
+    await page.goto("/reports?tags=env:prod"); // Summary is default; a tag filter is active
+
+    await expect(page.getByTestId("reports-panel-summary")).toBeVisible();
+    // The fleet narrative is NOT shown scoped to a tag subset — a note explains instead.
+    await expect(page.getByTestId("narrative-card")).toHaveCount(0);
+    await expect(page.getByTestId("summary-fleet-only-note")).toBeVisible();
+
+    // Clearing the filter reveals the fleet narrative.
+    await page.getByTestId("clear-tag-filter").click();
+    await expect(page.locator('[data-testid="narrative-card"][data-scope="fleet"]')).toBeVisible();
+    await expect(page.getByTestId("summary-fleet-only-note")).toHaveCount(0);
   });
 
   test("compact per-monitor narrative shows directly on the monitor's report card", async ({ page }) => {
