@@ -166,6 +166,12 @@ export interface Check {
    * null for anonymous/viewer callers. null when the monitor uses none.
    */
   secret_headers: Record<string, string> | null;
+  /**
+   * Model-B login credentials: { role -> value }, e.g. { username, password }. WRITE-ONLY — the API
+   * encrypts on write and the read DTO masks each slot to the literal "set" (never the value/ciphertext),
+   * session-gated to editors (null for anon/viewer, like secret_headers). Written via PUT /checks/{id}/credentials.
+   */
+  login_credentials: Record<string, string> | null;
   request_body: string | null;
   auth: CheckAuth | null;
   /** Multistep checks: ordered API-chain steps (null/empty otherwise). */

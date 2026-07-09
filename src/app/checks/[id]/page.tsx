@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth-provider";
 import { AvailabilityChart, LatencyChart, MetricsCharts } from "@/components/charts";
 import { CheckSlaPanel, SloPanel } from "@/components/sla";
 import { MonitorCostPanel } from "@/components/cost";
+import { CredentialsPanel } from "@/components/credentials-panel";
 import { TrustCard } from "@/components/trust";
 import { RunHistory } from "@/components/run-history";
 import { LiveStepsChecklist } from "@/components/live-steps";
@@ -95,45 +96,6 @@ function NetPanel({ check, latest }: { check: Check; latest: Run | null }) {
       {latest?.duration_ms != null && (
         <p className="mt-2 text-xs text-[var(--color-ink-faint)]">latency {formatDuration(latest.duration_ms)}</p>
       )}
-    </div>
-  );
-}
-
-/**
- * Per-monitor SECRET request headers (synthwatch-api #197; runner migration 0061). READ-ONLY — shows WHICH
- * env-var REFERENCE each secret header resolves to (`{ headerName -> ENV_VAR_NAME }`). Reference names only:
- * the credential VALUE lives in an ACA secret / env var the runner resolves at request time and is never
- * stored or returned here — there is no value input. The API is runner-owned for this field (no dashboard
- * write path), so this is a viewer, not an editor. Self-hides when null: the field is null both when the
- * monitor uses no secret headers AND when the caller isn't a write-session (the API editor-gates the
- * readback), so an anonymous/viewer sees nothing — the gate is respected by rendering only on data.
- */
-function SecretHeadersPanel({ check }: { check: Check }) {
-  const entries = Object.entries(check.secret_headers ?? {});
-  if (entries.length === 0) return null;
-  return (
-    <div className="sw-panel p-4" data-testid="secret-headers-panel">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-[var(--color-ink)]">Secret headers</h3>
-        <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
-          references only
-        </span>
-      </div>
-      <div className="space-y-1.5">
-        {entries.map(([header, envRef]) => (
-          <div key={header} className="flex items-center gap-2 text-[13px]" data-testid={`secret-header-${header}`}>
-            <span className="sw-mono truncate text-[var(--color-ink)]">{header}</span>
-            <span aria-hidden className="text-[var(--color-ink-faint)]">→</span>
-            <span className="sw-mono truncate text-[var(--color-brand)]" title={`resolved from process.env.${envRef}`}>
-              {envRef}
-            </span>
-          </div>
-        ))}
-      </div>
-      <p className="mt-2 text-[11px] text-[var(--color-ink-faint)]">
-        Reference names only — each value is set as an ACA secret / env var out-of-band and is never shown here.
-        Runner-managed (read-only).
-      </p>
     </div>
   );
 }
@@ -573,8 +535,9 @@ export default function CheckDetailPage() {
         <StepChainPanel steps={check.steps ?? []} latest={recent_runs[0] ?? null} />
       )}
 
-      {/* Editor-only (the API nulls secret_headers for anon/viewer) — self-hides otherwise. */}
-      <SecretHeadersPanel check={check} />
+      {/* Model-B credential editor (Step C). Editor-only (canWrite); the API also nulls the masked slots for
+          a non-write session, so a viewer never sees it. Write-only: values are set, never read back. */}
+      <CredentialsPanel check={check} />
 
       <PerLocationPanel runs={recent_runs} />
 

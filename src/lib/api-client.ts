@@ -346,7 +346,8 @@ interface RawCheck {
   slo?: Slo | null;
   assertions?: Assertion[] | null;
   requestHeaders?: Record<string, string> | null;
-  secretHeaders?: Record<string, string> | null; // #197 refs-only { headerName -> ENV_VAR_NAME }; session-gated (null for anon)
+  secretHeaders?: Record<string, string> | null; // model B: masked { headerName -> "set" }; session-gated (null for anon)
+  loginCredentials?: Record<string, string> | null; // model B: masked { role -> "set" }; session-gated (null for anon)
   requestBody?: string | null;
   auth?: CheckAuth | null;
   tags?: Tag[] | null;
@@ -520,7 +521,8 @@ function mapCheck(raw: RawCheck): Check {
     // header dict), so pass them through unchanged.
     assertions: raw.assertions ?? [],
     request_headers: raw.requestHeaders ?? null,
-    secret_headers: raw.secretHeaders ?? null, // refs only; the API sends this to editors, null to anon/viewer
+    secret_headers: raw.secretHeaders ?? null, // model B: masked {name->"set"}; API sends to editors, null to anon/viewer
+    login_credentials: raw.loginCredentials ?? null, // model B: masked {role->"set"}; editor-gated like secret_headers
     request_body: raw.requestBody ?? null,
     auth: raw.auth ?? null,
     tags: raw.tags ?? [],
@@ -683,6 +685,32 @@ export async function listChecks(): Promise<CheckWithStatus[]> {
 export async function getCheck(id: number): Promise<CheckDetail> {
   const raw = await request<RawCheckDetail>(`/checks/${id}`);
   return { check: mapCheck(raw), recent_runs: (raw.recentRuns ?? []).map(mapRun) };
+}
+
+/** The masked echo the write endpoint (and every read) returns: { key -> "set" }, never a value/ciphertext. */
+export interface MaskedCredentials {
+  secret_headers: Record<string, string> | null;
+  login_credentials: Record<string, string> | null;
+}
+
+/**
+ * PUT /api/checks/{id}/credentials — model B: SET a monitor's secret_headers / login_credentials VALUES
+ * (encrypted server-side; the DB never holds plaintext). Editor/admin-gated (PUT verb-gate → anon 401); the
+ * bearer rides `request()` like every other write. ★ REPLACE semantics per column: each provided map REPLACES
+ * that whole column (send the full desired set); an omitted map leaves it unchanged; an EMPTY map clears it.
+ * The response is WRITE-ONLY — masked slots ({key->"set"}) only, so a caller can never round-trip a value.
+ * Send PLAINTEXT values; they are encrypted before store.
+ */
+export async function setCredentials(
+  id: number,
+  body: { secretHeaders?: Record<string, string>; loginCredentials?: Record<string, string> },
+): Promise<MaskedCredentials> {
+  const raw = await request<{ secretHeaders?: Record<string, string> | null; loginCredentials?: Record<string, string> | null }>(
+    `/checks/${id}/credentials`,
+    undefined,
+    { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) },
+  );
+  return { secret_headers: raw?.secretHeaders ?? null, login_credentials: raw?.loginCredentials ?? null };
 }
 
 /**

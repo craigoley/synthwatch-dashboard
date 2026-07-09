@@ -448,6 +448,29 @@ export async function mockApi(
       world.checkTags = { ...(world.checkTags ?? {}), [id]: tags };
       return json(route, tags);
     }
+    // PUT credentials (model B, stateful) — body { secretHeaders?, loginCredentials? } with PLAINTEXT values.
+    // Mirrors the real API: each provided map REPLACES that column, each slot MASKED to "set" on store/echo
+    // (never the value); an omitted map is unchanged; an empty map clears. The masked slots persist into the
+    // check detail so a re-GET reflects them — exactly the write-only round-trip the editor relies on.
+    if ((m = path.match(/^\/api\/checks\/(\d+)\/credentials$/)) && method === "PUT") {
+      const id = Number(m[1]);
+      const body = JSON.parse(req.postData() || "{}") as {
+        secretHeaders?: Record<string, string>;
+        loginCredentials?: Record<string, string>;
+      };
+      const mask = (map?: Record<string, string>): RawObj | null | undefined => {
+        if (map == null) return undefined; // omitted → column unchanged
+        const keys = Object.keys(map);
+        return keys.length === 0 ? null : Object.fromEntries(keys.map((k) => [k, "set"]));
+      };
+      const d = (world.details[id] ?? {}) as RawObj;
+      const sh = mask(body.secretHeaders);
+      const lc = mask(body.loginCredentials);
+      if (sh !== undefined) d.secretHeaders = sh;
+      if (lc !== undefined) d.loginCredentials = lc;
+      world.details[id] = d;
+      return json(route, { secretHeaders: d.secretHeaders ?? null, loginCredentials: d.loginCredentials ?? null });
+    }
     // PUT location assignment — mirrors the API's ≥1-location rule (empty → 400).
     if (/^\/api\/checks\/(\d+)\/locations$/.test(path) && method === "PUT") {
       const body = JSON.parse(req.postData() || "{}");
