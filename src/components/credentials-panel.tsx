@@ -50,7 +50,7 @@ export function CredentialsPanel({ check }: { check: Check }) {
         column="loginCredentials"
         title="Login credentials"
         keyLabel="Field"
-        keyPlaceholder="username"
+        keyPlaceholder="role (e.g. username)"
         current={check.login_credentials}
       />
 
