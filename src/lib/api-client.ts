@@ -1681,6 +1681,34 @@ function toFactChips(fp: unknown): NarrativeFact[] {
     facts.push({ label: "Incidents", value: String(c.incidents), delta: d.incidents ? signed(d.incidents, "") : null });
   if (c.downtimeMin != null)
     facts.push({ label: "Downtime", value: `${c.downtimeMin}m`, delta: d.downtimeMin ? signed(d.downtimeMin, "m") : null });
+
+  // Cost citations (Layer 3). The runner writes fleet compute-cost into fact_pack.cost
+  // ({ fleetProjected, fleetMeasured, fleetDivergence, notable:[{name,projected,divergenceFlag,…}], topDrivers }).
+  // Fleet-scoped only (guard on scopeType) so a monitor card never cites the whole fleet's cost; self-absent
+  // when the pack predates cost (fleetProjected == null → no chips, never a fake $0). Cites the real keys
+  // field-for-field, same discipline as the reliability chips above.
+  const cost = (o.cost ?? {}) as {
+    fleetProjected?: number | null;
+    fleetMeasured?: number | null;
+    fleetDivergence?: number | null;
+    notable?: Array<{ name?: string; projected?: number | null; divergenceFlag?: boolean }>;
+  };
+  if (o.scopeType === "fleet" && cost.fleetProjected != null) {
+    const usd = (n: number) => `$${n.toFixed(2)}/mo`;
+    facts.push({ label: "Proj. cost", value: usd(cost.fleetProjected), delta: null });
+    if (cost.fleetMeasured != null)
+      // divergence = measured/projected; surface how far measured runs under/over projected (signed %).
+      facts.push({
+        label: "Measured",
+        value: usd(cost.fleetMeasured),
+        delta: cost.fleetDivergence != null ? signed(Math.round((cost.fleetDivergence - 1) * 100), "%") : null,
+      });
+    const top = cost.notable?.[0];
+    if (top?.projected != null && top.name) {
+      const name = top.name.length > 26 ? `${top.name.slice(0, 25)}…` : top.name;
+      facts.push({ label: "Top cost", value: usd(top.projected), delta: `${top.divergenceFlag ? "⚠ " : ""}${name}` });
+    }
+  }
   return facts;
 }
 

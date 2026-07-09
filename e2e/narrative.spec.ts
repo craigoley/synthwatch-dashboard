@@ -68,6 +68,34 @@ test.describe("reporting layer 3 — narrative card", () => {
     await expect(facts.filter({ hasText: "Availability" })).toContainText("99.2%");
   });
 
+  test("★ cost-citation chips render from factPack.cost (fleet), never a fake $0 when absent", async ({ page }) => {
+    const w = worldWithNarrative();
+    // Add the runner's structured cost object (matches the live factPack.cost shape) to the fleet narrative.
+    const fleet = w.narratives?.fleet;
+    if (fleet) {
+      fleet.factPack = {
+        current: { availabilityPct: 99.2, p95: 420, incidents: 1, downtimeMin: 45 },
+        deltas: { availabilityPts: -0.3, p95Pct: 15, incidents: 1, downtimeMin: 30 },
+        scopeType: "fleet",
+        cost: {
+          fleetProjected: 67.33,
+          fleetMeasured: 51.25,
+          fleetDivergence: 0.761,
+          notable: [{ name: "Wegmans: recipe navigation", projected: 8.81, divergenceFlag: false }],
+        },
+      };
+    }
+    await mockApi(page, w);
+    await page.goto("/reports");
+
+    const facts = page.locator('[data-scope="fleet"] [data-testid="narrative-fact"]');
+    // the fleet cost figures are cited as chips beside the reliability ones
+    await expect(facts.filter({ hasText: "Proj. cost" })).toContainText("$67.33/mo");
+    await expect(facts.filter({ hasText: "Measured" })).toContainText("$51.25/mo");
+    await expect(facts.filter({ hasText: "Measured" })).toContainText("-24%"); // under projected (divergence)
+    await expect(facts.filter({ hasText: "Top cost" })).toContainText("$8.81/mo");
+  });
+
   test("graceful: no narrative served → card hidden (no error, no empty box)", async ({ page }) => {
     await mockApi(page, defaultWorld()); // no narratives → /reports/narrative 404s
     await page.goto("/reports"); // Summary is the default tab

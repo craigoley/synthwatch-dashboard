@@ -1,190 +1,402 @@
 {
-  "scope": "fleet",
-  "key": "",
-  "window": "7d",
-  "headline": "Fleet 7d: availability 77.19% (-0.47pts w/w), 14 incident(s).",
-  "body": "Availability 77.19% (-0.47pts w/w) over 7d. 14 incident(s) opened (real-outage, unclassified, environment-regional, selector-drift, flaky-transient); 5270 min downtime. p95 32987ms (+232.1% w/w). p95 latency up 232.1% w/w (9932ms -> 32987ms). Incidents up 7 w/w (7 -> 14). Repeat offender: 4 incidents with the same failure signature. Lowest-availability monitors: Wegmans: recipe search 0.00%, rca-demo 0.00%, Meals 2 Go: browse a cuisine menu (anon) 50.00%.",
-  "highlights": [
-    "p95 latency up 232.1% w/w (9932ms -> 32987ms).",
-    "Incidents up 7 w/w (7 -> 14).",
-    "Repeat offender: 4 incidents with the same failure signature.",
-    "Lowest-availability monitors: Wegmans: recipe search 0.00%, rca-demo 0.00%, Meals 2 Go: browse a cuisine menu (anon) 50.00%."
-  ],
-  "generatedAt": "2026-07-01T00:30:29.514478+00:00",
-  "stale": false,
-  "model": "fallback-template",
-  "factPack": {
-    "deltas": {
-      "p95Pct": 232.1,
-      "incidents": 7,
-      "downtimeMin": 2968,
-      "availabilityPts": -0.47
-    },
+    "scope": "fleet",
+    "key": "",
     "window": "7d",
-    "current": {
-      "to": "2026-07-01T00:00:00.000Z",
-      "up": 8640,
-      "p50": 2629,
-      "p95": 32987,
-      "p99": 36984,
-      "down": 2553,
-      "from": "2026-06-24T00:00:00.000Z",
-      "lcpP75": 5032,
-      "latencyN": 8640,
-      "incidents": 14,
-      "downtimeMin": 5270,
-      "availabilityPct": 77.19
-    },
-    "previous": {
-      "to": "2026-06-24T00:00:00.000Z",
-      "up": 796,
-      "p50": 1694,
-      "p95": 9932,
-      "p99": 12640,
-      "down": 229,
-      "from": "2026-06-17T00:00:00.000Z",
-      "lcpP75": 1378,
-      "latencyN": 796,
-      "incidents": 7,
-      "downtimeMin": 2302,
-      "availabilityPct": 77.66
-    },
-    "scopeKey": "",
-    "anomalies": [
-      "p95 latency up 232.1% w/w (9932ms -> 32987ms).",
-      "Incidents up 7 w/w (7 -> 14).",
-      "Repeat offender: 4 incidents with the same failure signature.",
-      "Lowest-availability monitors: Wegmans: recipe search 0.00%, rca-demo 0.00%, Meals 2 Go: browse a cuisine menu (anon) 50.00%."
+    "headline": "Fleet 7d: availability 93.33% (+11.36pts w/w), 4 incident(s).",
+    "body": "Availability 93.33% (+11.36pts w/w) over 7d. 4 incident(s) opened (environment-regional, unclassified); 118 min downtime. p95 27240ms (-16.8% w/w). Lowest-availability monitors: rca-demo 0.00%, Wegmans B2C login \u2014 InfoSec on-demand unblock test 16.67%, kitting-catering-api 88.35%. Projected $67.33/mo, measured $51.25/mo (divergence 0.761\u00d7). rca-demo: $1.49/mo measured vs $0.86 projected (1.734\u00d7) \u2014 retry/slowdown amplification. 12 deploy(s) in-window (f0144141f23d, etag, etag).",
+    "highlights": [
+        "Lowest-availability monitors: rca-demo 0.00%, Wegmans B2C login \u2014 InfoSec on-demand unblock test 16.67%, kitting-catering-api 88.35%.",
+        "rca-demo cost divergence 1.734\u00d7"
     ],
-    "scopeName": "Fleet",
-    "scopeType": "fleet",
-    "incidentList": [
-      {
-        "check": "rca-demo",
-        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
-        "openedAt": "2026-06-24T00:10:18.675Z",
-        "severity": "critical",
-        "resolvedAt": "2026-06-24T12:47:04.984Z",
-        "durationMin": 757,
-        "classification": "real-outage"
-      },
-      {
-        "check": "rca-demo",
-        "summary": null,
-        "openedAt": "2026-06-24T12:50:34.933Z",
-        "severity": "critical",
-        "resolvedAt": "2026-06-24T13:36:02.258Z",
-        "durationMin": 45,
-        "classification": null
-      },
-      {
-        "check": "rca-demo",
-        "summary": null,
-        "openedAt": "2026-06-24T13:40:18.123Z",
-        "severity": "critical",
-        "resolvedAt": "2026-06-24T14:24:27.620Z",
-        "durationMin": 44,
-        "classification": null
-      },
-      {
-        "check": "rca-demo",
-        "summary": null,
-        "openedAt": "2026-06-24T14:25:33.325Z",
-        "severity": "critical",
-        "resolvedAt": "2026-06-24T14:58:55.588Z",
-        "durationMin": 33,
-        "classification": null
-      },
-      {
-        "check": "rca-demo",
-        "summary": null,
-        "openedAt": "2026-06-24T15:00:19.615Z",
-        "severity": "critical",
-        "resolvedAt": "2026-06-24T16:13:42.669Z",
-        "durationMin": 73,
-        "classification": null
-      },
-      {
-        "check": "rca-demo",
-        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
-        "openedAt": "2026-06-24T16:15:18.447Z",
-        "severity": "critical",
-        "resolvedAt": "2026-06-25T01:47:34.191Z",
-        "durationMin": 572,
-        "classification": "real-outage"
-      },
-      {
-        "check": "rca-demo",
-        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
-        "openedAt": "2026-06-25T01:50:20.078Z",
-        "severity": "critical",
-        "resolvedAt": "2026-06-25T02:10:58.096Z",
-        "durationMin": 21,
-        "classification": "real-outage"
-      },
-      {
-        "check": "rca-demo",
-        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
-        "openedAt": "2026-06-25T02:20:20.004Z",
-        "severity": "critical",
-        "resolvedAt": null,
-        "durationMin": 8530,
-        "classification": "real-outage"
-      },
-      {
-        "check": "Wegmans: search → product page",
-        "summary": "The synthetic runner cannot find a required module (specShim.js), causing the check to error out before contacting the site; this appears to be a monitoring/runtime deployment issue affecting collectors rather than a Wegmans outage. Investigate the runner/agent installation, recent deploys, and file paths/permissions on the collectors.",
-        "openedAt": "2026-06-26T00:00:26.415Z",
-        "severity": "critical",
-        "resolvedAt": "2026-06-26T11:55:47.661Z",
-        "durationMin": 715,
-        "classification": "environment-regional"
-      },
-      {
-        "check": "Wegmans: recipe navigation",
-        "summary": "The check consistently fails because the expected 'Dinner' element never becomes visible even though the Meals & Recipes page loads. Update the monitor's selector or adjust the step to match the page's current DOM (the site appears up, not down).",
-        "openedAt": "2026-06-26T13:41:29.379Z",
-        "severity": "critical",
-        "resolvedAt": "2026-06-26T17:00:51.886Z",
-        "durationMin": 199,
-        "classification": "selector-drift"
-      },
-      {
-        "check": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
-        "summary": "The homepage loads but the monitor timed out waiting for the fulfillment element used to set carry-out Buffalo/McKinley; failures are consistent across locations and runs, pointing to a page/selector change (update the monitor's selector or workflow to match the new UI).",
-        "openedAt": "2026-06-29T02:06:40.362Z",
-        "severity": "critical",
-        "resolvedAt": "2026-06-29T18:20:55.643Z",
-        "durationMin": 974,
-        "classification": "selector-drift"
-      },
-      {
-        "check": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
-        "summary": "The browser check errored with a JS assertion ('toBeNull' on undefined) while adding the pizza. The site content renders but the element the test expects appears missing or altered (selector drift); inspect and update the monitor's selector/assertion or handle the dialog variant that appeared in the baseline screenshot.",
-        "openedAt": "2026-06-29T18:58:02.359Z",
-        "severity": "critical",
-        "resolvedAt": "2026-06-29T21:22:29.208Z",
-        "durationMin": 144,
-        "classification": "selector-drift"
-      },
-      {
-        "check": "Wegmans: recipe search",
-        "summary": "The synthetic monitor process could not import /app/dist/checks/recipe-search.js, causing the check to error before contacting the target; this appears to be a monitoring build/deploy issue rather than the Wegmans site being down — verify the check artifact, build/packaging step, and recent deploys.",
-        "openedAt": "2026-06-30T18:23:26.271Z",
-        "severity": "critical",
-        "resolvedAt": null,
-        "durationMin": 367,
-        "classification": "flaky-transient"
-      },
-      {
-        "check": "Meals 2 Go: browse a cuisine menu (anon)",
-        "summary": "The check failed without an HTTP response and the error details are redacted, but there is no run history and only a single monitoring location impacted — this looks like a likely transient or agent-side issue; investigate the monitor logs/error payload and run a manual test or re-run from additional locations to narrow down whether the site or the monitor/region is at fault.",
-        "openedAt": "2026-06-30T19:31:02.349Z",
-        "severity": "critical",
-        "resolvedAt": "2026-06-30T21:51:08.362Z",
-        "durationMin": 140,
-        "classification": "flaky-transient"
-      }
-    ]
-  }
+    "generatedAt": "2026-07-09T13:45:27.309932+00:00",
+    "stale": false,
+    "model": "fallback-template",
+    "factPack": {
+        "cost": {
+            "notable": [
+                {
+                    "name": "Wegmans: recipe navigation",
+                    "measured": 6.84,
+                    "projected": 8.81,
+                    "divergence": 0.777,
+                    "divergenceFlag": false,
+                    "availabilityPct": 99.85
+                },
+                {
+                    "name": "Meals 2 Go: homepage load",
+                    "measured": 4.53,
+                    "projected": 6.99,
+                    "divergence": 0.649,
+                    "divergenceFlag": false,
+                    "availabilityPct": 99.46
+                },
+                {
+                    "name": "Wegmans: shop category browse",
+                    "measured": 5.09,
+                    "projected": 6.56,
+                    "divergence": 0.776,
+                    "divergenceFlag": false,
+                    "availabilityPct": 100
+                },
+                {
+                    "name": "Wegmans commerce PREVIEW: search \u2192 product (pre-prod regression)",
+                    "measured": 0.65,
+                    "projected": 5.91,
+                    "divergence": 0.111,
+                    "divergenceFlag": false,
+                    "availabilityPct": 100
+                },
+                {
+                    "name": "Wegmans: homepage load",
+                    "measured": 4.41,
+                    "projected": 5.74,
+                    "divergence": 0.769,
+                    "divergenceFlag": false,
+                    "availabilityPct": 99.85
+                },
+                {
+                    "name": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
+                    "measured": 4.37,
+                    "projected": 5.67,
+                    "divergence": 0.771,
+                    "divergenceFlag": false,
+                    "availabilityPct": 99.49
+                },
+                {
+                    "name": "Wegmans: search \u2192 product page",
+                    "measured": 5.98,
+                    "projected": 5.64,
+                    "divergence": 1.06,
+                    "divergenceFlag": false,
+                    "availabilityPct": 99.9
+                },
+                {
+                    "name": "Wegmans: store locator",
+                    "measured": 4.76,
+                    "projected": 4.44,
+                    "divergence": 1.072,
+                    "divergenceFlag": false,
+                    "availabilityPct": 99.9
+                },
+                {
+                    "name": "Wegmans: recipe search",
+                    "measured": 3.04,
+                    "projected": 3.74,
+                    "divergence": 0.813,
+                    "divergenceFlag": false,
+                    "availabilityPct": 99.86
+                },
+                {
+                    "name": "Wegmans: search autocomplete suggestions",
+                    "measured": 2.45,
+                    "projected": 3.02,
+                    "divergence": 0.812,
+                    "divergenceFlag": false,
+                    "availabilityPct": 99.73
+                },
+                {
+                    "name": "Meals 2 Go: browse a cuisine menu (anon)",
+                    "measured": 1.25,
+                    "projected": 2.72,
+                    "divergence": 0.458,
+                    "divergenceFlag": false,
+                    "availabilityPct": 99.6
+                },
+                {
+                    "name": "Meals 2 Go: browse a catering menu (anon)",
+                    "measured": 0.8,
+                    "projected": 2.61,
+                    "divergence": 0.308,
+                    "divergenceFlag": false,
+                    "availabilityPct": 99.21
+                },
+                {
+                    "name": "Wegmans homepage",
+                    "measured": 1.55,
+                    "projected": 1.91,
+                    "divergence": 0.812,
+                    "divergenceFlag": false,
+                    "availabilityPct": 99.86
+                },
+                {
+                    "name": "rca-demo",
+                    "measured": 1.49,
+                    "projected": 0.86,
+                    "divergence": 1.734,
+                    "divergenceFlag": true,
+                    "availabilityPct": 0
+                },
+                {
+                    "name": "Next Door: homepage location picker",
+                    "measured": 0.74,
+                    "projected": 0.37,
+                    "divergence": 2.016,
+                    "divergenceFlag": true,
+                    "availabilityPct": 99.76
+                },
+                {
+                    "name": "Amore: menu page exposes a downloadable menu",
+                    "measured": 0.82,
+                    "projected": 0.29,
+                    "divergence": 2.792,
+                    "divergenceFlag": true,
+                    "availabilityPct": 99.89
+                },
+                {
+                    "name": "Amore: reservations OpenTable widget loads",
+                    "measured": 0.42,
+                    "projected": 0.28,
+                    "divergence": 1.503,
+                    "divergenceFlag": true,
+                    "availabilityPct": 99.37
+                },
+                {
+                    "name": "SynthWatch API health",
+                    "measured": 0.39,
+                    "projected": 0.23,
+                    "divergence": 1.749,
+                    "divergenceFlag": true,
+                    "availabilityPct": 100
+                },
+                {
+                    "name": "algolia-product-search-api",
+                    "measured": 0.09,
+                    "projected": 0.14,
+                    "divergence": 0.631,
+                    "divergenceFlag": false,
+                    "availabilityPct": 99.9
+                },
+                {
+                    "name": "Next Door: reservations OpenTable widget loads",
+                    "measured": 0.37,
+                    "projected": 0.13,
+                    "divergence": 2.774,
+                    "divergenceFlag": true,
+                    "availabilityPct": 99.44
+                },
+                {
+                    "name": "kitting-catering-api",
+                    "measured": 0.03,
+                    "projected": 0.02,
+                    "divergence": 1.483,
+                    "divergenceFlag": false,
+                    "availabilityPct": 88.35
+                },
+                {
+                    "name": "kitting-takeout-api",
+                    "measured": 0.02,
+                    "projected": 0.01,
+                    "divergence": 1.508,
+                    "divergenceFlag": true,
+                    "availabilityPct": 94.83
+                },
+                {
+                    "name": "wegmansnextdoor-dns",
+                    "measured": 0.02,
+                    "projected": 0.01,
+                    "divergence": 3.325,
+                    "divergenceFlag": true,
+                    "availabilityPct": 100
+                },
+                {
+                    "name": "wegmansamore-dns",
+                    "measured": 0.02,
+                    "projected": 0.01,
+                    "divergence": 3.293,
+                    "divergenceFlag": true,
+                    "availabilityPct": 100
+                }
+            ],
+            "topDrivers": [
+                {
+                    "name": "Wegmans: recipe navigation",
+                    "projected": 8.81
+                },
+                {
+                    "name": "Meals 2 Go: homepage load",
+                    "projected": 6.99
+                },
+                {
+                    "name": "Wegmans: shop category browse",
+                    "projected": 6.56
+                },
+                {
+                    "name": "Wegmans commerce PREVIEW: search \u2192 product (pre-prod regression)",
+                    "projected": 5.91
+                },
+                {
+                    "name": "Wegmans: homepage load",
+                    "projected": 5.74
+                }
+            ],
+            "fleetMeasured": 51.25,
+            "fleetProjected": 67.33,
+            "fleetDivergence": 0.761
+        },
+        "deltas": {
+            "p95Pct": -16.8,
+            "incidents": -4,
+            "downtimeMin": -3727,
+            "availabilityPts": 11.36
+        },
+        "window": "7d",
+        "current": {
+            "to": "2026-07-09T00:00:00.000Z",
+            "up": 48757,
+            "p50": 342,
+            "p95": 27240,
+            "p99": 35244,
+            "down": 3486,
+            "from": "2026-07-02T00:00:00.000Z",
+            "lcpP75": 6914,
+            "latencyN": 55135,
+            "incidents": 4,
+            "downtimeMin": 118,
+            "availabilityPct": 93.33
+        },
+        "previous": {
+            "to": "2026-07-02T00:00:00.000Z",
+            "up": 12093,
+            "p50": 4915,
+            "p95": 32726,
+            "p99": 36931,
+            "down": 2660,
+            "from": "2026-06-25T00:00:00.000Z",
+            "lcpP75": 5808,
+            "latencyN": 12093,
+            "incidents": 8,
+            "downtimeMin": 3845,
+            "availabilityPct": 81.97
+        },
+        "scopeKey": "",
+        "anomalies": [
+            "Lowest-availability monitors: rca-demo 0.00%, Wegmans B2C login \u2014 InfoSec on-demand unblock test 16.67%, kitting-catering-api 88.35%."
+        ],
+        "scopeName": "Fleet",
+        "scopeType": "fleet",
+        "incidentList": [
+            {
+                "check": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
+                "summary": "The page served an 'We're Sorry...website isn't available' modal in 2 of 3 locations, blocking the 'Start an Order' CTA. This appears to be a recent, regionally-scoped outage (edge/CDN or regional infra/deploy) rather than a stale selector; investigate regional edge pools, recent deployments, and maintenance windows.",
+                "openedAt": "2026-07-08T02:17:32.237Z",
+                "severity": "critical",
+                "resolvedAt": "2026-07-08T02:47:06.446Z",
+                "durationMin": 30,
+                "classification": "environment-regional"
+            },
+            {
+                "check": "Meals 2 Go: homepage load",
+                "summary": null,
+                "openedAt": "2026-07-08T02:19:05.667Z",
+                "severity": "critical",
+                "resolvedAt": "2026-07-08T02:47:43.440Z",
+                "durationMin": 29,
+                "classification": null
+            },
+            {
+                "check": "Meals 2 Go: browse a catering menu (anon)",
+                "summary": "The catering browse failed because the catering menus API (wegapi.azure-api.net/...) did not return 200 within 30s; the page loaded but the backend API timed out. The problem affected 2 of 3 probe locations and is a recent, otherwise-passing run \u2014 likely a regional/infrastructure blip; check API gateway/region logs and network connectivity for the failing locations.",
+                "openedAt": "2026-07-08T02:27:16.641Z",
+                "severity": "critical",
+                "resolvedAt": "2026-07-08T02:55:36.517Z",
+                "durationMin": 28,
+                "classification": "environment-regional"
+            },
+            {
+                "check": "Meals 2 Go: browse a cuisine menu (anon)",
+                "summary": null,
+                "openedAt": "2026-07-08T02:29:23.021Z",
+                "severity": "critical",
+                "resolvedAt": "2026-07-08T03:01:11.643Z",
+                "durationMin": 32,
+                "classification": null
+            }
+        ],
+        "deployMarkers": [
+            {
+                "sha": "f0144141f23d",
+                "isSha": true,
+                "source": "sentry-release",
+                "deployedAt": "2026-07-07T17:30:21.400Z",
+                "targetHost": "www.wegmans.com"
+            },
+            {
+                "sha": null,
+                "isSha": false,
+                "source": "etag",
+                "deployedAt": "2026-07-07T19:02:22.309Z",
+                "targetHost": "synthwatch-dashboard.vercel.app"
+            },
+            {
+                "sha": null,
+                "isSha": false,
+                "source": "etag",
+                "deployedAt": "2026-07-07T19:32:18.535Z",
+                "targetHost": "synthwatch-dashboard.vercel.app"
+            },
+            {
+                "sha": null,
+                "isSha": false,
+                "source": "etag",
+                "deployedAt": "2026-07-08T02:31:21.238Z",
+                "targetHost": "synthwatch-dashboard.vercel.app"
+            },
+            {
+                "sha": null,
+                "isSha": false,
+                "source": "etag",
+                "deployedAt": "2026-07-08T10:50:38.349Z",
+                "targetHost": "www.meals2go.com"
+            },
+            {
+                "sha": null,
+                "isSha": false,
+                "source": "etag",
+                "deployedAt": "2026-07-08T12:02:11.712Z",
+                "targetHost": "synthwatch-dashboard.vercel.app"
+            },
+            {
+                "sha": null,
+                "isSha": false,
+                "source": "etag",
+                "deployedAt": "2026-07-08T12:25:59.005Z",
+                "targetHost": "synthwatch-dashboard.vercel.app"
+            },
+            {
+                "sha": null,
+                "isSha": false,
+                "source": "etag",
+                "deployedAt": "2026-07-08T14:16:02.977Z",
+                "targetHost": "synthwatch-dashboard.vercel.app"
+            },
+            {
+                "sha": "3210ffe2df93",
+                "isSha": true,
+                "source": "sentry-release",
+                "deployedAt": "2026-07-08T14:16:13.503Z",
+                "targetHost": "preview.commerce.wegmans.com"
+            },
+            {
+                "sha": null,
+                "isSha": false,
+                "source": "etag",
+                "deployedAt": "2026-07-08T18:02:02.797Z",
+                "targetHost": "synthwatch-dashboard.vercel.app"
+            },
+            {
+                "sha": null,
+                "isSha": false,
+                "source": "etag",
+                "deployedAt": "2026-07-08T21:05:20.518Z",
+                "targetHost": "synthwatch-dashboard.vercel.app"
+            },
+            {
+                "sha": null,
+                "isSha": false,
+                "source": "etag",
+                "deployedAt": "2026-07-08T22:35:20.775Z",
+                "targetHost": "synthwatch-dashboard.vercel.app"
+            }
+        ]
+    }
 }
