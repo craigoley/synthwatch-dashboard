@@ -12,6 +12,7 @@ import { ReportWebVitals, ReportSeriesArea } from "@/components/charts";
 import { FleetSloReport } from "@/components/fleet-slo";
 import { FleetMttrReport } from "@/components/fleet-mttr";
 import { TrustScorecard } from "@/components/trust";
+import { FleetCostSummary } from "@/components/cost";
 import { TabBar, useTab, type TabDef } from "@/components/tabs";
 import { StalenessStamp, useFetchedAt } from "@/components/staleness";
 import { formatDuration } from "@/lib/format";
@@ -27,6 +28,7 @@ const TABS: TabDef[] = [
   { id: "reliability", label: "Reliability" },
   { id: "monitors", label: "Monitors" },
   { id: "trust", label: "Trust" },
+  { id: "cost", label: "Cost" },
 ];
 const TAB_IDS = TABS.map((t) => t.id);
 
@@ -291,6 +293,12 @@ export default function ReportsPage() {
       {tab === "trust" && (
         <div data-testid="reports-panel-trust">
           <TrustScorecard window={window} />
+        </div>
+      )}
+
+      {tab === "cost" && (
+        <div data-testid="reports-panel-cost">
+          <FleetCostSummary />
         </div>
       )}
     </div>

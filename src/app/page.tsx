@@ -4,10 +4,10 @@ import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { useChecks, useSla, useTags } from "@/lib/client";
+import { useChecks, useSla, useTags, useCostReport } from "@/lib/client";
 import { CheckCard } from "@/components/check-card";
+import { costEstimateLabel } from "@/components/cost";
 import { FleetSlaSummary } from "@/components/sla";
-import { FleetCostSummary } from "@/components/cost";
 import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { MonitorChatInput } from "@/components/monitor-chat-input";
@@ -74,6 +74,7 @@ function StatusGrid() {
   const params = useSearchParams();
   const { data, error, isLoading } = useChecks();
   const { data: sla24h } = useSla("24h");
+  const { data: costReport } = useCostReport(); // one shared fetch; each card reads its own projected cost
 
   // 24h availability per check, for the small badge on each card.
   const availabilityByCheck = useMemo(() => {
@@ -82,6 +83,14 @@ function StatusGrid() {
       map.set(row.check_id, { pct: row.availability_pct, insufficient: row.insufficient_data });
     return map;
   }, [sla24h]);
+
+  // Per-check projected $/mo from /reports/cost (no per-card compute, no API change — recon 2026-07-08).
+  const costByCheck = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const c of costReport?.checks ?? []) map.set(c.check_id, c.projected_monthly);
+    return map;
+  }, [costReport]);
+  const costLabel = costReport ? costEstimateLabel(costReport) : undefined;
 
   const status = (params.get("status") as StatusFilter) || "all";
   const kind = (params.get("kind") as KindFilter) || "all";
@@ -134,10 +143,6 @@ function StatusGrid() {
       {canWrite && <MonitorChatInput onPrefill={create.openPrefilled} />}
 
       <FleetSlaSummary />
-
-      {/* Estimated monthly ACA compute cost — total + top drivers (#229: which monitors dominate). Self-hides
-          if the endpoint isn't deployed. */}
-      <FleetCostSummary />
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-0.5">
@@ -229,6 +234,8 @@ function StatusGrid() {
                 check={c}
                 availability={sla?.pct ?? null}
                 availabilityInsufficient={sla?.insufficient ?? false}
+                projectedCost={costByCheck.get(c.id) ?? null}
+                costEstimateLabel={costLabel}
               />
             );
           })}

@@ -33,6 +33,7 @@ import { FlowCombobox, type FlowComboOption } from "@/components/flow-combobox";
 import type { Check, CheckKind, DnsRecordType, HttpMethod, LighthouseFormFactor, Tag } from "@/lib/types";
 import { flowNameFor, type ActivationContext } from "@/lib/specs";
 import { minutesToSeconds, secondsToMinutesLabel } from "@/lib/format";
+import { MonitorCostEstimate } from "@/components/cost";
 
 interface Props {
   initial?: Check | null;
@@ -1004,6 +1005,13 @@ export function MonitorForm({ initial, activation, prefill, prefillErrors, onDon
           />
         </Field>
       </div>
+
+      {/* Live projected cost — recomputes as interval/regions change (avg duration held constant, measured). */}
+      <MonitorCostEstimate
+        checkId={isEdit && initial ? initial.id : null}
+        intervalSeconds={minutesToSeconds(numOrNull(form.interval_minutes) ?? 0)}
+        regionCount={form.locations.length}
+      />
 
       {form.kind === "browser" && (
       <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">

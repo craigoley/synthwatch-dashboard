@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { CheckWithStatus, RunStatus, SparkPoint } from "@/lib/types";
 import { StatusBadge, TONE_VAR } from "@/components/status-badge";
 import { Sparkline } from "@/components/sparkline";
+import { money } from "@/components/cost";
 import { TagChips } from "@/components/tag-chips";
 import { AvailabilityValue } from "@/components/sla";
 import { runStatusMeta } from "@/lib/status";
@@ -43,10 +44,16 @@ export function CheckCard({
   check,
   availability = null,
   availabilityInsufficient = false,
+  projectedCost = null,
+  costEstimateLabel,
 }: {
   check: CheckWithStatus;
   availability?: number | null;
   availabilityInsufficient?: boolean;
+  /** Projected $/mo from /reports/cost (null when the endpoint is absent or the check has no cost row, e.g. paused). */
+  projectedCost?: number | null;
+  /** The endpoint's echoed rate label (tooltip) — never hardcoded (rate provenance from /reports/cost). */
+  costEstimateLabel?: string;
 }) {
   // ★ Rail + pill read the last SETTLED outcome, NOT current_status — so a passing monitor stays green
   // mid-run. current_status is used only to flag that a run is in flight (a separate indicator below).
@@ -176,12 +183,22 @@ export function CheckCard({
         <Sparkline points={check.spark} />
       </div>
 
-      <div className="mt-3 flex items-center justify-between border-t border-[var(--color-border)] pt-2.5">
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--color-border)] pt-2.5">
         <span className="sw-mono text-[11px] text-[var(--color-ink-faint)]">
           last run {formatRelative(check.last_started_at)}
         </span>
-        <span className="sw-mono text-[11px] text-[var(--color-ink-faint)]">
-          {check.runs_24h} runs/24h
+        <span className="flex shrink-0 items-center gap-2">
+          <span className="sw-mono text-[11px] text-[var(--color-ink-faint)]">{check.runs_24h} runs/24h</span>
+          {/* Per-monitor projected compute cost (est.) — from /reports/cost; self-hides when absent (e.g. paused). */}
+          {projectedCost != null && projectedCost > 0 && (
+            <span
+              className="sw-mono text-[11px] text-[var(--color-ink-dim)]"
+              data-testid={`card-cost-${check.id}`}
+              title={costEstimateLabel ?? "estimated monthly compute cost"}
+            >
+              · ~{money(projectedCost)}/mo est.
+            </span>
+          )}
         </span>
       </div>
     </Link>

@@ -12,18 +12,33 @@ import type { CostCheck, CostReport } from "@/lib/types";
  * guessing, no hardcoded rate.
  */
 
-const SECONDS_PER_MONTH = 2_592_000; // 30d × 86400 — matches the API's runs/month divisor.
+export const SECONDS_PER_MONTH = 2_592_000; // 30d × 86400 — matches the API's runs/month divisor.
 
 /** $ with honest small-value handling — never a fake $0.00 for a real-but-tiny cost. */
-function money(n: number): string {
+export function money(n: number): string {
   if (n <= 0) return "$0.00";
   if (n < 0.01) return "<$0.01";
   return `$${n.toFixed(2)}`;
 }
 
 /** The estimate provenance line, read from the endpoint's echoed rate (never hardcoded). */
-function estimateLabel(r: CostReport): string {
+export function costEstimateLabel(r: CostReport): string {
   return `Estimate · rate $${r.rate_used}/vCPU-s (${r.rate_source}, set ${r.rate_set_date}). The Azure bill is ground truth.`;
+}
+
+/**
+ * The proven cost model as a PURE function (recon #220/#229) — the SAME arithmetic the API's /reports/cost
+ * uses, so the modal's live recompute is consistent with the endpoint. `avg_duration_s` is MEASURED (held
+ * constant across interval/region edits); interval + region_count are the user-editable inputs.
+ */
+export function projectedMonthlyCost(
+  avgDurationS: number,
+  intervalSeconds: number,
+  regionCount: number,
+  ratePerVcpuSecond: number,
+): number {
+  if (intervalSeconds <= 0) return 0;
+  return avgDurationS * (SECONDS_PER_MONTH / intervalSeconds) * regionCount * ratePerVcpuSecond;
 }
 
 function DivergenceFlag({ c }: { c: CostCheck }) {
@@ -101,7 +116,7 @@ export function FleetCostSummary() {
       </div>
 
       <p className="mt-2 text-[10px] text-[var(--color-ink-faint)]" data-testid="fleet-cost-estimate-label">
-        {estimateLabel(data)}
+        {costEstimateLabel(data)}
       </p>
     </div>
   );
@@ -139,7 +154,7 @@ export function MonitorCostPanel({ checkId }: { checkId: number }) {
         <h3 className="text-sm font-semibold text-[var(--color-ink)]">Estimated monthly cost</h3>
         <span
           className="sw-mono cursor-help text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]"
-          title={estimateLabel(data)}
+          title={costEstimateLabel(data)}
           data-testid="monitor-cost-estimate-label"
         >
           estimate ⓘ
@@ -180,6 +195,68 @@ export function MonitorCostPanel({ checkId }: { checkId: number }) {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * EDIT MODAL live recompute: projects this monitor's monthly cost from the modal's CURRENT interval + region
+ * count, holding `avg_duration_s` CONSTANT (it's MEASURED from past runs — a config change can't retro-alter
+ * it). Pure arithmetic, so it recomputes instantly as the user edits frequency/regions — before save.
+ *
+ * ★ Honesty: it exactly predicts a FREQUENCY or REGION change; it CANNOT predict how a SPEC change would move
+ * duration (that's measured, not projected) — the label says so. A never-run check has no measured duration →
+ * the "no history yet" state, never $0. On save, the card + detail projected figures adopt these settings
+ * (go-forward); measured (7d) stays backward-looking until new runs accumulate (an expected, non-error gap).
+ */
+export function MonitorCostEstimate({
+  checkId,
+  intervalSeconds,
+  regionCount,
+}: {
+  checkId: number | null; // null = new check (no measured duration yet)
+  intervalSeconds: number;
+  regionCount: number;
+}) {
+  const { data } = useCostReport();
+  if (!data) return null; // cost endpoint absent → no estimate (the form still works)
+
+  const stored = checkId != null ? data.checks.find((c) => c.check_id === checkId) : undefined;
+  const avg = stored?.avg_duration_s ?? null;
+
+  if (avg == null) {
+    return (
+      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2" data-testid="modal-cost-estimate">
+        <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Projected monthly cost</div>
+        <p className="mt-0.5 text-[12px] text-[var(--color-ink-dim)]" data-testid="modal-cost-no-history">
+          No duration history yet — cost projects after the first run.
+        </p>
+      </div>
+    );
+  }
+
+  const valid = intervalSeconds > 0 && regionCount > 0;
+  const projected = valid ? projectedMonthlyCost(avg, intervalSeconds, regionCount, data.rate_used) : 0;
+  const runsPerMonth = intervalSeconds > 0 ? Math.round(SECONDS_PER_MONTH / intervalSeconds) : 0;
+
+  return (
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2" data-testid="modal-cost-estimate">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Projected monthly cost</span>
+        <span className="sw-mono text-lg font-semibold text-[var(--color-ink)]" data-testid="modal-cost-projected">
+          {valid ? `~${money(projected)}/mo` : "—"}
+        </span>
+      </div>
+      {valid && (
+        <p className="mt-1 sw-mono text-[10px] text-[var(--color-ink-dim)]" data-testid="modal-cost-breakdown">
+          {avg.toFixed(2)}s avg × {runsPerMonth.toLocaleString()} runs/mo × {regionCount} region
+          {regionCount === 1 ? "" : "s"} × ${data.rate_used}/vCPU-s
+        </p>
+      )}
+      <p className="mt-1 text-[10px] text-[var(--color-ink-faint)]">
+        Projected from the <strong>recent avg duration</strong> ({avg.toFixed(2)}s, measured) × your frequency &amp;
+        regions. A spec change that alters duration isn&apos;t predicted here — it re-measures after new runs.
+      </p>
     </div>
   );
 }
