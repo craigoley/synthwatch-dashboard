@@ -22,11 +22,14 @@ function trackRequests(page: Page): string[] {
 const count = (paths: string[], suffix: string) => paths.filter((p) => p.endsWith(suffix)).length;
 
 test.describe("reports — sub-tabs", () => {
-  test("default load → Performance tab (Reliability/Monitors panels not mounted)", async ({ page }) => {
+  test("default load → Summary tab (AI narrative first; other panels not mounted)", async ({ page }) => {
     await mockApi(page, defaultWorld());
     await page.goto("/reports");
-    await expect(page.getByTestId("reports-panel-performance")).toBeVisible();
-    await expect(page.getByTestId("reports-tab-performance")).toHaveAttribute("aria-selected", "true");
+    // Summary panel mounted + selected (defaultWorld serves no narrative → the card self-hides, so the panel
+    // is intentionally empty here; assert it's the active tab, not that an empty box has height).
+    await expect(page.getByTestId("reports-panel-summary")).toHaveCount(1);
+    await expect(page.getByTestId("reports-tab-summary")).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId("reports-panel-performance")).toHaveCount(0);
     await expect(page.getByTestId("reports-panel-reliability")).toHaveCount(0);
     await expect(page.getByTestId("reports-panel-monitors")).toHaveCount(0);
   });
@@ -89,7 +92,7 @@ test.describe("reports — sub-tabs", () => {
     await mockApi(page, w);
     const paths = trackRequests(page);
 
-    await page.goto("/reports");
+    await page.goto("/reports?tab=performance");
     await expect(page.getByTestId("reports-panel-performance")).toBeVisible();
     // Performance-only load fetched avail/perf (page-level) but NOT the Reliability endpoints.
     expect(count(paths, "/reports/availability")).toBeGreaterThan(0);
@@ -110,7 +113,7 @@ test.describe("reports — sub-tabs", () => {
     await mockApi(page, defaultWorld());
     const paths = trackRequests(page);
 
-    await page.goto("/reports");
+    await page.goto("/reports?tab=performance");
     await expect(page.getByTestId("reports-panel-performance")).toBeVisible();
     const availAfterLoad = count(paths, "/reports/availability");
     const perfAfterLoad = count(paths, "/reports/performance");

@@ -24,6 +24,7 @@ const WINDOWS: ReportWindow[] = ["7d", "30d", "90d"];
 // self-fetching Reliability cards mount ONLY when that tab is active (lazy) — avail/perf stay page-level (below)
 // and feed both Performance and Monitors, so switching between them never re-fetches.
 const TABS: TabDef[] = [
+  { id: "summary", label: "Summary" },
   { id: "performance", label: "Performance" },
   { id: "reliability", label: "Reliability" },
   { id: "monitors", label: "Monitors" },
@@ -57,7 +58,7 @@ export default function ReportsPage() {
   const [window, setWindow] = useState<ReportWindow>("7d");
   const { selected, toggle, clear } = useTagFilter();
   const { groupBy, setGroupBy } = useGroupBy();
-  const { tab, setTab } = useTab(TAB_IDS, "performance");
+  const { tab, setTab } = useTab(TAB_IDS, "summary"); // ★ Reports opens on the AI summary first
 
   // ★ The monitor SET comes from the live checks list — the proven, always-populated source (the same one
   // the status/monitors pages use). The old reports list bound only to /reports/availability, which returns
@@ -167,9 +168,6 @@ export default function ReportsPage() {
         </div>
       </header>
 
-      {/* AI narrative summary (Layer 3) — fleet-wide, runner-generated (no per-tag narrative). Hide it under an
-          active tag filter so a FLEET narrative is never read as the tagged subset's story. */}
-      {selected.length === 0 && <NarrativeCard scope="fleet" window={window} />}
 
       {/* ★ Scope obviousness: when a tag filter is active, every aggregate BELOW is the tagged subset — say so
           loudly so a scoped CWV/precision number is never mistaken for the fleet's. */}
@@ -205,6 +203,20 @@ export default function ReportsPage() {
       {/* Sub-tabs: only the ACTIVE tab's cards mount → the self-fetching Reliability cards (breakdown/SLO/MTTR)
           fire their hooks only when Reliability is opened, not on page load. */}
       <TabBar tabs={TABS} active={tab} onSelect={setTab} label="Report sections" />
+
+      {/* AI narrative summary (Layer 3) — its own DEFAULT tab. Fleet-wide, runner-generated (no per-tag
+          narrative), so under an active tag filter show a note instead of a FLEET story read as the subset's. */}
+      {tab === "summary" && (
+        <div data-testid="reports-panel-summary">
+          {selected.length === 0 ? (
+            <NarrativeCard scope="fleet" window={window} />
+          ) : (
+            <p className="sw-panel p-4 text-[13px] text-[var(--color-ink-dim)]" data-testid="summary-fleet-only-note">
+              The AI summary is fleet-wide — clear the tag filter to view it.
+            </p>
+          )}
+        </div>
+      )}
 
       {tab === "performance" && (
         /* ★ Fleet Core Web Vitals (p75) + fleet trend — ONLY when ungrouped. When grouped, groups[0] is the
