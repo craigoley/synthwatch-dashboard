@@ -1,35 +1,17 @@
 import Link from "next/link";
 
-import type { CheckWithStatus, RunStatus, SparkPoint } from "@/lib/types";
+import type { CheckWithStatus } from "@/lib/types";
 import { StatusBadge, TONE_VAR } from "@/components/status-badge";
 import { Sparkline } from "@/components/sparkline";
 import { money } from "@/components/cost";
 import { TagChips } from "@/components/tag-chips";
 import { AvailabilityValue } from "@/components/sla";
-import { runStatusMeta } from "@/lib/status";
+// lastSettledStatus hoisted to lib/status (byte-identical) so the header roll-up (deriveSystemStatus)
+// reads the SAME settled value as the card's rail/pill — one source of truth, no drift.
+import { lastSettledStatus, runStatusMeta } from "@/lib/status";
 import { formatCertExpiry, formatDuration, formatRelative } from "@/lib/format";
 
 const RAIL: Record<string, string> = TONE_VAR;
-
-/**
- * Last SETTLED outcome for the rail + health pill (not current_status) so a generally-passing monitor
- * stays green while a run is in flight — the live run shows via a separate affordance instead. Pure.
- *
- * When current_status is ALREADY settled (not "running") it IS the latest settled outcome — return it
- * directly, identical to the prior behavior, so non-running cards are unchanged even if `spark` is empty
- * (no regression). Only while running do we peel back to the most recent non-running `spark` point;
- * ISO timestamps sort lexically. Null when nothing has settled (brand-new / short-history monitor) → the
- * caller renders idle, never a fabricated pass.
- */
-function lastSettledStatus(check: CheckWithStatus): RunStatus | null {
-  if (check.current_status && check.current_status !== "running") return check.current_status;
-  let latest: SparkPoint | null = null;
-  for (const p of check.spark) {
-    if (p.s === "running") continue;
-    if (!latest || p.t > latest.t) latest = p;
-  }
-  return latest?.s ?? null;
-}
 
 /** Compact target label for network checks (dns: "A host"; tcp/ping: "host:port"). */
 function netLabel(check: CheckWithStatus): string {
