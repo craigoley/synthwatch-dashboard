@@ -61,11 +61,12 @@ function SpecCacheLine({ checkId }: { checkId: number }) {
 
 // Compact inline config item: label + value on one baseline (was a tall bordered tile). `whitespace-nowrap`
 // keeps each label/value pair intact; the flex-wrap parent breaks BETWEEN pairs on narrow screens.
-function ConfigChip({ label, value }: { label: string; value: string }) {
+function ConfigChip({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
+    <span className={`inline-flex items-baseline gap-1.5 whitespace-nowrap${note ? " cursor-help" : ""}`} title={note}>
       <span className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">{label}</span>
       <span className="sw-mono text-[12px] text-[var(--color-ink)]">{value}</span>
+      {note && <span aria-hidden className="text-[10px] text-[var(--color-ink-faint)]">ⓘ</span>}
     </span>
   );
 }
@@ -514,7 +515,11 @@ export default function CheckDetailPage() {
         data-testid="config-row"
       >
         <ConfigChip label="Interval" value={`${secondsToMinutesLabel(check.interval_seconds)} min`} />
-        <ConfigChip label="Timeout" value={`${check.timeout_ms}ms`} />
+        <ConfigChip
+          label="Per-action timeout"
+          value={`${check.timeout_ms / 1000}s`}
+          note="Max time for each individual action (click, fill, wait) — NOT the whole script. The overall run budget is a separate runner limit."
+        />
         <ConfigChip label="Fail thresh" value={String(check.failure_threshold)} />
         <ConfigChip label="Severity" value={check.severity} />
         {check.kind === "http" && (

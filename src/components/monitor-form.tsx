@@ -69,7 +69,7 @@ interface FormState {
   body_must_contain: string;
   // UI speaks MINUTES; converted to the API's interval_seconds on submit (see format.ts).
   interval_minutes: string;
-  timeout_ms: string;
+  timeout_seconds: string; // per-action timeout, EDITED in seconds; converted to timeout_ms at the API boundary
   failure_threshold: string;
   severity: SeverityOpt;
   enabled: boolean;
@@ -126,7 +126,7 @@ function fromCheck(c: Check | null | undefined): FormState {
     expected_status: String(c?.expected_status ?? 200),
     body_must_contain: c?.body_must_contain ?? "",
     interval_minutes: secondsToMinutesLabel(c?.interval_seconds ?? 300), // stored seconds → minutes
-    timeout_ms: String(c?.timeout_ms ?? 30000),
+    timeout_seconds: String((c?.timeout_ms ?? 30000) / 1000), // stored ms → seconds for the input (30000 → "30")
     failure_threshold: String(c?.failure_threshold ?? 3),
     severity: asSeverity(c?.severity),
     enabled: c?.enabled ?? true,
@@ -569,7 +569,8 @@ export function MonitorForm({ initial, activation, prefill, prefillErrors, onDon
       body_must_contain: form.kind === "http" ? form.body_must_contain.trim() || null : null,
       // minutes → seconds at the API boundary (5 min → 300s). Default 5 min when blank.
       interval_seconds: minutesToSeconds(numOrNull(form.interval_minutes) ?? 5),
-      timeout_ms: numOrNull(form.timeout_ms) ?? 30000,
+      // seconds → ms at the API boundary (30s → 30000ms); the stored unit + runner contract stay ms.
+      timeout_ms: (numOrNull(form.timeout_seconds) ?? 30) * 1000,
       failure_threshold: numOrNull(form.failure_threshold) ?? 3,
       severity: form.severity,
       enabled: form.enabled,
@@ -988,12 +989,16 @@ export function MonitorForm({ initial, activation, prefill, prefillErrors, onDon
             placeholder="5"
           />
         </Field>
-        <Field label="Timeout (ms)">
+        <Field
+          label="Per-action timeout (seconds)"
+          hint="Max time for EACH action (click, fill, wait) — not the whole script. The overall run budget is a separate runner limit."
+        >
           <input
             className="sw-input sw-mono"
-            value={form.timeout_ms}
-            onChange={(e) => set("timeout_ms", e.target.value)}
+            value={form.timeout_seconds}
+            onChange={(e) => set("timeout_seconds", e.target.value)}
             inputMode="numeric"
+            placeholder="30"
           />
         </Field>
         <Field label="Fail threshold">
