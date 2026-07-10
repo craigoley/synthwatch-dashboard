@@ -23,43 +23,71 @@ import { revalidateChecks } from "@/lib/client";
  */
 export function CredentialsPanel({ check }: { check: Check }) {
   const { canWrite } = useAuth();
+  // COLLAPSED by default (a disclosure) — the box took too much top-of-page space. React state only, no
+  // localStorage (unavailable in this environment). All editor functionality is preserved when expanded.
+  const [open, setOpen] = useState(false);
   // Non-editor → nothing (mirrors the API nulling the fields for a non-write session). An editor sees the
   // panel even with no credentials set yet, so they can add the first one.
   if (!canWrite) return null;
 
+  // A small "N set" summary on the collapsed header so the count is visible without expanding.
+  const setCount =
+    Object.keys(check.secret_headers ?? {}).length + Object.keys(check.login_credentials ?? {}).length;
+
   return (
     <div className="sw-panel p-4" data-testid="credentials-panel">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-[var(--color-ink)]">Credentials</h3>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        data-testid="credentials-disclosure"
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <span className="flex items-center gap-2">
+          <svg
+            width="12" height="12" viewBox="0 0 12 12" aria-hidden
+            className={`text-[var(--color-ink-faint)] transition-transform ${open ? "rotate-90" : ""}`}
+          >
+            <path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <h3 className="text-sm font-semibold text-[var(--color-ink)]">Credentials</h3>
+          {setCount > 0 && (
+            <span className="sw-mono text-[11px] text-[var(--color-ink-dim)]">· {setCount} set</span>
+          )}
+        </span>
         <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
           write-only
         </span>
-      </div>
+      </button>
 
-      <CredentialColumn
-        checkId={check.id}
-        column="secretHeaders"
-        title="Secret headers"
-        keyLabel="Header name"
-        keyPlaceholder="X-Api-Key"
-        current={check.secret_headers}
-      />
-      <div className="my-4 border-t border-[var(--color-border)]" />
-      <CredentialColumn
-        checkId={check.id}
-        column="loginCredentials"
-        title="Login credentials"
-        keyLabel="Field"
-        keyPlaceholder="role (e.g. username)"
-        current={check.login_credentials}
-      />
+      {open && (
+        <div className="mt-3" data-testid="credentials-body">
+          <CredentialColumn
+            checkId={check.id}
+            column="secretHeaders"
+            title="Secret headers"
+            keyLabel="Header name"
+            keyPlaceholder="X-Api-Key"
+            current={check.secret_headers}
+          />
+          <div className="my-4 border-t border-[var(--color-border)]" />
+          <CredentialColumn
+            checkId={check.id}
+            column="loginCredentials"
+            title="Login credentials"
+            keyLabel="Field"
+            keyPlaceholder="role (e.g. username)"
+            current={check.login_credentials}
+          />
 
-      <p className="mt-4 text-[11px] leading-relaxed text-[var(--color-ink-faint)]" data-testid="credentials-honesty">
-        Values are encrypted at rest (AES-256-GCM) and used directly by the runner. They are{" "}
-        <strong>write-only</strong> — never displayed back here; a configured slot shows only as “set”. Saving a
-        section <strong>replaces every slot in it</strong>, and existing values can’t be read back, so include
-        every value you want to keep.
-      </p>
+          <p className="mt-4 text-[11px] leading-relaxed text-[var(--color-ink-faint)]" data-testid="credentials-honesty">
+            Values are encrypted at rest (AES-256-GCM) and used directly by the runner. They are{" "}
+            <strong>write-only</strong> — never displayed back here; a configured slot shows only as “set”. Saving a
+            section <strong>replaces every slot in it</strong>, and existing values can’t be read back, so include
+            every value you want to keep.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

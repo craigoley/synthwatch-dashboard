@@ -742,6 +742,10 @@ test.describe("check detail — credential editor (model B, write-only, editor-g
 
     const panel = page.getByTestId("credentials-panel");
     await expect(panel).toBeVisible();
+    // ★ COLLAPSED by default (top-of-page footprint): the body is hidden until the disclosure is clicked.
+    await expect(panel.getByTestId("credentials-body")).toHaveCount(0);
+    await panel.getByTestId("credentials-disclosure").click();
+    await expect(panel.getByTestId("credentials-body")).toBeVisible();
     // configured slots render masked "set", never a value/ciphertext
     await expect(panel.getByTestId("cred-slot-secretHeaders-X-Api-Key")).toContainText("set");
     await expect(panel.getByTestId("cred-slot-loginCredentials-username")).toContainText("set");
@@ -771,6 +775,7 @@ test.describe("check detail — credential editor (model B, write-only, editor-g
 
     const panel = page.getByTestId("credentials-panel");
     await expect(panel).toBeVisible();
+    await panel.getByTestId("credentials-disclosure").click(); // expand the collapsed-by-default box
     // no slot yet
     await expect(panel.getByTestId("cred-slot-secretHeaders-X-Api-Key")).toHaveCount(0);
 
@@ -788,5 +793,38 @@ test.describe("check detail — credential editor (model B, write-only, editor-g
     // after the write the mock re-GETs and the slot now shows masked "set" — the value is NOT round-tripped
     await expect(panel.getByTestId("cred-slot-secretHeaders-X-Api-Key")).toContainText("set");
     await expect(panel).not.toContainText("dummy-not-a-real-secret");
+  });
+});
+
+test.describe("check detail — compact top layout", () => {
+  test("config options render in one compact row that does not overflow on mobile", async ({ page }) => {
+    const w = defaultWorld();
+    w.details[1] = detail({ id: 1, name: "API health", kind: "http" }, [run({ id: 100, status: "pass" })]);
+    await mockApi(page, w);
+
+    // Narrow (mobile) viewport — the row must WRAP, never force a horizontal scrollbar.
+    await page.setViewportSize({ width: 375, height: 800 });
+    await page.goto("/checks/1");
+
+    const row = page.getByTestId("config-row");
+    await expect(row).toBeVisible();
+    await expect(row).toContainText("Interval"); // the config values are preserved, just compact
+    await expect(row).toContainText("Timeout");
+    // ★ no horizontal page overflow (the mobile one-line trap)
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1); // sub-pixel rounding tolerance
+  });
+
+  test("credentials box is collapsed by default (footprint reduced), expands on click", async ({ page }) => {
+    const w = defaultWorld();
+    w.details[1] = detail({ id: 1, name: "API health", kind: "http", secretHeaders: { "X-Api-Key": "set" } }, [run({ id: 100, status: "pass" })]);
+    await mockApi(page, w); // editor session
+    await page.goto("/checks/1");
+
+    const panel = page.getByTestId("credentials-panel");
+    await expect(panel.getByTestId("credentials-disclosure")).toBeVisible(); // header always shown
+    await expect(panel.getByTestId("credentials-body")).toHaveCount(0); // collapsed by default
+    await panel.getByTestId("credentials-disclosure").click();
+    await expect(panel.getByTestId("credentials-body")).toBeVisible(); // expands
   });
 });
