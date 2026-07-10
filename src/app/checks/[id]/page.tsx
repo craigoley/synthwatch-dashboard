@@ -35,12 +35,14 @@ import { usePersistedBoolean } from "@/lib/use-persisted-boolean";
 import { formatCertExpiry, formatDuration, formatRelative, secondsToMinutesLabel } from "@/lib/format";
 import type { ChainStep, Check, Run } from "@/lib/types";
 
+// Compact inline config item: label + value on one baseline (was a tall bordered tile). `whitespace-nowrap`
+// keeps each label/value pair intact; the flex-wrap parent breaks BETWEEN pairs on narrow screens.
 function ConfigChip({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">{label}</div>
-      <div className="sw-mono mt-0.5 text-sm text-[var(--color-ink)]">{value}</div>
-    </div>
+    <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
+      <span className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">{label}</span>
+      <span className="sw-mono text-[12px] text-[var(--color-ink)]">{value}</span>
+    </span>
   );
 }
 
@@ -482,7 +484,11 @@ export default function CheckDetailPage() {
         <LiveStepsChecklist run={recent_runs[0]!} templateRunId={recent_runs[1]?.id ?? null} />
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      {/* One compact row on desktop (flex), wraps gracefully on mobile (no forced-one-line overflow). */}
+      <div
+        className="sw-panel flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2.5"
+        data-testid="config-row"
+      >
         <ConfigChip label="Interval" value={`${secondsToMinutesLabel(check.interval_seconds)} min`} />
         <ConfigChip label="Timeout" value={`${check.timeout_ms}ms`} />
         <ConfigChip label="Fail thresh" value={String(check.failure_threshold)} />
