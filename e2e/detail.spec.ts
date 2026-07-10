@@ -852,7 +852,10 @@ test.describe("check detail — compact top layout", () => {
     const row = page.getByTestId("config-row");
     await expect(row).toBeVisible();
     await expect(row).toContainText("Interval"); // the config values are preserved, just compact
-    await expect(row).toContainText("Timeout");
+    // ★ the timeout field is the PER-ACTION timeout, shown in SECONDS (30000ms → 30s), not the raw ms label
+    await expect(row).toContainText("Per-action timeout");
+    await expect(row).toContainText("30s");
+    await expect(row).not.toContainText("30000ms");
     // ★ no horizontal page overflow (the mobile one-line trap)
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1); // sub-pixel rounding tolerance

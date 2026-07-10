@@ -84,6 +84,31 @@ test.describe("monitor form", () => {
     await expect(page.getByPlaceholder("5")).toHaveValue("30"); // 1800s rendered as 30 min, not "1800"
   });
 
+  // ★ Per-action timeout is shown/entered in SECONDS (usability + it's per-action, not whole-script), but the
+  // API contract is ms — the form converts seconds → ms (×1000) on submit. The wire field stays timeoutMs.
+  test("per-action timeout entered in seconds is sent to the API as ms (×1000)", async ({ page }) => {
+    await mockApi(page);
+    await openNewMonitor(page);
+    await page.getByRole("dialog").locator("input").first().fill("Timeout check");
+    await page.locator('input[inputmode="url"]').fill("https://example.com/health");
+    await page.getByPlaceholder("30").fill("300"); // 300 SECONDS (not ms) — proves the conversion
+
+    const post = page.waitForRequest((r) => r.url().endsWith("/api/checks") && r.method() === "POST");
+    await page.getByRole("button", { name: "Create monitor" }).click();
+    const body = (await post).postDataJSON();
+    expect(body.timeoutMs).toBe(300000); // 300s → 300000ms, NOT 300 (the stored unit stays ms)
+  });
+
+  test("editing an existing monitor shows its stored per-action timeout in SECONDS", async ({ page }) => {
+    const world = defaultWorld();
+    world.checks = world.checks.map((c, i) => (i === 0 ? { ...c, timeoutMs: 45000 } : c)); // 45s stored
+    await mockApi(page, world);
+    await page.goto("/monitors");
+    await page.getByRole("button", { name: "Edit" }).first().click();
+    await page.getByRole("heading", { name: /Edit ·/ }).waitFor();
+    await expect(page.getByPlaceholder("30")).toHaveValue("45"); // 45000ms rendered as 45s, not "45000"
+  });
+
   // ★ Security property: auth is a secret REFERENCE (env-var names only). There
   // must be NO field that accepts a raw credential, anywhere, ever.
   test("no raw-credential field exists in any auth section", async ({ page }) => {
