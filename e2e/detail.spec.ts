@@ -794,6 +794,49 @@ test.describe("check detail — credential editor (model B, write-only, editor-g
     await expect(panel.getByTestId("cred-slot-secretHeaders-X-Api-Key")).toContainText("set");
     await expect(panel).not.toContainText("dummy-not-a-real-secret");
   });
+
+  // ★ MUST-GO-RED: editing one login-credential role must NOT wipe the others. The API REPLACES the whole
+  // column and values are write-only, so the editor pre-fills every stored role by name and blocks a save that
+  // would silently drop one. Revert the pre-fill → a single-field save clobbers the other → this fails.
+  test("★ partial save preserves the other role (was clobbering unset roles)", async ({ page }) => {
+    const w = defaultWorld();
+    w.details[1] = detail(
+      { id: 1, name: "Shop flow", kind: "browser", loginCredentials: { username: "set", password: "set" } },
+      [run({ id: 100, status: "pass" })],
+    );
+    await mockApi(page, w); // editor session
+    await page.goto("/checks/1");
+
+    const panel = page.getByTestId("credentials-panel");
+    await panel.getByTestId("credentials-disclosure").click();
+
+    // ★ both stored roles are pre-filled by name so neither can be silently dropped on save
+    await expect(panel.getByTestId("cred-name-loginCredentials-0")).toHaveValue("username");
+    await expect(panel.getByTestId("cred-name-loginCredentials-1")).toHaveValue("password");
+
+    // set ONLY the new password, leave username blank → the guard blocks; NO write goes out (no clobber)
+    let putFired = false;
+    page.on("request", (r) => {
+      if (r.method() === "PUT" && /\/checks\/1\/credentials$/.test(r.url())) putFired = true;
+    });
+    await panel.getByTestId("cred-value-loginCredentials-1").fill("newpass-dummy");
+    await panel.getByTestId("cred-save-loginCredentials").click();
+    await expect(panel.getByTestId("cred-error-loginCredentials")).toContainText(/username/i);
+    expect(putFired, "a blank-username save must NOT PUT (would clobber username)").toBe(false);
+    await expect(panel.getByTestId("cred-slot-loginCredentials-username")).toContainText("set"); // still stored
+
+    // re-enter username too → save carries BOTH roles → neither is clobbered by the REPLACE write
+    const putP = page.waitForRequest((r) => r.method() === "PUT" && /\/checks\/1\/credentials$/.test(r.url()));
+    await panel.getByTestId("cred-value-loginCredentials-0").fill("user-dummy");
+    await panel.getByTestId("cred-save-loginCredentials").click();
+    const put = await putP;
+    expect(JSON.parse(put.postData() || "{}")).toEqual({
+      loginCredentials: { username: "user-dummy", password: "newpass-dummy" },
+    });
+    // both slots remain set after the write — the other role was preserved, not wiped
+    await expect(panel.getByTestId("cred-slot-loginCredentials-username")).toContainText("set");
+    await expect(panel.getByTestId("cred-slot-loginCredentials-password")).toContainText("set");
+  });
 });
 
 test.describe("check detail — compact top layout", () => {

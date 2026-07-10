@@ -62,7 +62,11 @@ export function CredentialsPanel({ check }: { check: Check }) {
 
       {open && (
         <div className="mt-3" data-testid="credentials-body">
+          {/* ★ key on the configured-set: after a save (revalidate updates the masked slots) the column
+              remounts and re-pre-fills its rows from the new set — so a follow-up edit can't start blank
+              and clobber. */}
           <CredentialColumn
+            key={`sh-${Object.keys(check.secret_headers ?? {}).sort().join(",")}`}
             checkId={check.id}
             column="secretHeaders"
             title="Secret headers"
@@ -72,6 +76,7 @@ export function CredentialsPanel({ check }: { check: Check }) {
           />
           <div className="my-4 border-t border-[var(--color-border)]" />
           <CredentialColumn
+            key={`lc-${Object.keys(check.login_credentials ?? {}).sort().join(",")}`}
             checkId={check.id}
             column="loginCredentials"
             title="Login credentials"
@@ -82,9 +87,10 @@ export function CredentialsPanel({ check }: { check: Check }) {
 
           <p className="mt-4 text-[11px] leading-relaxed text-[var(--color-ink-faint)]" data-testid="credentials-honesty">
             Values are encrypted at rest (AES-256-GCM) and used directly by the runner. They are{" "}
-            <strong>write-only</strong> — never displayed back here; a configured slot shows only as “set”. Saving a
-            section <strong>replaces every slot in it</strong>, and existing values can’t be read back, so include
-            every value you want to keep.
+            <strong>write-only</strong> — never displayed back here; a configured slot shows only as “set”.
+            Existing fields are <strong>pre-filled by name</strong> — re-enter each value to keep it, or ✕ to
+            remove it. Saving <strong>replaces the whole section</strong> (existing values can’t be read back),
+            so a field left blank is rejected rather than silently dropped.
           </p>
         </div>
       )}
@@ -115,7 +121,13 @@ function CredentialColumn({
   current: Record<string, string> | null;
 }) {
   const configured = Object.keys(current ?? {});
-  const [rows, setRows] = useState<EditRow[]>([{ name: "", value: "" }]);
+  // ★ PRE-FILL the existing role names so a partial save can't silently clobber the others. The API REPLACES
+  // the whole column on write and values are write-only (can't be read back), so an edit that omits a stored
+  // role would delete it. Listing every stored role as a (blank-value) row means the save guard below forces
+  // the user to re-enter each value to keep it — or ✕ to intentionally remove it. Nothing is dropped silently.
+  const [rows, setRows] = useState<EditRow[]>(
+    configured.length > 0 ? configured.map((name) => ({ name, value: "" })) : [{ name: "", value: "" }],
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedNote, setSavedNote] = useState<string | null>(null);
@@ -125,7 +137,8 @@ function CredentialColumn({
   const addRow = () => setRows((rs) => [...rs, { name: "", value: "" }]);
   const removeRow = (i: number) => setRows((rs) => (rs.length === 1 ? [{ name: "", value: "" }] : rs.filter((_, j) => j !== i)));
 
-  // Assemble the desired map: rows with BOTH a name and a value. (Replace semantics — this is the full new set.)
+  // Assemble the desired map: rows with BOTH a name and a value = the full new set for this column (the API
+  // REPLACES the column). Pre-filled stored roles start blank → land in `namesOnly` → the save guard blocks.
   const filled = rows.filter((r) => r.name.trim() !== "" && r.value !== "");
   const namesOnly = rows.filter((r) => r.name.trim() !== "" && r.value === "");
 
@@ -148,7 +161,8 @@ function CredentialColumn({
   async function save() {
     const missing = namesOnly[0];
     if (missing) {
-      setError(`Enter a value for “${missing.name.trim()}”, or remove that row.`);
+      // A named row with no value would be dropped by the REPLACE write → clobber. Force a value or ✕ removal.
+      setError(`Enter a value for “${missing.name.trim()}” to keep it, or ✕ to remove it — saving replaces the whole section.`);
       return;
     }
     if (filled.length === 0) {
@@ -186,7 +200,8 @@ function CredentialColumn({
         </div>
       )}
 
-      {/* New name/value rows — the values entered here REPLACE the whole column on save. */}
+      {/* Name/value rows — stored roles are pre-filled by name (blank value); re-enter to keep, ✕ to remove.
+          The full set here REPLACES the column on save, so a blank named row is rejected (guard), never dropped. */}
       <div className="space-y-1.5">
         {rows.map((r, i) => (
           <div key={i} className="flex items-center gap-1.5">
