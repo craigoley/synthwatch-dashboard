@@ -149,6 +149,8 @@ export interface World {
   vitalsNoInp?: boolean;
   /** AI narratives (Layer 3). Unset → /reports/narrative 404 → card hides (graceful). */
   narratives?: { fleet?: RawObj; monitor?: Record<string, RawObj> };
+  /** GET /checks/{id}/spec-cache body per check id. Unset → derived from the detail's specPath (see handler). */
+  specCache?: Record<number, RawObj>;
   /**
    * Monitors-as-code drift (Phase 6b). Unset → /api/reconcile/drift 404 → the surface hides.
    * Set to { items: [] } for the "in sync" empty state, or with rows to list drift.
@@ -918,6 +920,20 @@ export async function mockApi(
       }
       const d = world.details[cid];
       return d ? json(route, d) : json(route, { error: "not_found" }, 404);
+    }
+    // GET /checks/{id}/spec-cache — read-only cached-spec identity. Explicit world.specCache override wins;
+    // otherwise derive from the detail's specPath (git-managed → a stable fake sha; else not git-managed).
+    if ((m = path.match(/^\/api\/checks\/(\d+)\/spec-cache$/)) && method === "GET") {
+      const cid = Number(m[1]);
+      const override = world.specCache?.[cid];
+      if (override) return json(route, override);
+      const specPath = (world.details[cid]?.specPath as string | undefined) ?? null;
+      return json(
+        route,
+        specPath
+          ? { gitManaged: true, specPath, cachedSha: null, fetchedAt: null }
+          : { gitManaged: false, specPath: null, cachedSha: null, fetchedAt: null },
+      );
     }
     if ((m = path.match(/^\/api\/checks\/(\d+)\/runs$/))) {
       const cid = Number(m[1]);
