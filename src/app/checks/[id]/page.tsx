@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
-import { useCheck, useMetrics, updateCheck, revalidateChecks, runCheckNow, revalidateRunHistory } from "@/lib/client";
+import { useCheck, useMetrics, updateCheck, revalidateChecks, runCheckNow, revalidateRunHistory, useSpecCache } from "@/lib/client";
 import { useAuth } from "@/components/auth-provider";
 import { AvailabilityChart, LatencyChart, MetricsCharts } from "@/components/charts";
 import { CheckSlaPanel, SloPanel } from "@/components/sla";
@@ -34,6 +34,30 @@ import { runStatusMeta } from "@/lib/status";
 import { usePersistedBoolean } from "@/lib/use-persisted-boolean";
 import { formatCertExpiry, formatDuration, formatRelative, secondsToMinutesLabel } from "@/lib/format";
 import type { ChainStep, Check, Run } from "@/lib/types";
+
+/**
+ * Read-only "which commit is cached" line for a Git-managed check (from GET /checks/{id}/spec-cache). The
+ * runner self-updates on a HEAD change; this makes the cached commit + last-fetch OBSERVABLE so a merge's
+ * propagation isn't a guess. Self-hides when the endpoint is absent (404 → null) or the check isn't Git-managed.
+ */
+function SpecCacheLine({ checkId }: { checkId: number }) {
+  const { data } = useSpecCache(checkId);
+  if (!data || !data.git_managed) return null;
+  const short = data.cached_sha ? data.cached_sha.slice(0, 7) : null;
+  return (
+    <p className="sw-mono text-[11px] text-[var(--color-ink-faint)]" data-testid="spec-cache-line">
+      Git spec ·{" "}
+      {short ? (
+        <>
+          cached <span className="text-[var(--color-ink-dim)]" title={data.cached_sha ?? undefined}>{short}</span>
+          {data.fetched_at && <> · fetched {formatRelative(data.fetched_at)}</>}
+        </>
+      ) : (
+        <span className="text-[var(--color-ink-dim)]">not fetched yet</span>
+      )}
+    </p>
+  );
+}
 
 // Compact inline config item: label + value on one baseline (was a tall bordered tile). `whitespace-nowrap`
 // keeps each label/value pair intact; the flex-wrap parent breaks BETWEEN pairs on narrow screens.
@@ -539,6 +563,10 @@ export default function CheckDetailPage() {
           <ConfigChip label="Steps" value={String(check.steps?.length ?? 0)} />
         )}
       </div>
+
+      {/* Git-managed checks: which monitors-repo commit is cached + when it was fetched — makes a merge's
+          propagation observable (if fetched AFTER your merge, the next run already has it). */}
+      {check.spec_path && <SpecCacheLine checkId={check.id} />}
 
       {check.kind === "ssl" && <CertPanel check={check} latest={recent_runs[0] ?? null} />}
       {(check.kind === "dns" || check.kind === "tcp" || check.kind === "ping") && (

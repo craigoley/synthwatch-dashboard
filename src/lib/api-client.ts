@@ -689,6 +689,35 @@ export async function getCheck(id: number): Promise<CheckDetail> {
   return { check: mapCheck(raw), recent_runs: (raw.recentRuns ?? []).map(mapRun) };
 }
 
+/** The runner's cached runtime-spec identity for a Git-managed check (read-only observability). */
+export interface SpecCache {
+  git_managed: boolean;
+  spec_path: string | null;
+  /** The monitors-repo commit SHA the cached compile was fetched at (null: never fetched / not Git-managed). */
+  cached_sha: string | null;
+  fetched_at: string | null;
+}
+
+/**
+ * GET /checks/{id}/spec-cache — which monitors-repo commit is cached + when it was last fetched, so a merge's
+ * propagation is observable. Read-only (the runner owns eviction — the API can't write spec_cache). 404 (the
+ * endpoint isn't deployed yet) → null so the caller self-hides.
+ */
+export async function getSpecCache(id: number): Promise<SpecCache | null> {
+  try {
+    const raw = await request<Record<string, unknown>>(`/checks/${id}/spec-cache`);
+    return {
+      git_managed: Boolean(raw?.gitManaged),
+      spec_path: (raw?.specPath as string | null) ?? null,
+      cached_sha: (raw?.cachedSha as string | null) ?? null,
+      fetched_at: (raw?.fetchedAt as string | null) ?? null,
+    };
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null;
+    throw err;
+  }
+}
+
 /** The masked echo the write endpoint (and every read) returns: { key -> "set" }, never a value/ciphertext. */
 export interface MaskedCredentials {
   secret_headers: Record<string, string> | null;

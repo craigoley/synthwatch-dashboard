@@ -871,3 +871,33 @@ test.describe("check detail — compact top layout", () => {
     await expect(panel.getByTestId("credentials-body")).toBeVisible(); // expands
   });
 });
+
+test.describe("check detail — spec-cache observability", () => {
+  test("Git-managed check shows the cached commit + fetched-at", async ({ page }) => {
+    const w = defaultWorld();
+    w.details[1] = detail(
+      { id: 1, name: "Shop flow", kind: "browser", specPath: "monitors/shop.spec.ts" },
+      [run({ id: 100, status: "pass" })],
+    );
+    w.specCache = {
+      1: { gitManaged: true, specPath: "monitors/shop.spec.ts", cachedSha: "abc1234deadbeef", fetchedAt: "2026-07-09T00:00:00Z" },
+    };
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+
+    const line = page.getByTestId("spec-cache-line");
+    await expect(line).toBeVisible();
+    await expect(line).toContainText("abc1234"); // short (7-char) SHA — makes cached-vs-HEAD observable
+    await expect(line).toContainText(/fetched/i);
+  });
+
+  test("baked-in (non-Git) check shows no spec-cache line", async ({ page }) => {
+    const w = defaultWorld();
+    w.details[2] = detail({ id: 2, name: "API health", kind: "http" }, [run({ id: 200, status: "pass" })]);
+    await mockApi(page, w);
+    await page.goto("/checks/2");
+
+    await expect(page.getByRole("heading", { name: "API health" })).toBeVisible();
+    await expect(page.getByTestId("spec-cache-line")).toHaveCount(0); // no spec_path → not Git-managed
+  });
+});

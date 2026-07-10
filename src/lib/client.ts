@@ -17,6 +17,7 @@ import useSWRInfinite from "swr/infinite";
 import {
   listChecks,
   getCheck,
+  getSpecCache,
   getRuns,
   getSteps,
   getMetrics,
@@ -104,6 +105,7 @@ const keys = {
   availability: (id: number, window: SlaWindow) => ["availability", id, window] as const,
   locations: ["locations"] as const,
   checkLocations: (id: number) => ["check-locations", id] as const,
+  specCache: (id: number) => ["spec-cache", id] as const,
   channels: ["channels"] as const,
   routing: ["routing"] as const,
   deliveryReadiness: ["delivery-readiness"] as const,
@@ -405,6 +407,15 @@ export function useCheckLocations(id: number | null) {
   return useSWR(
     id ? keys.checkLocations(id) : null,
     () => getCheckLocations(id as number),
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+}
+
+/** The cached runtime-spec identity (commit SHA + fetched-at) for a Git-managed check — read-only observability. */
+export function useSpecCache(id: number | null) {
+  return useSWR(
+    id ? keys.specCache(id) : null,
+    () => getSpecCache(id as number),
     { revalidateOnFocus: false, shouldRetryOnError: false },
   );
 }
