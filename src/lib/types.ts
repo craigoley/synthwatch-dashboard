@@ -425,6 +425,9 @@ export interface IncidentDetail {
   check_id: number;
   check_name: string;
   check_kind: CheckKind;
+  /** The check's deployment environment (authoritative `checks.environment`, api #205 → surfaced on the
+   *  incident DTO). Feeds the shared <EnvBadge>/envOf(); "prod" when absent (pre-API tolerance). */
+  environment: string;
   status: string;
   severity: IncidentSeverity;
   opened_at: string;

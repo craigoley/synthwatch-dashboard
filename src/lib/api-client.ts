@@ -1126,6 +1126,7 @@ interface RawIncidentDetail {
   checkId: number;
   checkName: string;
   checkKind: CheckKind;
+  environment?: string | null; // authoritative checks.environment (api #205 → incident DTO); absent → default "prod"
   status: string;
   severity: IncidentSeverity;
   openedAt: string;
@@ -1158,6 +1159,7 @@ export async function getIncident(id: number): Promise<IncidentDetail> {
     check_id: raw.checkId,
     check_name: raw.checkName,
     check_kind: raw.checkKind,
+    environment: raw.environment ?? "prod", // authoritative column (api #205); default prod when absent
     status: raw.status,
     severity: raw.severity,
     opened_at: raw.openedAt,
