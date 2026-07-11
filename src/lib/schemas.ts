@@ -136,6 +136,9 @@ export const updateCheckSchema = z
     failure_threshold: positiveInt,
     severity,
     enabled: z.boolean(),
+    // Reversible archive (0071): true → archive (set archived_at); false → unarchive. Sent as `archived`
+    // (→ api PATCH { archived }). DISTINCT from `enabled`/pause; `.partial()` makes it optional.
+    archived: z.boolean(),
     lighthouse_enabled: z.boolean(),
     lighthouse_interval_seconds: positiveInt.nullable(),
     lighthouse_form_factor: formFactor,

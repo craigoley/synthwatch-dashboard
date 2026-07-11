@@ -370,6 +370,18 @@ export default function CheckDetailPage() {
     }
   }
 
+  // Reversible archive (0071): stops running + shows "archived"; reactivate resumes with the prior
+  // enabled/paused state (archive is DISTINCT from pause — it doesn't touch `enabled`). Mirrors togglePause.
+  async function toggleArchive() {
+    setPausing(true);
+    try {
+      await updateCheck(check.id, { archived: !check.archived_at });
+      await revalidateChecks(check.id);
+    } finally {
+      setPausing(false);
+    }
+  }
+
   async function refreshRuns() {
     await Promise.all([revalidateChecks(check.id), revalidateRunHistory(check.id)]);
   }
@@ -418,10 +430,16 @@ export default function CheckDetailPage() {
                 <span className="text-[9px] uppercase tracking-wider text-[var(--color-ink-faint)]">latest run</span>
                 <StatusBadge status={recent_runs[0]?.status ?? null} />
               </span>
-              {!check.enabled && (
+              {check.archived_at ? (
                 <span className="sw-mono text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">
-                  paused
+                  archived
                 </span>
+              ) : (
+                !check.enabled && (
+                  <span className="sw-mono text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+                    paused
+                  </span>
+                )
               )}
               {/* B10: a sensitive-but-unredacted monitor is flagged loudly right in the header. */}
               <RedactionBadge health={check.redaction_health} />
@@ -496,8 +514,11 @@ export default function CheckDetailPage() {
               keeps the UX honest. */}
           {canWrite && (
             <>
-              <button onClick={togglePause} disabled={pausing} className="sw-btn">
+              <button onClick={togglePause} disabled={pausing || check.archived_at != null} className="sw-btn">
                 {pausing ? "…" : check.enabled ? "Pause" : "Resume"}
+              </button>
+              <button onClick={toggleArchive} disabled={pausing} className="sw-btn">
+                {pausing ? "…" : check.archived_at ? "Reactivate" : "Archive"}
               </button>
               <button onClick={() => setEditing(true)} className="sw-btn sw-btn-primary">
                 Edit

@@ -152,6 +152,12 @@ export interface Check {
    */
   environment: string;
   created_at: string;
+  /**
+   * Reversible, dashboard-owned ARCHIVE (api/runner 0071). null = active; an ISO timestamp = archived (the
+   * monitor stops running + shows "archived", re-activatable). DISTINCT from `enabled`/pause — clearing it
+   * restores the exact prior enabled/paused state. Survives reconcile (in neither git-write allow-list).
+   */
+  archived_at: string | null;
   lighthouse_enabled: boolean;
   lighthouse_interval_seconds: number | null;
   lighthouse_form_factor: string;
@@ -1038,9 +1044,10 @@ export interface ReconcileApplyPlan {
  *  - `unmonitored` — no check → not set up yet (the activation target, in a later PR).
  *  - `active` — a check exists and is enabled (running).
  *  - `paused` — a check exists but is disabled.
+ *  - `archived` — a check exists but is archived (archived_at set) — reversible retire, distinct from paused.
  * Orthogonal to runnability (a spec can be unmonitored+orphan, or active+orphan).
  */
-export type SpecCoverage = "unmonitored" | "active" | "paused";
+export type SpecCoverage = "unmonitored" | "active" | "paused" | "archived";
 
 /** Per-check health for a MONITORED spec (null when unmonitored). */
 export interface SpecHealth {
@@ -1074,6 +1081,8 @@ export interface SpecCatalogEntry {
   check_id: number | null;
   check_name: string | null;
   enabled: boolean | null;
+  /** Reversible archive (0071): non-null ISO timestamp → the check is archived (coverage = "archived"). */
+  archived_at: string | null;
   health: SpecHealth | null;
 }
 

@@ -142,6 +142,17 @@ export default function MonitorsPage() {
     }
   }
 
+  // Reversible archive (0071): stops running + badges "archived"; unarchive resumes with the prior
+  // enabled/paused state (archive is DISTINCT from pause — it doesn't touch `enabled`). Mirrors togglePause.
+  async function toggleArchive(check: CheckWithStatus) {
+    setPausingId(check.id);
+    try {
+      await updateCheck(check.id, { archived: !check.archived_at });
+    } finally {
+      setPausingId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -241,7 +252,7 @@ export default function MonitorsPage() {
                 </div>
                 <span className="sw-mono text-xs uppercase text-[var(--color-ink-dim)]">{c.kind}</span>
                 <span className="sw-mono text-xs text-[var(--color-ink-dim)]">
-                  {c.enabled ? "enabled" : "paused"}
+                  {c.archived_at ? "archived" : c.enabled ? "enabled" : "paused"}
                 </span>
                 <span className="sw-mono text-xs text-[var(--color-ink-faint)]">
                   {formatRelative(c.last_started_at)}
@@ -250,10 +261,17 @@ export default function MonitorsPage() {
                   <div className="flex flex-wrap gap-1.5 sm:justify-end">
                     <button
                       onClick={() => togglePause(c)}
-                      disabled={pausingId === c.id}
+                      disabled={pausingId === c.id || c.archived_at != null}
                       className="sw-btn sw-btn-ghost sw-btn-sm"
                     >
                       {pausingId === c.id ? "…" : c.enabled ? "Pause" : "Resume"}
+                    </button>
+                    <button
+                      onClick={() => toggleArchive(c)}
+                      disabled={pausingId === c.id}
+                      className="sw-btn sw-btn-ghost sw-btn-sm"
+                    >
+                      {pausingId === c.id ? "…" : c.archived_at ? "Unarchive" : "Archive"}
                     </button>
                     <button onClick={() => setEditing(c)} className="sw-btn sw-btn-ghost sw-btn-sm">
                       Edit

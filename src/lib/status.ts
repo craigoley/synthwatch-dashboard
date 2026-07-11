@@ -31,11 +31,11 @@ export function runStatusMeta(status: RunStatus | null): StatusMeta {
     return { label: "No data", token: "idle", dotClass: "sw-dot-idle" };
   }
   // The API can report a check-level status outside the run taxonomy (e.g.
-  // "paused" for a disabled check). Fall back to a neutral meta so an unexpected
-  // value never crashes the grid.
+  // "paused" for a disabled check, "archived" for an archived one — 0071). Fall back to a neutral meta
+  // so an unexpected value never crashes the grid.
   return (
     RUN_STATUS[status] ?? {
-      label: (status as string) === "paused" ? "Paused" : "No data",
+      label: (status as string) === "paused" ? "Paused" : (status as string) === "archived" ? "Archived" : "No data",
       token: "idle",
       dotClass: "sw-dot-idle",
     }

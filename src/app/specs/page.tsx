@@ -34,12 +34,14 @@ import type { SpecCatalogEntry, SpecCoverage } from "@/lib/types";
 
 function coverageOf(s: SpecCatalogEntry): SpecCoverage {
   if (!s.monitored) return "unmonitored";
+  if (s.archived_at) return "archived"; // reversible archive (0071) — takes precedence over active/paused
   return s.enabled ? "active" : "paused";
 }
 
 const COVERAGE_META: Record<SpecCoverage, { label: string; tone: string }> = {
   active: { label: "Active", tone: "var(--color-pass)" },
   paused: { label: "Paused", tone: "var(--color-idle)" },
+  archived: { label: "Archived", tone: "var(--color-ink-faint)" },
   unmonitored: { label: "Unmonitored", tone: "var(--color-ink-faint)" },
 };
 
@@ -62,7 +64,7 @@ const SPEC_SORTS: { col: SpecSortCol; label: string }[] = [
   { col: "interval", label: "Interval" },
 ];
 // Coverage order for the "coverage" sort: not-set-up first (the page's focus), then paused, then active.
-const COVERAGE_RANK: Record<SpecCoverage, number> = { unmonitored: 0, paused: 1, active: 2 };
+const COVERAGE_RANK: Record<SpecCoverage, number> = { unmonitored: 0, archived: 1, paused: 2, active: 3 };
 const isSortCol = (v: string): v is SpecSortCol => SPEC_SORTS.some((s) => s.col === v);
 
 /** Sort comparator. Health/interval are absent on unmonitored rows → NULLS LAST regardless of dir; name is
