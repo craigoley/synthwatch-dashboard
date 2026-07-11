@@ -5,6 +5,7 @@
  */
 
 import type { CheckWithStatus, IncidentSeverity, RunStatus, RunStepStatus, SparkPoint } from "@/lib/types";
+import { isNonProd } from "@/lib/env";
 
 export interface StatusMeta {
   label: string;
@@ -157,7 +158,7 @@ export function lastSettledStatus(check: CheckWithStatus): RunStatus | null {
 export function deriveSystemStatus(checks: CheckWithStatus[]): SystemStatusMeta {
   let partial = false;
   for (const c of checks) {
-    if (!c.enabled || (c.environment ?? "prod") !== "prod") continue;
+    if (!c.enabled || isNonProd(c)) continue;
     const settled = lastSettledStatus(c);
     const down = settled === "fail" || settled === "error";
     const degraded = settled === "warn";

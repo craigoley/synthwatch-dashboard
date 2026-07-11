@@ -7,8 +7,10 @@ import type { Tag } from "@/lib/types";
 // The old fallback HASHED each key into a palette that included those status colors, so a plain label like
 // "wegmans" hashed to red and read as an error/alert — a false signal, not a real state. Keeping arbitrary
 // tags neutral preserves the status colors' meaning (globals.css: "Status color law is absolute").
+// NOTE: no `env` hue here on purpose. Deployment environment is the authoritative `checks.environment` COLUMN,
+// rendered ONLY via <EnvBadge> — never an `env:` tag. Reserving a hue for a phantom `env:` tag created a second
+// env indicator that could disagree with the column's amber badge; retired so env has a single channel.
 const KEY_TONE: Record<string, string> = {
-  env: "var(--color-running)",
   service: "var(--color-brand)",
   team: "var(--color-warn)",
   criticality: "var(--color-fail)",

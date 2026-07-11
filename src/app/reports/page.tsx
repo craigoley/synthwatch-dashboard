@@ -17,6 +17,7 @@ import { TabBar, useTab, type TabDef } from "@/components/tabs";
 import { StalenessStamp, useFetchedAt } from "@/components/staleness";
 import { formatDuration } from "@/lib/format";
 import type { ReportWindow } from "@/lib/types";
+import { envOf, isNonProd } from "@/lib/env";
 
 const WINDOWS: ReportWindow[] = ["7d", "30d", "90d"];
 
@@ -79,7 +80,7 @@ export default function ReportsPage() {
   const { data: checks, isLoading, error: checksError } = useChecks();
   // Non-prod checks are server-excluded from the SLO/MTTR/trust aggregates (api #188). Count them so the
   // panels can say so — otherwise a staging check silently absent reads as missing data, not intentional.
-  const nonProdCount = (checks ?? []).filter((c) => (c.environment ?? "prod") !== "prod").length;
+  const nonProdCount = (checks ?? []).filter(isNonProd).length;
   const { data: sla } = useSla(window);
   // ★ The aggregate tiles (CWV / trend / verdict-breakdown) take the SAME tag filter as the monitor list,
   // server-scoped via ?tag= — so a filtered view shows the SUBSET's numbers, never the fleet's. Empty → fleet.
@@ -117,6 +118,7 @@ export default function ReportsPage() {
         cert_expiry_warn_days: c.cert_expiry_warn_days,
         name: c.name,
         kind: c.kind,
+        environment: envOf(c),
         current_status: c.current_status,
         tags: c.tags,
         availability_pct: a?.availability_pct ?? computedPct,

@@ -5,6 +5,7 @@ import { StatusBadge, TONE_VAR } from "@/components/status-badge";
 import { Sparkline } from "@/components/sparkline";
 import { money } from "@/components/cost";
 import { TagChips } from "@/components/tag-chips";
+import { EnvBadge } from "@/components/env-badge";
 import { AvailabilityValue } from "@/components/sla";
 // lastSettledStatus hoisted to lib/status (byte-identical) so the header roll-up (deriveSystemStatus)
 // reads the SAME settled value as the card's rail/pill — one source of truth, no drift.
@@ -72,17 +73,9 @@ export function CheckCard({
             <h3 className="truncate text-[15px] font-semibold text-[var(--color-ink)]">{check.name}</h3>
           </div>
           <div className="mt-1 flex items-center gap-2">
-            {/* Non-prod env badge (authoritative checks.environment column, not the env: tag). Prod shows
-                nothing so the 99% case is visually unchanged; staging/preview get a loud pill. */}
-            {check.environment !== "prod" && (
-              <span
-                className="sw-mono rounded px-1 text-[10px] font-semibold uppercase tracking-wider"
-                style={{ color: TONE_VAR.warn, background: `color-mix(in srgb, ${TONE_VAR.warn} 15%, transparent)` }}
-                data-testid={`env-badge-${check.id}`}
-              >
-                {check.environment}
-              </span>
-            )}
+            {/* Env is the authoritative checks.environment column, rendered via the shared <EnvBadge> (the
+                single env-rendering path) — self-hides for prod so the 99% case is visually unchanged. */}
+            <EnvBadge check={check} />
             <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
               {check.kind}
             </span>
