@@ -31,7 +31,7 @@ import { RedactionBadge } from "@/components/redaction";
 import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
-import { runStatusMeta } from "@/lib/status";
+import { runStatusMeta, daysUntilPurge, PURGE_WINDOW_DAYS } from "@/lib/status";
 import { usePersistedBoolean } from "@/lib/use-persisted-boolean";
 import { formatCertExpiry, formatDuration, formatRelative, secondsToMinutesLabel } from "@/lib/format";
 import type { ChainStep, Check, Run } from "@/lib/types";
@@ -430,7 +430,15 @@ export default function CheckDetailPage() {
                 <span className="text-[9px] uppercase tracking-wider text-[var(--color-ink-faint)]">latest run</span>
                 <StatusBadge status={recent_runs[0]?.status ?? null} />
               </span>
-              {check.archived_at ? (
+              {check.removed_at ? (
+                <span
+                  className="sw-mono text-[11px] uppercase tracking-wider"
+                  style={{ color: "var(--color-fail)" }}
+                  title={`Git-removed — hard-deletes in ${daysUntilPurge(check.removed_at) ?? 0} day(s)`}
+                >
+                  removed · purging {daysUntilPurge(check.removed_at) ?? 0}d
+                </span>
+              ) : check.archived_at ? (
                 <span className="sw-mono text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">
                   archived
                 </span>
@@ -514,10 +522,16 @@ export default function CheckDetailPage() {
               keeps the UX honest. */}
           {canWrite && (
             <>
-              <button onClick={togglePause} disabled={pausing || check.archived_at != null} className="sw-btn">
+              {/* A git-removed check is read-only — its lifecycle is driven by the manifest, so pause/archive
+                  are moot (re-add in git to bring it back). */}
+              <button
+                onClick={togglePause}
+                disabled={pausing || check.archived_at != null || check.removed_at != null}
+                className="sw-btn"
+              >
                 {pausing ? "…" : check.enabled ? "Pause" : "Resume"}
               </button>
-              <button onClick={toggleArchive} disabled={pausing} className="sw-btn">
+              <button onClick={toggleArchive} disabled={pausing || check.removed_at != null} className="sw-btn">
                 {pausing ? "…" : check.archived_at ? "Reactivate" : "Archive"}
               </button>
               <button onClick={() => setEditing(true)} className="sw-btn sw-btn-primary">
@@ -527,6 +541,28 @@ export default function CheckDetailPage() {
           )}
         </div>
       </header>
+
+      {/* Git-removal (0072): this monitor's manifest entry was deleted from synthwatch-monitors. It stopped
+          running and is on the 90-day purge clock. Read-only from here — re-add it in git to cancel the purge
+          (that clears removed_at on the next reconcile). Distinct from the reversible Archive control above. */}
+      {check.removed_at && (
+        <div
+          className="rounded-md border px-4 py-3 text-sm"
+          style={{
+            borderColor: "color-mix(in srgb, var(--color-fail) 34%, transparent)",
+            background: "color-mix(in srgb, var(--color-fail) 8%, transparent)",
+            color: "var(--color-ink)",
+          }}
+        >
+          <span className="font-medium" style={{ color: "var(--color-fail)" }}>
+            Removed from git — purging in {daysUntilPurge(check.removed_at) ?? 0} day(s).
+          </span>{" "}
+          <span className="text-[var(--color-ink-dim)]">
+            This monitor’s entry was deleted from the manifest, so it no longer runs and will be hard-deleted
+            after {PURGE_WINDOW_DAYS} days. Re-add it in synthwatch-monitors to cancel the purge.
+          </span>
+        </div>
+      )}
 
       {/* Live step-by-step checklist — shown only while a run is in flight (the run-history funnel takes
           over once it's terminal). Rides #108's fast poll; steps come from the runner's live run_steps. */}

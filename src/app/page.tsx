@@ -16,7 +16,7 @@ import { useAuth } from "@/components/auth-provider";
 import type { CheckWithStatus, Tag } from "@/lib/types";
 import { isNonProd } from "@/lib/env";
 
-type StatusFilter = "all" | "attention" | "pass" | "paused" | "archived";
+type StatusFilter = "all" | "attention" | "pass" | "paused" | "archived" | "removed";
 type KindFilter = "all" | "http" | "browser" | "ssl";
 type EnvFilter = "all" | "prod" | "nonprod";
 
@@ -38,18 +38,22 @@ function matches(
     case "attention":
       return (
         !check.archived_at && // an archived monitor doesn't run → never demands attention
+        !check.removed_at && // nor does a git-removed one (on the purge clock)
         (check.open_incident_count > 0 ||
           check.current_status === "fail" ||
           check.current_status === "error" ||
           check.current_status === "warn")
       );
     case "pass":
-      return !check.archived_at && check.enabled && check.current_status === "pass";
+      return !check.archived_at && !check.removed_at && check.enabled && check.current_status === "pass";
     case "paused":
-      // Archived is a distinct state (its own tab) — an archived check is NOT counted as paused.
-      return !check.archived_at && !check.enabled;
+      // Archived + removed are distinct states (their own tabs) — neither is counted as paused.
+      return !check.archived_at && !check.removed_at && !check.enabled;
     case "archived":
-      return check.archived_at != null;
+      // Removed supersedes archived — a git-removed check shows under Removed, not Archived.
+      return check.archived_at != null && !check.removed_at;
+    case "removed":
+      return check.removed_at != null;
     default:
       return true;
   }
@@ -173,6 +177,9 @@ function StatusGrid() {
           </FilterTab>
           <FilterTab active={status === "archived"} onClick={() => setParam("status", "archived")}>
             Archived
+          </FilterTab>
+          <FilterTab active={status === "removed"} onClick={() => setParam("status", "removed")}>
+            Removed
           </FilterTab>
         </div>
         <div className="flex rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-0.5">

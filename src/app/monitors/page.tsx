@@ -18,6 +18,7 @@ import { RedactionBadge, RedactionFleetSummary } from "@/components/redaction";
 import { useAuth } from "@/components/auth-provider";
 import { SignInToEdit } from "@/components/write-gate";
 import { formatRelative } from "@/lib/format";
+import { daysUntilPurge } from "@/lib/status";
 import type { Check, CheckWithStatus } from "@/lib/types";
 
 function DeleteDialog({
@@ -251,24 +252,36 @@ export default function MonitorsPage() {
                   </div>
                 </div>
                 <span className="sw-mono text-xs uppercase text-[var(--color-ink-dim)]">{c.kind}</span>
-                <span className="sw-mono text-xs text-[var(--color-ink-dim)]">
-                  {c.archived_at ? "archived" : c.enabled ? "enabled" : "paused"}
-                </span>
+                {c.removed_at ? (
+                  <span
+                    className="sw-mono text-xs"
+                    style={{ color: "var(--color-fail)" }}
+                    title={`Git-removed — hard-deletes in ${daysUntilPurge(c.removed_at) ?? 0} day(s)`}
+                  >
+                    removed · purging {daysUntilPurge(c.removed_at) ?? 0}d
+                  </span>
+                ) : (
+                  <span className="sw-mono text-xs text-[var(--color-ink-dim)]">
+                    {c.archived_at ? "archived" : c.enabled ? "enabled" : "paused"}
+                  </span>
+                )}
                 <span className="sw-mono text-xs text-[var(--color-ink-faint)]">
                   {formatRelative(c.last_started_at)}
                 </span>
                 {canWrite ? (
                   <div className="flex flex-wrap gap-1.5 sm:justify-end">
+                    {/* A git-removed check is read-only here — its lifecycle is driven by the manifest
+                        (re-add in git to cancel the purge), so pause/archive are moot. */}
                     <button
                       onClick={() => togglePause(c)}
-                      disabled={pausingId === c.id || c.archived_at != null}
+                      disabled={pausingId === c.id || c.archived_at != null || c.removed_at != null}
                       className="sw-btn sw-btn-ghost sw-btn-sm"
                     >
                       {pausingId === c.id ? "…" : c.enabled ? "Pause" : "Resume"}
                     </button>
                     <button
                       onClick={() => toggleArchive(c)}
-                      disabled={pausingId === c.id}
+                      disabled={pausingId === c.id || c.removed_at != null}
                       className="sw-btn sw-btn-ghost sw-btn-sm"
                     >
                       {pausingId === c.id ? "…" : c.archived_at ? "Unarchive" : "Archive"}
