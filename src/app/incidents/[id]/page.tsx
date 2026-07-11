@@ -7,6 +7,7 @@ import { useIncident, useCheckTags } from "@/lib/client";
 import { StatusBadge, ToneBadge, TONE_VAR } from "@/components/status-badge";
 import { RcaPanel } from "@/components/rca-panel";
 import { TagChips } from "@/components/tag-chips";
+import { EnvBadge } from "@/components/env-badge";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { runStatusMeta, severityMeta } from "@/lib/status";
 import { formatDuration, formatLocalDateTime, formatRelative, formatSpan } from "@/lib/format";
@@ -250,6 +251,9 @@ export default function IncidentDetailPage() {
           <Link href={`/checks/${incident.check_id}`} className="text-[var(--color-brand)] hover:underline">
             {incident.check_name}
           </Link>
+          {/* Env is as visible as tags on every surface now — the shared <EnvBadge> (self-hides for prod)
+              finishes #237, which deferred incident detail until the DTO carried environment. */}
+          <EnvBadge check={{ environment: incident.environment, id: incident.check_id }} />
           <span className="sw-mono uppercase text-[var(--color-ink-faint)]">{incident.check_kind}</span>
           <span>· {incident.consecutive_failures} consecutive failures</span>
           <span>
