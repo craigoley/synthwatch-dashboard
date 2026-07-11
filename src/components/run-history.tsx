@@ -29,7 +29,11 @@ import type { Run, RunOutcome } from "@/lib/types";
 function RunArtifacts({ run }: { run: Run }) {
   const [imgFailed, setImgFailed] = useState(false);
   // ★ SAME-ORIGIN screenshot proxy (app/screenshot-proxy/[runId]) — cookie→bearer, the trace proxy's sibling.
-  const screenshot = run.screenshot_url ? `/screenshot-proxy/${run.id}` : null;
+  // The screenshot is a FAILURE affordance (its block is labelled "Failure screenshot"), so gate it on a
+  // failed run: now that RunArtifacts renders for any run (pass runs can carry a redacted trace), a green run
+  // must never render a red-sounding "Failure screenshot" header. (A pass run has no screenshot in practice.)
+  const failed = run.status === "fail" || run.status === "error";
+  const screenshot = failed && run.screenshot_url ? `/screenshot-proxy/${run.id}` : null;
   // ★ Serve the trace SAME-ORIGIN via the dashboard's own proxy (app/trace-proxy/[id]).
   // The viewer fetch()es the trace, and fetching the cross-origin (API-origin) trace is
   // the documented-broken CORS trap (Playwright #38622); same-origin dodges it entirely
