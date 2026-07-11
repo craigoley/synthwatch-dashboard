@@ -394,6 +394,7 @@ interface RawRun {
   certDaysRemaining: number | null;
   retryCount?: number | null; // runner 0048; optional → tolerant of pre-deploy API responses without it
   sandbox?: boolean; // runner 0065; optional → tolerant of pre-deploy API responses without it
+  hasTraceSignals?: boolean; // persisted trace_signals present, independent of traceUrl; optional → tolerant of pre-deploy API
 }
 
 interface RawCheckDetail extends RawCheck {
@@ -580,6 +581,7 @@ function mapRun(raw: RawRun): Run {
     cert_days_remaining: raw.certDaysRemaining ?? null,
     retry_count: raw.retryCount ?? null, // null when the API predates 0048 → row shows nothing
     sandbox: raw.sandbox ?? false, // false when the API predates 0065 → no badge
+    has_trace_signals: raw.hasTraceSignals ?? false, // false when the API predates the flag → no summary offered
   };
 }
 
@@ -775,6 +777,37 @@ export async function getRuns(id: number, query: RunsQuery = {}): Promise<RunsPa
 export async function getSteps(runId: number): Promise<RunStep[]> {
   const raw = await request<RawStep[]>(`/runs/${runId}/steps`);
   return raw.map(mapStep);
+}
+
+// ─── Trace SIGNALS summary (GET /api/runs/:id/trace-signals — the compact, redacted network/console summary) ─
+// Distinct from the AI insights above: no AOAI, no token spend — just the persisted trace_signals the runner
+// extracted at capture. Available even when there's NO downloadable trace (a sensitive monitor's green run:
+// trace_url null by B10 design, but signals persisted). The API serializes the TraceSignalsDto camelCase; we
+// type only the fields the summary renders (extra keys are ignored structurally).
+export interface TraceSignalsSummary {
+  targetHost: string | null;
+  network: {
+    totalRequests: number;
+    wireKb: number;
+    thirdPartyCount: number;
+    failed: { url: string; status: number; thirdParty: boolean }[];
+    topThirdParties: { host: string; count: number; kb: number }[];
+  };
+  console: {
+    messages: { level: string; origin: string; sourceHost?: string; text: string }[];
+    droppedError: number;
+  };
+}
+
+/** GET /api/runs/:id/trace-signals — null when the run has no signals (404). 401/403 propagate to the global
+ *  re-login/permission UX (same as the other gated fetchers). */
+export async function getTraceSignals(runId: number): Promise<TraceSignalsSummary | null> {
+  try {
+    return await request<TraceSignalsSummary>(`/runs/${runId}/trace-signals`);
+  } catch (e) {
+    if (e instanceof ApiRequestError && e.status === 404) return null;
+    throw e;
+  }
 }
 
 // ─── Trace AI insights (POST /api/runs/:id/ai-insights — slice 2 endpoint, gated editor/admin) ────────
