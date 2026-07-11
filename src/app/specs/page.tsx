@@ -30,10 +30,12 @@ import { useAuth } from "@/components/auth-provider";
 import { SignInToEdit } from "@/components/write-gate";
 import { activationFrom } from "@/lib/specs";
 import { formatDuration, formatRelative } from "@/lib/format";
+import { daysUntilPurge } from "@/lib/status";
 import type { SpecCatalogEntry, SpecCoverage } from "@/lib/types";
 
 function coverageOf(s: SpecCatalogEntry): SpecCoverage {
   if (!s.monitored) return "unmonitored";
+  if (s.removed_at) return "removed"; // git-removed (0072) — purging; supersedes archive/active/paused
   if (s.archived_at) return "archived"; // reversible archive (0071) — takes precedence over active/paused
   return s.enabled ? "active" : "paused";
 }
@@ -42,6 +44,7 @@ const COVERAGE_META: Record<SpecCoverage, { label: string; tone: string }> = {
   active: { label: "Active", tone: "var(--color-pass)" },
   paused: { label: "Paused", tone: "var(--color-idle)" },
   archived: { label: "Archived", tone: "var(--color-ink-faint)" },
+  removed: { label: "Removed", tone: "var(--color-fail)" },
   unmonitored: { label: "Unmonitored", tone: "var(--color-ink-faint)" },
 };
 
@@ -64,7 +67,7 @@ const SPEC_SORTS: { col: SpecSortCol; label: string }[] = [
   { col: "interval", label: "Interval" },
 ];
 // Coverage order for the "coverage" sort: not-set-up first (the page's focus), then paused, then active.
-const COVERAGE_RANK: Record<SpecCoverage, number> = { unmonitored: 0, archived: 1, paused: 2, active: 3 };
+const COVERAGE_RANK: Record<SpecCoverage, number> = { unmonitored: 0, removed: 1, archived: 2, paused: 3, active: 4 };
 const isSortCol = (v: string): v is SpecSortCol => SPEC_SORTS.some((s) => s.col === v);
 
 /** Sort comparator. Health/interval are absent on unmonitored rows → NULLS LAST regardless of dir; name is
@@ -133,12 +136,15 @@ function useSpecFilters() {
   };
 }
 
-function CoverageBadge({ coverage }: { coverage: SpecCoverage }) {
+function CoverageBadge({ coverage, removedAt }: { coverage: SpecCoverage; removedAt?: string | null }) {
   const meta = COVERAGE_META[coverage];
+  // Git-removed rows (0072) carry a purge countdown so the "Removed" badge reads as terminal, not a pause.
+  const daysLeft = coverage === "removed" ? daysUntilPurge(removedAt) : null;
   return (
     <span
       data-testid="spec-coverage"
       data-coverage={coverage}
+      title={daysLeft != null ? `Git-removed — hard-deletes in ${daysLeft} day${daysLeft === 1 ? "" : "s"}` : undefined}
       className="sw-mono inline-flex w-fit shrink-0 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider"
       style={{
         color: meta.tone,
@@ -147,6 +153,7 @@ function CoverageBadge({ coverage }: { coverage: SpecCoverage }) {
       }}
     >
       {meta.label}
+      {daysLeft != null && <span className="ml-1 normal-case opacity-80">· purging {daysLeft}d</span>}
     </span>
   );
 }
@@ -257,7 +264,7 @@ function SpecRow({
         <span className="sw-mono block truncate text-[11px] text-[var(--color-ink-faint)]">{entry.spec_path}</span>
       </div>
 
-      <CoverageBadge coverage={coverageOf(entry)} />
+      <CoverageBadge coverage={coverageOf(entry)} removedAt={entry.removed_at} />
       <RunnableCell entry={entry} />
 
       {/* Linked monitor */}

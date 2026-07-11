@@ -31,15 +31,30 @@ export function runStatusMeta(status: RunStatus | null): StatusMeta {
     return { label: "No data", token: "idle", dotClass: "sw-dot-idle" };
   }
   // The API can report a check-level status outside the run taxonomy (e.g.
-  // "paused" for a disabled check, "archived" for an archived one — 0071). Fall back to a neutral meta
-  // so an unexpected value never crashes the grid.
+  // "paused" for a disabled check, "archived" for an archived one — 0071, "removed" for a git-removed one
+  // pending purge — 0072). Fall back to a neutral meta so an unexpected value never crashes the grid.
   return (
-    RUN_STATUS[status] ?? {
-      label: (status as string) === "paused" ? "Paused" : (status as string) === "archived" ? "Archived" : "No data",
-      token: "idle",
-      dotClass: "sw-dot-idle",
-    }
+    RUN_STATUS[status] ??
+    (((): StatusMeta => {
+      const s = status as string;
+      const label = s === "paused" ? "Paused" : s === "archived" ? "Archived" : s === "removed" ? "Removed" : "No data";
+      return { label, token: "idle", dotClass: "sw-dot-idle" };
+    })())
   );
+}
+
+// Git-removal purge window (runner RETENTION_DAYS / migration 0072). A git-removed check (removed_at set)
+// is hard-deleted this many days after removal. Kept in sync with the runner's 90d blob-lifecycle clock.
+export const PURGE_WINDOW_DAYS = 90;
+
+// Days until a git-removed check is purged, from its removed_at timestamp. null when not removed.
+// Clamped at 0 (an overdue-but-incident-deferred check reads "purging in 0 days", never negative).
+export function daysUntilPurge(removedAt: string | null | undefined): number | null {
+  if (!removedAt) return null;
+  const removedMs = new Date(removedAt).getTime();
+  if (Number.isNaN(removedMs)) return null;
+  const purgeAt = removedMs + PURGE_WINDOW_DAYS * 86_400_000;
+  return Math.max(0, Math.ceil((purgeAt - Date.now()) / 86_400_000));
 }
 
 // run_steps.status is a plain string in the DB; map known values, default idle.

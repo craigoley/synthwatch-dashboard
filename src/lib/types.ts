@@ -158,6 +158,11 @@ export interface Check {
    * restores the exact prior enabled/paused state. Survives reconcile (in neither git-write allow-list).
    */
   archived_at: string | null;
+  /**
+   * Git-removal purge clock (0072). null = present in the manifest; an ISO timestamp = git-removed, purging
+   * in ~90 days. RECONCILE-owned (read-only here) — surfaced so the UI shows "removed, purging in N days".
+   */
+  removed_at: string | null;
   lighthouse_enabled: boolean;
   lighthouse_interval_seconds: number | null;
   lighthouse_form_factor: string;
@@ -1045,9 +1050,10 @@ export interface ReconcileApplyPlan {
  *  - `active` — a check exists and is enabled (running).
  *  - `paused` — a check exists but is disabled.
  *  - `archived` — a check exists but is archived (archived_at set) — reversible retire, distinct from paused.
+ *  - `removed` — a check whose manifest entry was git-deleted (removed_at set) — purging in N days, read-only.
  * Orthogonal to runnability (a spec can be unmonitored+orphan, or active+orphan).
  */
-export type SpecCoverage = "unmonitored" | "active" | "paused" | "archived";
+export type SpecCoverage = "unmonitored" | "active" | "paused" | "archived" | "removed";
 
 /** Per-check health for a MONITORED spec (null when unmonitored). */
 export interface SpecHealth {
@@ -1083,6 +1089,8 @@ export interface SpecCatalogEntry {
   enabled: boolean | null;
   /** Reversible archive (0071): non-null ISO timestamp → the check is archived (coverage = "archived"). */
   archived_at: string | null;
+  /** Git-removal (0072): non-null ISO timestamp → git-removed, purging in N days (coverage = "removed"). */
+  removed_at: string | null;
   health: SpecHealth | null;
 }
 

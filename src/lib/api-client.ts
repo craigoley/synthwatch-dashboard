@@ -361,6 +361,7 @@ interface RawCheck {
   lastRunAt: string | null;
   createdAt: string;
   archivedAt?: string | null;
+  removedAt?: string | null;
 }
 
 const REDACTION_HEALTHS: readonly string[] = ["ok", "misconfigured", "n/a"];
@@ -511,6 +512,7 @@ function mapCheck(raw: RawCheck): Check {
     environment: raw.environment ?? "prod", // authoritative column (api #205); default prod when absent
     created_at: raw.createdAt,
     archived_at: raw.archivedAt ?? null, // reversible archive (0071); null = active
+    removed_at: raw.removedAt ?? null, // git-removal purge clock (0072); null = present in git
 
     lighthouse_enabled: raw.lighthouseEnabled,
     lighthouse_interval_seconds: raw.lighthouseIntervalSeconds ?? null,
@@ -1344,6 +1346,7 @@ interface RawSpecItem {
   checkName?: string | null;
   enabled?: boolean | null;
   archivedAt?: string | null;
+  removedAt?: string | null;
   health?: RawSpecHealth | null;
 }
 
@@ -1368,6 +1371,7 @@ export async function getSpecCatalog(): Promise<SpecCatalog | null> {
       check_name: s.checkName ?? null,
       enabled: s.enabled ?? null,
       archived_at: s.archivedAt ?? null,
+      removed_at: s.removedAt ?? null,
       health: s.health
         ? {
             current_status: s.health.currentStatus ?? null,
