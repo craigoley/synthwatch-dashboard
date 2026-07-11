@@ -360,6 +360,7 @@ interface RawCheck {
   redactionHealth?: string;
   lastRunAt: string | null;
   createdAt: string;
+  archivedAt?: string | null;
 }
 
 const REDACTION_HEALTHS: readonly string[] = ["ok", "misconfigured", "n/a"];
@@ -509,6 +510,8 @@ function mapCheck(raw: RawCheck): Check {
     enabled: raw.enabled,
     environment: raw.environment ?? "prod", // authoritative column (api #205); default prod when absent
     created_at: raw.createdAt,
+    archived_at: raw.archivedAt ?? null, // reversible archive (0071); null = active
+
     lighthouse_enabled: raw.lighthouseEnabled,
     lighthouse_interval_seconds: raw.lighthouseIntervalSeconds ?? null,
     lighthouse_form_factor: raw.lighthouseFormFactor ?? "desktop",
@@ -1340,6 +1343,7 @@ interface RawSpecItem {
   checkId?: number | null;
   checkName?: string | null;
   enabled?: boolean | null;
+  archivedAt?: string | null;
   health?: RawSpecHealth | null;
 }
 
@@ -1363,6 +1367,7 @@ export async function getSpecCatalog(): Promise<SpecCatalog | null> {
       check_id: s.checkId ?? null,
       check_name: s.checkName ?? null,
       enabled: s.enabled ?? null,
+      archived_at: s.archivedAt ?? null,
       health: s.health
         ? {
             current_status: s.health.currentStatus ?? null,
