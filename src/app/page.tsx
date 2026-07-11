@@ -14,13 +14,11 @@ import { MonitorChatInput } from "@/components/monitor-chat-input";
 import { useCreateMonitor, CreateMonitorModal } from "@/components/create-monitor";
 import { useAuth } from "@/components/auth-provider";
 import type { CheckWithStatus, Tag } from "@/lib/types";
+import { isNonProd } from "@/lib/env";
 
 type StatusFilter = "all" | "attention" | "pass" | "paused";
 type KindFilter = "all" | "http" | "browser" | "ssl";
 type EnvFilter = "all" | "prod" | "nonprod";
-
-/** Env facet from the authoritative checks.environment column (not the env: tag). */
-const isNonProd = (check: CheckWithStatus) => (check.environment ?? "prod") !== "prod";
 
 function matches(
   check: CheckWithStatus,

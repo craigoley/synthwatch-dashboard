@@ -26,6 +26,7 @@ function hostFromUrl(u: string | null | undefined): string | undefined {
   }
 }
 import { TagChips } from "@/components/tag-chips";
+import { EnvBadge } from "@/components/env-badge";
 import { RedactionBadge } from "@/components/redaction";
 import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";
@@ -427,6 +428,9 @@ export default function CheckDetailPage() {
             </span>
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-[var(--color-ink-dim)]">
+            {/* Env is as visible as tags now — the shared <EnvBadge> (self-hides for prod) fixes "a staging
+                monitor read as prod on its own detail page". */}
+            <EnvBadge check={check} />
             <span className="sw-mono uppercase">{check.kind}</span>
             {check.kind === "http" && (
               <span className="sw-mono">· {check.method} → {check.expected_status}</span>

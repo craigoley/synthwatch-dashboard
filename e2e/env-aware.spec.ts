@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 import { mockApi, defaultWorld } from "./mock";
-import { listItem } from "./fixtures";
+import { listItem, detail, run } from "./fixtures";
 
 /**
  * Env-aware display (api #205 projects checks.environment). A non-prod (staging) check must be badged +
@@ -83,5 +83,30 @@ test.describe("env-aware display — badge, filter, banner guard, exclusion capt
 
     await page.goto("/status");
     await expect(page.getByTestId("system-status-label")).toHaveText("All Systems Operational");
+  });
+});
+
+test.describe("env rendering — unified EnvBadge everywhere tags render", () => {
+  test("★ staging monitor shows its env badge on the DETAIL page (was only the grid card)", async ({ page }) => {
+    const w = defaultWorld();
+    w.details[354] = detail(
+      { id: 354, name: "Wegmans PREVIEW", kind: "browser", flowName: "preview", environment: "staging" },
+      [run({ id: 1, status: "pass" })],
+    );
+    await mockApi(page, w);
+    await page.goto("/checks/354");
+
+    await expect(page.getByRole("heading", { name: "Wegmans PREVIEW" })).toBeVisible();
+    await expect(page.getByTestId("env-badge-354")).toHaveText(/staging/i); // the fix: env visible on detail
+  });
+
+  test("prod monitor shows NO env badge on the detail page (prod is visually unchanged)", async ({ page }) => {
+    const w = defaultWorld();
+    w.details[1] = detail({ id: 1, name: "API health", kind: "http" }, [run({ id: 1, status: "pass" })]); // env defaults prod
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+
+    await expect(page.getByRole("heading", { name: "API health" })).toBeVisible();
+    await expect(page.getByTestId("env-badge-1")).toHaveCount(0);
   });
 });

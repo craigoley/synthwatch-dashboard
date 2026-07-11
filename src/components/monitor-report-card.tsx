@@ -7,6 +7,7 @@ import { MonitorReportDetail } from "@/components/monitor-report-detail";
 import { Sparkline } from "@/components/sparkline";
 import { StatusDot } from "@/components/status-badge";
 import { TagChips } from "@/components/tag-chips";
+import { EnvBadge } from "@/components/env-badge";
 import { availabilityTone } from "@/lib/status";
 import { formatDuration, formatPct } from "@/lib/format";
 import type { CheckKind, ReportWindow, RunStatus, SparkPoint, Tag, IncidentSeverity } from "@/lib/types";
@@ -22,6 +23,8 @@ export interface ReportRow {
   check_id: number;
   name: string;
   kind: CheckKind;
+  /** Authoritative deployment env (checks.environment) — rendered via <EnvBadge>, self-hides for prod. */
+  environment: string;
   current_status: RunStatus | null;
   tags: Tag[];
   /** Availability over the selected window (computed from SLA up/down, or the rollup report when present). */
@@ -150,6 +153,7 @@ export function MonitorReportCard({
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium text-[var(--color-ink)]">{row.name}</span>
               <span className="flex flex-wrap items-center gap-1.5">
+                <EnvBadge check={{ environment: row.environment, id: row.check_id }} />
                 <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">{row.kind}</span>
                 <CertRunway days={row.last_cert_days_remaining} warnDays={row.cert_expiry_warn_days} />
                 <TagChips tags={row.tags} />
