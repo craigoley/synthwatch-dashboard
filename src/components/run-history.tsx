@@ -11,6 +11,7 @@ import { runStatusMeta } from "@/lib/status";
 import { formatDuration, formatLocalDateTime } from "@/lib/format";
 import { runsDebug } from "@/lib/debug";
 import { TraceViewer } from "@/components/trace-viewer";
+import { TraceSummary } from "@/components/trace-summary";
 import { AiInsightsPanel } from "@/components/ai-insights";
 import { BaselineDiffPanel } from "@/components/baseline-diff";
 import type { Run, RunOutcome } from "@/lib/types";
@@ -185,6 +186,10 @@ function RunRow({
             </p>
           )}
           {failed && <RunArtifacts run={run} />}
+          {/* ★ A run with persisted trace_signals but NO downloadable trace (a sensitive monitor's run — B10
+              stores no zip) surfaces the redacted network/console summary here, so it never reads as "no
+              trace". When trace_url IS present, RunArtifacts' full viewer covers it (no duplicate summary). */}
+          {run.has_trace_signals && !run.trace_url && <TraceSummary runId={run.id} />}
           {!run.error_message && !failed && (
             <p className="mt-3 text-xs text-[var(--color-ink-faint)]">Run completed without errors.</p>
           )}

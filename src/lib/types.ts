@@ -300,6 +300,14 @@ export interface Run {
    * resumed monitor's history stays honest. Optional/false-default — tolerant of pre-0065 API responses.
    */
   sandbox?: boolean;
+  /**
+   * True when the run has PERSISTED trace_signals (the compact, redacted network/console summary),
+   * INDEPENDENT of `trace_url`. A sensitive monitor's green run stores no downloadable trace (`trace_url`
+   * null, by B10 design) but does persist signals — so the UI surfaces the redacted summary (via
+   * `/api/runs/{id}/trace-signals`) instead of reading as "no trace". Optional/false-default — tolerant of a
+   * pre-flag API.
+   */
+  has_trace_signals?: boolean;
 }
 
 /** Check detail payload: the check plus its most recent runs. */
