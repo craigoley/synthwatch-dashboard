@@ -70,8 +70,8 @@ function RunArtifacts({ run }: { run: Run }) {
             iframeTestId={`trace-viewer-${run.id}`}
           />
           <p className="mt-1.5 text-[11px] text-[var(--color-ink-faint)]">
-            Per-action screenshots, console, network waterfall &amp; DOM time-travel — from the trace
-            captured on failure.
+            Per-action screenshots, console, network waterfall &amp; DOM time-travel — from the captured
+            trace. Sensitive monitors serve a redacted, reduced trace (secrets scrubbed, images stripped).
           </p>
           {/* On-demand AOAI analysis of this trace (slice 3) — gated + inert-until-configured. */}
           <AiInsightsPanel runId={run.id} />
@@ -185,7 +185,11 @@ function RunRow({
               {run.error_message}
             </p>
           )}
-          {failed && <RunArtifacts run={run} />}
+          {/* Render for ANY run with an artifact (RunArtifacts self-hides when there's none). A sensitive
+              monitor now stores a REDACTED trace on PASS runs too, so a green run can have a viewable
+              trace_url — no longer failure-gated. The failure screenshot block inside still only appears
+              when a screenshot exists (failures). */}
+          <RunArtifacts run={run} />
           {/* ★ A run with persisted trace_signals but NO downloadable trace (a sensitive monitor's run — B10
               stores no zip) surfaces the redacted network/console summary here, so it never reads as "no
               trace". When trace_url IS present, RunArtifacts' full viewer covers it (no duplicate summary). */}
