@@ -34,8 +34,9 @@ export function useTab(ids: readonly string[], fallback: string) {
  * ★ MOBILE: the row WRAPS (max-w-full flex-wrap) instead of overflowing the viewport. The old inline-flex
  * row clipped at phone width with no scroll affordance — "Cost" rendered half-bisected by the screen edge,
  * a hidden-navigation failure (a tab you can't see doesn't exist). Wrapping means NOTHING is ever hidden:
- * all six labels are short enough for two rows at 390px, matching the app header's own wrap-to-two-rows
- * mobile solution (app-shell.tsx) rather than inventing a scroll+fade mechanism for six short labels.
+ * all six labels are short enough for two rows at 390px — no scroll+fade mechanism to invent for six short
+ * labels. (The app header solves its mobile width the same spirit-wise: its container wraps so the nav gets
+ * its own full row — order-last w-full in app-shell.tsx — though the nav itself then scrolls within it.)
  * Buttons get a ≥44px touch target on mobile (min-h-11), reset to the original compact height from sm: up.
  */
 export function TabBar({
