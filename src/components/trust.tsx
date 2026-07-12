@@ -285,8 +285,11 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
         </div>
       </div>
 
-      {/* degrading-but-green early warning — a distinct annotation, NOT a chip demotion (the chip stays as-is) */}
-      {m.retried_passes >= RETRIED_PASSES_MIN_TO_WARN && (
+      {/* degrading-but-green early warning + transient-flap note — distinct annotations, NOT a chip demotion.
+          Each self-hides (RetriedPassesNote when < MIN, FlapNote when 0), so gate on EITHER having something to
+          say — otherwise a check that flaps but has no retried passes would silently drop the flap note here
+          while the fleet scorecard still shows it. */}
+      {(m.retried_passes >= RETRIED_PASSES_MIN_TO_WARN || m.flap_count > 0) && (
         <div className="mb-3">
           <RetriedPassesNote retriedPasses={m.retried_passes} window={window} />
           <FlapNote flapCount={m.flap_count} scheduledCount={m.scheduled_count} window={window} />
