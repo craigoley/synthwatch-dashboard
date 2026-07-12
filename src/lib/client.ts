@@ -19,6 +19,7 @@ import {
   getCheck,
   getSpecCache,
   getErrorDiff,
+  getErrorMutes,
   getRuns,
   getSteps,
   getMetrics,
@@ -108,6 +109,7 @@ const keys = {
   checkLocations: (id: number) => ["check-locations", id] as const,
   specCache: (id: number) => ["spec-cache", id] as const,
   errorDiff: (id: number, runId: number | null) => ["error-diff", id, runId] as const,
+  errorMutes: (id: number) => ["error-mutes", id] as const,
   channels: ["channels"] as const,
   routing: ["routing"] as const,
   deliveryReadiness: ["delivery-readiness"] as const,
@@ -427,6 +429,15 @@ export function useErrorDiff(id: number | null, runId?: number | null) {
   return useSWR(
     id ? keys.errorDiff(id, runId ?? null) : null,
     () => getErrorDiff(id as number, runId != null ? { runId } : {}),
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+}
+
+/** The error mutes for a check (P4) — feeds the muted disclosure's notes. Editor-gated; [] for a non-editor. */
+export function useErrorMutes(id: number | null) {
+  return useSWR(
+    id ? keys.errorMutes(id) : null,
+    () => getErrorMutes(id as number),
     { revalidateOnFocus: false, shouldRetryOnError: false },
   );
 }

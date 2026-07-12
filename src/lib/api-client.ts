@@ -740,6 +740,16 @@ export interface ErrorItem {
   severity: number;
   severity_label: string;
   first_seen_run_id: number | null;
+  /** P4: the deploy this NEW error first appeared after (in the window between the previous run and this one),
+   *  or null. Correlation, never causation — set only on NEW items. */
+  first_seen_after_deploy: FirstSeenAfterDeploy | null;
+}
+
+/** P4: the deploy a NEW error first appeared after. `sha` is "" for a non-commit marker (etag/sentry-release). */
+export interface FirstSeenAfterDeploy {
+  sha: string;
+  deployed_at: string;
+  target_host: string;
 }
 
 /** First-party vs third-party counts per bucket (so the UI can label the third-party toggle without re-counting). */
@@ -750,6 +760,8 @@ export interface ErrorDiffCounts {
   persistent_third_party: number;
   resolved_first_party: number;
   resolved_third_party: number;
+  /** P4: errors muted for this check that would otherwise be NEW (surfaced in `muted`, not `new_errors`). */
+  muted: number;
 }
 
 /** GET /checks/{id}/error-diff — this run's errors vs the union of the last N settled runs. NEW = the regression. */
@@ -762,6 +774,9 @@ export interface ErrorDiff {
   new_errors: ErrorItem[];
   persistent: ErrorItem[];
   resolved: ErrorItem[];
+  /** P4: errors the operator muted for this check that would otherwise be NEW — surfaced (never dropped) so the
+   *  UI can show a "N muted" disclosure with an unmute action. */
+  muted: ErrorItem[];
   counts: ErrorDiffCounts;
   /** true when this run or any baseline run hit the console cap — the diff is INCOMPLETE above the cap. */
   truncated: boolean;
@@ -781,6 +796,17 @@ function mapErrorItem(r: Record<string, unknown>): ErrorItem {
     severity: Number(r.severity ?? 0),
     severity_label: String(r.severityLabel ?? ""),
     first_seen_run_id: (r.firstSeenRunId as number | null) ?? null,
+    first_seen_after_deploy: mapDeploy(r.firstSeenAfterDeploy),
+  };
+}
+
+function mapDeploy(v: unknown): FirstSeenAfterDeploy | null {
+  if (!v || typeof v !== "object") return null;
+  const d = v as Record<string, unknown>;
+  return {
+    sha: String(d.sha ?? ""),
+    deployed_at: String(d.deployedAt ?? ""),
+    target_host: String(d.targetHost ?? ""),
   };
 }
 
@@ -811,6 +837,7 @@ export async function getErrorDiff(
       new_errors: asItems(raw?.new),
       persistent: asItems(raw?.persistent),
       resolved: asItems(raw?.resolved),
+      muted: asItems(raw?.muted),
       counts: {
         new_first_party: Number(counts.newFirstParty ?? 0),
         new_third_party: Number(counts.newThirdParty ?? 0),
@@ -818,6 +845,7 @@ export async function getErrorDiff(
         persistent_third_party: Number(counts.persistentThirdParty ?? 0),
         resolved_first_party: Number(counts.resolvedFirstParty ?? 0),
         resolved_third_party: Number(counts.resolvedThirdParty ?? 0),
+        muted: Number(counts.muted ?? 0),
       },
       truncated: Boolean(raw?.truncated),
       baseline_run_count: Number(raw?.baselineRunCount ?? 0),
@@ -826,6 +854,60 @@ export async function getErrorDiff(
     if (err instanceof ApiRequestError && err.status === 404) return null;
     throw err;
   }
+}
+
+/** One error mute (P4): the muted fingerprint + when/who/why. `muted_by`/`note` are best-effort (nullable). */
+export interface ErrorMute {
+  fingerprint: string;
+  muted_at: string;
+  muted_by: string | null;
+  note: string | null;
+}
+
+function mapMute(r: Record<string, unknown>): ErrorMute {
+  return {
+    fingerprint: String(r.fingerprint ?? ""),
+    muted_at: String(r.mutedAt ?? ""),
+    muted_by: (r.mutedBy as string | null) ?? null,
+    note: (r.note as string | null) ?? null,
+  };
+}
+
+/** GET /checks/{id}/error-mutes — every mute for the check (newest first). Session-gated; 401/403 → [] (the
+ *  disclosure just shows nothing for a non-editor). */
+export async function getErrorMutes(checkId: number): Promise<ErrorMute[]> {
+  try {
+    const raw = await request<{ mutes?: Record<string, unknown>[] }>(`/checks/${checkId}/error-mutes`);
+    return Array.isArray(raw?.mutes) ? raw.mutes.map(mapMute) : [];
+  } catch (err) {
+    if (err instanceof ApiRequestError && (err.status === 401 || err.status === 403)) return [];
+    throw err;
+  }
+}
+
+/** POST /checks/{id}/error-mutes — mute a fingerprint for this monitor (optional note). Editor-gated (verb-gate
+ *  → anon 401). Idempotent server-side. The muted error leaves `new_errors` and joins `muted` on the next read. */
+export async function muteError(checkId: number, fingerprint: string, note?: string): Promise<ErrorMute> {
+  const raw = await request<Record<string, unknown>>(
+    `/checks/${checkId}/error-mutes`,
+    undefined,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ fingerprint, note: note && note.trim() !== "" ? note.trim() : undefined }),
+    },
+  );
+  return mapMute(raw ?? {});
+}
+
+/** DELETE /checks/{id}/error-mutes?fingerprint=… — unmute (the fingerprint is a query param: a network
+ *  fingerprint embeds a URL, so it can't be a path segment). Editor-gated; idempotent (204). */
+export async function unmuteError(checkId: number, fingerprint: string): Promise<void> {
+  await request<null>(
+    `/checks/${checkId}/error-mutes`,
+    { fingerprint },
+    { method: "DELETE" },
+  );
 }
 
 /** The masked echo the write endpoint (and every read) returns: { key -> "set" }, never a value/ciphertext. */

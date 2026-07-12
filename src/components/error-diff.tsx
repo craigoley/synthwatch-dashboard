@@ -2,17 +2,24 @@
 
 import { useState } from "react";
 
-import { useErrorDiff } from "@/lib/client";
+import { useErrorDiff, useErrorMutes } from "@/lib/client";
+import { muteError, unmuteError } from "@/lib/api-client";
 import type { ErrorItem } from "@/lib/api-client";
+import { useAuth } from "@/components/auth-provider";
 import { Spinner } from "@/components/states";
 import { TONE_VAR } from "@/components/status-badge";
+import { formatRelative } from "@/lib/format";
 
 /**
- * Error diff (P3) — the payoff of Craig's ask: "see new JS/API/page errors that didn't exist on the last run".
- * This run's errors vs the UNION of the last N settled runs (anti-flap). NEW leads + is expanded (the
- * regression signal); persistent/resolved collapse below. FIRST-PARTY by default — third-party tracker noise
- * (doubleclick/rlcdn/astutebot/bing) is hidden behind a counted toggle so it can't drown the signal. Items
- * arrive already severity-sorted from the API (first-party 5xx first).
+ * Error diff (P3) + anti-fatigue (P4) — Craig's ask: "see new JS/API/page errors that didn't exist on the last
+ * run". This run's errors vs the UNION of the last N settled runs (anti-flap). NEW leads + is expanded (the
+ * regression signal); persistent/resolved collapse below. FIRST-PARTY by default — third-party tracker noise is
+ * hidden behind a counted toggle. Items arrive already severity-sorted from the API (first-party 5xx first).
+ *
+ * P4 adds: (a) DEPLOY ATTRIBUTION — a NEW error shows the deploy it first appeared after ("first seen after
+ * deploy abc1234 · 2h ago"), correlation not causation. (b) MUTE — an editor mutes a known/accepted NEW error
+ * per-monitor; it leaves NEW and joins a collapsed "N muted" disclosure (never silently dropped) with an unmute
+ * action. Mute is per-monitor and persists until unmuted (no localStorage — it's server state).
  */
 
 const isFirstParty = (i: ErrorItem) => i.origin === "first-party";
@@ -43,7 +50,21 @@ function SeverityBadge({ item }: { item: ErrorItem }) {
   );
 }
 
-function ErrorRow({ item }: { item: ErrorItem }) {
+/** The deploy a NEW error first appeared after (P4). Correlation, never causation — worded as "first seen after". */
+function DeployAttribution({ item }: { item: ErrorItem }) {
+  const d = item.first_seen_after_deploy;
+  if (!d) return null;
+  const when = d.deployed_at ? formatRelative(d.deployed_at) : "";
+  return (
+    <div className="sw-mono mt-0.5 text-[10px] text-[var(--color-warn)]" data-testid="ediff-deploy">
+      ↑ first seen after {d.sha ? <>deploy <b>{d.sha.slice(0, 7)}</b></> : "a deploy"}
+      {d.target_host ? ` · ${d.target_host}` : ""}
+      {when ? ` · ${when}` : ""}
+    </div>
+  );
+}
+
+function ErrorRow({ item, action }: { item: ErrorItem; action?: React.ReactNode }) {
   const net = netStatusLabel(item);
   return (
     <div className="flex items-start gap-2 py-1" data-testid="ediff-row">
@@ -58,13 +79,93 @@ function ErrorRow({ item }: { item: ErrorItem }) {
           {item.count > 1 ? ` · ×${item.count}` : ""}
           {!isFirstParty(item) ? " · 3rd-party" : ""}
         </div>
+        <DeployAttribution item={item} />
+        {action}
       </div>
     </div>
   );
 }
 
+/** Per-NEW-row mute affordance (P4). Editor-only (server-gated regardless). Click → inline note field → mute;
+ *  no browser dialog (those block the page). On success the parent revalidates → the row leaves NEW. */
+function MuteControl({
+  checkId,
+  item,
+  onChanged,
+}: {
+  checkId: number;
+  item: ErrorItem;
+  onChanged: () => Promise<void>;
+}) {
+  const { canWrite, promptLogin } = useAuth();
+  const [editing, setEditing] = useState(false);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(false);
+
+  if (!canWrite) return null;
+
+  async function doMute() {
+    setBusy(true);
+    setErr(false);
+    try {
+      await muteError(checkId, item.fingerprint, note);
+      await onChanged();
+      // component unmounts when the row leaves NEW; no need to reset editing.
+    } catch {
+      setErr(true);
+      setBusy(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        data-testid="ediff-mute-btn"
+        className="sw-mono mt-1 text-[10px] text-[var(--color-ink-faint)] transition hover:text-[var(--color-ink)]"
+      >
+        mute
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+      <input
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="note (optional)"
+        data-testid="ediff-mute-note"
+        className="sw-mono w-40 rounded border border-[var(--color-border)] bg-[var(--color-bg)] px-1.5 py-0.5 text-[11px]"
+      />
+      <button
+        type="button"
+        onClick={doMute}
+        disabled={busy}
+        data-testid="ediff-mute-confirm"
+        className="sw-btn sw-btn-sm"
+      >
+        {busy ? "Muting…" : "Mute"}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setEditing(false);
+          setNote("");
+        }}
+        className="sw-mono text-[10px] text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
+      >
+        cancel
+      </button>
+      {err && <span className="text-[10px]" style={{ color: TONE_VAR.fail }} onClick={() => void promptLogin()}>couldn’t mute</span>}
+    </div>
+  );
+}
+
 /** Third-party items behind a counted disclosure — the anti-fatigue control (tracker noise stays hidden). */
-function ThirdPartyItems({ items }: { items: ErrorItem[] }) {
+function ThirdPartyItems({ items, renderAction }: { items: ErrorItem[]; renderAction?: (i: ErrorItem) => React.ReactNode }) {
   const [open, setOpen] = useState(false);
   if (items.length === 0) return null;
   return (
@@ -80,7 +181,7 @@ function ThirdPartyItems({ items }: { items: ErrorItem[] }) {
       {open && (
         <div className="mt-1 border-l border-[var(--color-border)] pl-2" data-testid="ediff-thirdparty-list">
           {items.map((i) => (
-            <ErrorRow key={i.fingerprint} item={i} />
+            <ErrorRow key={i.fingerprint} item={i} action={renderAction?.(i)} />
           ))}
         </div>
       )}
@@ -88,19 +189,27 @@ function ThirdPartyItems({ items }: { items: ErrorItem[] }) {
   );
 }
 
-/** First-party items listed, third-party behind the toggle. */
-function Bucket({ items, testId }: { items: ErrorItem[]; testId: string }) {
+/** First-party items listed, third-party behind the toggle. `renderAction` (P4 mute) applies to every row. */
+function Bucket({
+  items,
+  testId,
+  renderAction,
+}: {
+  items: ErrorItem[];
+  testId: string;
+  renderAction?: (i: ErrorItem) => React.ReactNode;
+}) {
   const first = items.filter(isFirstParty);
   const third = items.filter((i) => !isFirstParty(i));
   return (
     <div data-testid={testId}>
       {first.map((i) => (
-        <ErrorRow key={i.fingerprint} item={i} />
+        <ErrorRow key={i.fingerprint} item={i} action={renderAction?.(i)} />
       ))}
       {first.length === 0 && third.length > 0 && (
         <p className="text-[11px] text-[var(--color-ink-dim)]">No first-party errors.</p>
       )}
-      <ThirdPartyItems items={third} />
+      <ThirdPartyItems items={third} renderAction={renderAction} />
     </div>
   );
 }
@@ -130,6 +239,104 @@ function CollapsedBucket({ label, items, testId }: { label: string; items: Error
   );
 }
 
+/** P4 muted disclosure — collapsed "N muted", listing the muted errors present this run (message + note) with an
+ *  unmute action. VISIBLE-on-demand, never invisible: a muted error is out of NEW but still discoverable here. */
+function MutedDisclosure({
+  checkId,
+  items,
+  notesByFp,
+  onChanged,
+}: {
+  checkId: number;
+  items: ErrorItem[];
+  notesByFp: Map<string, string | null>;
+  onChanged: () => Promise<void>;
+}) {
+  const { canWrite } = useAuth();
+  const [open, setOpen] = useState(false);
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-2 border-t border-[var(--color-border)] pt-2" data-testid="error-diff-muted">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        data-testid="error-diff-muted-toggle"
+        className="flex w-full items-center gap-1.5 text-left text-[12px] font-medium text-[var(--color-ink-dim)]"
+      >
+        <span className="text-[10px] text-[var(--color-ink-faint)]">{open ? "▾" : "▸"}</span>
+        Muted <span className="sw-mono text-[var(--color-ink-faint)]">({items.length})</span>
+      </button>
+      {open && (
+        <div className="mt-1" data-testid="error-diff-muted-list">
+          {items.map((i) => (
+            <MutedRow
+              key={i.fingerprint}
+              checkId={checkId}
+              item={i}
+              note={notesByFp.get(i.fingerprint) ?? null}
+              canWrite={canWrite}
+              onChanged={onChanged}
+            />
+          ))}
+          <p className="sw-mono mt-1.5 text-[10px] text-[var(--color-ink-faint)]">
+            Muting is per-monitor and persists until you unmute.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MutedRow({
+  checkId,
+  item,
+  note,
+  canWrite,
+  onChanged,
+}: {
+  checkId: number;
+  item: ErrorItem;
+  note: string | null;
+  canWrite: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  async function doUnmute() {
+    setBusy(true);
+    try {
+      await unmuteError(checkId, item.fingerprint);
+      await onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="flex items-start gap-2 py-1" data-testid="ediff-muted-row">
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[12px] leading-snug text-[var(--color-ink-dim)]" title={item.message}>
+          {item.message}
+        </div>
+        <div className="sw-mono mt-0.5 truncate text-[10px] text-[var(--color-ink-faint)]">
+          {item.source_host || "—"} · {item.kind}
+          {note ? ` · “${note}”` : ""}
+        </div>
+      </div>
+      {canWrite && (
+        <button
+          type="button"
+          onClick={doUnmute}
+          disabled={busy}
+          data-testid="ediff-unmute-btn"
+          className="sw-mono mt-0.5 shrink-0 text-[10px] text-[var(--color-ink-faint)] transition hover:text-[var(--color-ink)]"
+        >
+          {busy ? "…" : "unmute"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <section className="sw-panel p-4" data-testid="error-diff">
@@ -140,7 +347,13 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 export function ErrorDiff({ checkId, runId }: { checkId: number; runId?: number | null }) {
-  const { data, error, isLoading } = useErrorDiff(checkId, runId);
+  const { data, error, isLoading, mutate } = useErrorDiff(checkId, runId);
+  const { data: mutes, mutate: mutateMutes } = useErrorMutes(checkId);
+
+  // Revalidate BOTH reads after a mute/unmute so the row moves buckets + the notes stay in sync.
+  const onChanged = async () => {
+    await Promise.all([mutate(), mutateMutes()]);
+  };
 
   if (isLoading && data === undefined) {
     return (
@@ -164,6 +377,7 @@ export function ErrorDiff({ checkId, runId }: { checkId: number; runId?: number 
   const newFirst = data.new_errors.filter(isFirstParty).length;
   const runs = data.baseline_run_count;
   const context = `run #${data.run_id} · vs the last ${runs} run${runs === 1 ? "" : "s"}${data.location ? ` · ${data.location}` : ""}`;
+  const notesByFp = new Map((mutes ?? []).map((m) => [m.fingerprint, m.note] as const));
 
   return (
     <Shell>
@@ -181,7 +395,7 @@ export function ErrorDiff({ checkId, runId }: { checkId: number; runId?: number 
         </p>
       )}
 
-      {/* NEW — leads, always expanded (the regression signal). */}
+      {/* NEW — leads, always expanded (the regression signal). Each row can be muted (editor). */}
       <div data-testid="error-diff-new">
         <div className="mb-1 flex items-center gap-2">
           <span className="text-[12px] font-semibold text-[var(--color-ink)]">New</span>
@@ -194,10 +408,15 @@ export function ErrorDiff({ checkId, runId }: { checkId: number; runId?: number 
             ✓ No new errors vs the last {runs} run{runs === 1 ? "" : "s"}.
           </p>
         ) : (
-          <Bucket items={data.new_errors} testId="error-diff-new-body" />
+          <Bucket
+            items={data.new_errors}
+            testId="error-diff-new-body"
+            renderAction={(i) => <MuteControl checkId={checkId} item={i} onChanged={onChanged} />}
+          />
         )}
       </div>
 
+      <MutedDisclosure checkId={checkId} items={data.muted} notesByFp={notesByFp} onChanged={onChanged} />
       <CollapsedBucket label="Persistent" items={data.persistent} testId="error-diff-persistent" />
       <CollapsedBucket label="Resolved" items={data.resolved} testId="error-diff-resolved" />
     </Shell>
