@@ -109,9 +109,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_82%,transparent)] backdrop-blur-md">
-        {/* Mobile: wraps to two rows — logo + fleet pulse on row 1, the full nav on
-            row 2 (so every tab stays tappable at ~390px). Desktop: a single h-14 row. */}
-        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:h-14 sm:flex-nowrap sm:py-0 sm:px-6">
+        {/* Mobile AND tablet: wraps to two rows — logo + fleet pulse on row 1, the full nav on row 2 (so
+            every tab stays tappable). The single h-14 row engages at xl: — MEASURED: seven nav items +
+            logo + the right cluster only fit one row from ~1150px (at lg/1024 the row still overflows
+            112px), so the nowrap transition sits at xl (1280), not sm. */}
+        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:px-6 xl:h-14 xl:flex-nowrap xl:py-0">
           <Link href="/" className="flex shrink-0 items-center gap-2.5">
             <Logo />
             <span className="flex flex-col leading-none">
@@ -124,11 +126,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
 
-          {/* ★ MOBILE: the nav WRAPS instead of scrolling. The old overflow-x-auto clipped items at the
-              viewport edge with no fade/chevron/any affordance ("Catalog" rendered as "atalog") — hidden
-              navigation, the same failure #253 fixed on the Reports sub-tabs. Wrapping means every item is
-              always visible; sm: is unchanged (single row on the h-14 bar). */}
-          <nav className="order-last w-full flex flex-wrap items-center gap-1 sm:order-none sm:ml-2 sm:w-auto sm:flex-nowrap">
+          {/* ★ MOBILE + TABLET: the nav WRAPS instead of scrolling. The old overflow-x-auto clipped items
+              at the viewport edge with no fade/chevron/any affordance ("Catalog" rendered as "atalog") —
+              hidden navigation, the same failure #253 fixed on the Reports sub-tabs. Wrapping means every
+              item is always visible. The inline single-row form engages at xl: alongside the container's
+              h-14 row (see above — one row only fits from ~1150px; sm: left a 640–1150px band where the
+              nowrap row overflowed with no recovery, #254's review catch). */}
+          <nav className="order-last w-full flex flex-wrap items-center gap-1 xl:order-none xl:ml-2 xl:w-auto xl:flex-nowrap">
             {NAV.filter((item) => !item.adminOnly || isAdmin).map((item) => {
               const active = item.match(pathname);
               return (

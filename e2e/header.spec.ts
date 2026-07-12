@@ -35,12 +35,38 @@ test.describe("header (phone width)", () => {
     await expect(page.locator('[aria-label="fleet status summary"]')).toBeVisible();
   });
 
-  test("desktop (1280px): the nav is still a single row on the h-14 bar (wrap must not engage)", async ({ page }) => {
+  // ★ #254's review catch: sm:flex-nowrap left a 640–1150px band where the single row overflowed the
+  // header with NO scroll and NO wrap (measured: 496px over at 640, 287px at 768, 112px at lg/1024) —
+  // the same hidden-content failure, relocated to tablet. The wrap now stays engaged until xl (1280).
+  for (const width of [640, 768, 1024]) {
+    test(`tablet band (${width}px): all seven nav tabs fully visible — wrapped, no header overflow`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await mockApi(page);
+      await page.goto("/");
+      for (const name of ["Status", "Incidents", "Monitors", "Catalog", "Notifications", "Reports", "Environments"]) {
+        const box = (await page.getByRole("link", { name, exact: true }).first().boundingBox())!;
+        expect(box.x, `${name} left edge`).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width, `${name} right edge`).toBeLessThanOrEqual(width + 1);
+      }
+      const headerOverflow = await page.evaluate(() => {
+        const h = document.querySelector("header")!;
+        return h.scrollWidth - h.clientWidth;
+      });
+      expect(headerOverflow).toBe(0);
+    });
+  }
+
+  test("desktop (1280px = xl): the nav is a single row on the h-14 bar (wrap disengages)", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await mockApi(page);
     await page.goto("/");
     const first = (await page.getByRole("link", { name: "Status", exact: true }).first().boundingBox())!;
     const last = (await page.getByRole("link", { name: "Environments", exact: true }).first().boundingBox())!;
     expect(Math.abs(first.y - last.y), "first and last nav item on the same row").toBeLessThan(2);
+    const headerOverflow = await page.evaluate(() => {
+      const h = document.querySelector("header")!;
+      return h.scrollWidth - h.clientWidth;
+    });
+    expect(headerOverflow, "single row must actually FIT at xl").toBe(0);
   });
 });
