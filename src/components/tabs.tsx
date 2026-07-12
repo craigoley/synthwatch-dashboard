@@ -28,7 +28,16 @@ export function useTab(ids: readonly string[], fallback: string) {
   return { tab, setTab };
 }
 
-/** Segmented tab bar — reuses the visual language of the existing window toggle (bordered pill, active fill). */
+/**
+ * Segmented tab bar — reuses the visual language of the existing window toggle (bordered pill, active fill).
+ *
+ * ★ MOBILE: the row WRAPS (max-w-full flex-wrap) instead of overflowing the viewport. The old inline-flex
+ * row clipped at phone width with no scroll affordance — "Cost" rendered half-bisected by the screen edge,
+ * a hidden-navigation failure (a tab you can't see doesn't exist). Wrapping means NOTHING is ever hidden:
+ * all six labels are short enough for two rows at 390px, matching the app header's own wrap-to-two-rows
+ * mobile solution (app-shell.tsx) rather than inventing a scroll+fade mechanism for six short labels.
+ * Buttons get a ≥44px touch target on mobile (min-h-11), reset to the original compact height from sm: up.
+ */
 export function TabBar({
   tabs,
   active,
@@ -44,7 +53,7 @@ export function TabBar({
     <div
       role="tablist"
       aria-label={label}
-      className="inline-flex rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5"
+      className="inline-flex max-w-full flex-wrap gap-y-0.5 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-bg)] p-0.5"
     >
       {tabs.map((t) => {
         const isActive = t.id === active;
@@ -56,7 +65,7 @@ export function TabBar({
             aria-selected={isActive}
             data-testid={`reports-tab-${t.id}`}
             onClick={() => onSelect(t.id)}
-            className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+            className={`min-h-11 rounded-md px-3 py-1 text-xs font-medium transition sm:min-h-0 ${
               isActive
                 ? "bg-[var(--color-panel-2)] text-[var(--color-ink)]"
                 : "text-[var(--color-ink-dim)] hover:text-[var(--color-ink)]"
