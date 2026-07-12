@@ -35,7 +35,7 @@ test.describe("cost UI rework — Cost tab + card cost + modal live recompute", 
     await expect(page.getByTestId("reports-panel-cost")).toBeVisible();
     await expect(page.getByTestId("fleet-cost-total-projected")).toContainText("$67.42");
     await expect(page.getByTestId("cost-driver-77")).toContainText("wegmans-recipe-nav");
-    await expect(page.getByTestId("fleet-cost-estimate-label")).toContainText("$0.00003/vCPU-s");
+    await expect(page.getByTestId("fleet-cost-estimate-label")).toContainText("$0.00003/active-s");
   });
 
   test("★ NO CLIENT CAP: all top_cost_drivers render — the API ranks/limits (topN=50), the dashboard never slices", async ({ page }) => {
@@ -79,7 +79,7 @@ test.describe("cost UI rework — Cost tab + card cost + modal live recompute", 
     await page.getByRole("checkbox", { name: "westeurope" }).click();
     await expect(projected).toContainText("~$1.04/mo");
     // the breakdown reflects the live regions + the endpoint's rate (not hardcoded)
-    await expect(page.getByTestId("modal-cost-breakdown")).toContainText("2 regions × $0.00003/vCPU-s");
+    await expect(page.getByTestId("modal-cost-breakdown")).toContainText("2 regions × $0.00003/active-s");
   });
 
   test("no run history (never-run monitor) → 'no duration history yet', never a fake $0", async ({ page }) => {
@@ -101,5 +101,51 @@ test.describe("cost UI rework — Cost tab + card cost + modal live recompute", 
     await expect(page.getByTestId("fleet-cost-error")).toBeVisible();
     await page.goto("/checks/1");
     await expect(page.getByTestId("monitor-cost-error")).toBeVisible();
+  });
+
+  // ★ Bug B: the divergence warning named "retries/failures" — a cause the metric CANNOT SEE (duration
+  // cancels; it's a pure run-count ratio). It must attribute from data (config-change straddle / confirmation
+  // / sandbox) and show expected-vs-actual counts. MUST-GO-RED: the string "retries" must not appear.
+  test("divergence flag attributes to run-count causes from data — NEVER retries", async ({ page }) => {
+    // amore-menu-style: interval doubled (1800s), so the recent half has ~half the runs of the prior half →
+    // measured still holds the old cadence, projected uses the new interval → 1.9× (a config-change artifact).
+    // checkId 1 is a known monitor (defaultChecks), so /checks/1 renders the detail panel too.
+    const flagged = costCheck({
+      checkId: 1, name: "amore-menu", intervalSeconds: 1800, regionCount: 3,
+      projectedMonthly: 5, measuredMonthly7d: 9.5, divergenceRatio: 1.9, divergenceFlag: true,
+      runCount7d: 1900, confirmationCount7d: 0, sandboxCount7d: 0,
+      runCountRecent: 630, runCountPrior: 1270, // recent << prior → a cadence step (the interval change)
+    });
+    await mockApi(page, costWorld([flagged]));
+    await page.goto("/reports?tab=cost");
+
+    const badge = page.getByTestId("cost-divergence-1");
+    await expect(badge).toBeVisible();
+    await expect(badge).toContainText("runs"); // expected-vs-actual counts, not a bare ratio
+    await expect(badge).not.toContainText(/retr/i); // ★ must-go-red: no "retries"
+    const title = (await badge.getAttribute("title")) ?? "";
+    expect(title).toMatch(/interval changed recently/i); // the cadence-straddle attribution, from data
+    expect(title).not.toMatch(/retr/i);
+
+    // and on the monitor-detail panel
+    await page.goto("/checks/1");
+    const detail = page.getByTestId("monitor-cost-divergence");
+    await expect(detail).toBeVisible();
+    await expect(detail).toContainText("runs in the last 7d");
+    await expect(detail).not.toContainText(/retr/i);
+  });
+
+  test("divergence attributes to confirmation runs when present (still not retries)", async ({ page }) => {
+    const flagged = costCheck({
+      checkId: 2, name: "nextdoor-reservations", intervalSeconds: 900, regionCount: 3,
+      projectedMonthly: 4, measuredMonthly7d: 7.6, divergenceRatio: 1.9, divergenceFlag: true,
+      runCount7d: 3800, confirmationCount7d: 40, sandboxCount7d: 0,
+      runCountRecent: 1900, runCountPrior: 1900, // no cadence step → the cause is the confirmation re-runs
+    });
+    await mockApi(page, costWorld([flagged]));
+    await page.goto("/checks/2");
+    const detail = page.getByTestId("monitor-cost-divergence");
+    await expect(detail).toContainText("40 confirmation re-runs");
+    await expect(detail).not.toContainText(/retr(y|ies)/i);
   });
 });

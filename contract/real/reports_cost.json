@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-07-08T21:23:44.6808659+00:00",
-  "rateUsed": 0.00003,
+  "rateUsed": 3e-05,
   "rateSource": "ACA Consumption vCPU-second (cpu=1.0 vCPU / mem=2 GiB, main.bicep:528-529)",
   "rateSetDate": "2026-07-08",
   "totalProjectedMonthly": 67.95,
@@ -17,7 +17,12 @@
       "projectedMonthly": 8.87,
       "measuredMonthly7d": 6.7,
       "divergenceRatio": 0.755,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 1522,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 761,
+      "runCountPrior": 761
     },
     {
       "checkId": 81,
@@ -30,7 +35,12 @@
       "projectedMonthly": 7.03,
       "measuredMonthly7d": 4.29,
       "divergenceRatio": 0.61,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 3689,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1844,
+      "runCountPrior": 1845
     },
     {
       "checkId": 197,
@@ -43,12 +53,17 @@
       "projectedMonthly": 6.6,
       "measuredMonthly7d": 4.99,
       "divergenceRatio": 0.756,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 1524,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 762,
+      "runCountPrior": 762
     },
     {
       "checkId": 354,
       "sourceKey": "wegmans-search-product-preview",
-      "name": "Wegmans commerce PREVIEW: search → product (pre-prod regression)",
+      "name": "Wegmans commerce PREVIEW: search \u2192 product (pre-prod regression)",
       "kind": "browser",
       "intervalSeconds": 900,
       "regionCount": 3,
@@ -56,7 +71,12 @@
       "projectedMonthly": 6.09,
       "measuredMonthly7d": 0.08,
       "divergenceRatio": 0.014,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 28,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 14,
+      "runCountPrior": 14
     },
     {
       "checkId": 223,
@@ -69,7 +89,12 @@
       "projectedMonthly": 5.84,
       "measuredMonthly7d": 4.35,
       "divergenceRatio": 0.745,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 1502,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 751,
+      "runCountPrior": 751
     },
     {
       "checkId": 80,
@@ -82,12 +107,17 @@
       "projectedMonthly": 5.68,
       "measuredMonthly7d": 4.24,
       "divergenceRatio": 0.748,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 1508,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 754,
+      "runCountPrior": 754
     },
     {
       "checkId": 74,
       "sourceKey": "wegmans-search-product",
-      "name": "Wegmans: search → product page",
+      "name": "Wegmans: search \u2192 product page",
       "kind": "browser",
       "intervalSeconds": 900,
       "regionCount": 3,
@@ -95,7 +125,12 @@
       "projectedMonthly": 5.66,
       "measuredMonthly7d": 6,
       "divergenceRatio": 1.061,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 2139,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1069,
+      "runCountPrior": 1070
     },
     {
       "checkId": 196,
@@ -108,7 +143,12 @@
       "projectedMonthly": 4.45,
       "measuredMonthly7d": 4.79,
       "divergenceRatio": 1.077,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 2171,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1085,
+      "runCountPrior": 1086
     },
     {
       "checkId": 220,
@@ -121,7 +161,12 @@
       "projectedMonthly": 3.74,
       "measuredMonthly7d": 3,
       "divergenceRatio": 0.801,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 807,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 403,
+      "runCountPrior": 404
     },
     {
       "checkId": 224,
@@ -134,7 +179,12 @@
       "projectedMonthly": 3.07,
       "measuredMonthly7d": 2.46,
       "divergenceRatio": 0.8,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 806,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 403,
+      "runCountPrior": 403
     }
   ],
   "checks": [
@@ -149,7 +199,12 @@
       "projectedMonthly": 8.87,
       "measuredMonthly7d": 6.7,
       "divergenceRatio": 0.755,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 1522,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 761,
+      "runCountPrior": 761
     },
     {
       "checkId": 81,
@@ -162,7 +217,12 @@
       "projectedMonthly": 7.03,
       "measuredMonthly7d": 4.29,
       "divergenceRatio": 0.61,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 3689,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1844,
+      "runCountPrior": 1845
     },
     {
       "checkId": 197,
@@ -175,12 +235,17 @@
       "projectedMonthly": 6.6,
       "measuredMonthly7d": 4.99,
       "divergenceRatio": 0.756,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 1524,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 762,
+      "runCountPrior": 762
     },
     {
       "checkId": 354,
       "sourceKey": "wegmans-search-product-preview",
-      "name": "Wegmans commerce PREVIEW: search → product (pre-prod regression)",
+      "name": "Wegmans commerce PREVIEW: search \u2192 product (pre-prod regression)",
       "kind": "browser",
       "intervalSeconds": 900,
       "regionCount": 3,
@@ -188,7 +253,12 @@
       "projectedMonthly": 6.09,
       "measuredMonthly7d": 0.08,
       "divergenceRatio": 0.014,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 28,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 14,
+      "runCountPrior": 14
     },
     {
       "checkId": 223,
@@ -201,7 +271,12 @@
       "projectedMonthly": 5.84,
       "measuredMonthly7d": 4.35,
       "divergenceRatio": 0.745,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 1502,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 751,
+      "runCountPrior": 751
     },
     {
       "checkId": 80,
@@ -214,12 +289,17 @@
       "projectedMonthly": 5.68,
       "measuredMonthly7d": 4.24,
       "divergenceRatio": 0.748,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 1508,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 754,
+      "runCountPrior": 754
     },
     {
       "checkId": 74,
       "sourceKey": "wegmans-search-product",
-      "name": "Wegmans: search → product page",
+      "name": "Wegmans: search \u2192 product page",
       "kind": "browser",
       "intervalSeconds": 900,
       "regionCount": 3,
@@ -227,7 +307,12 @@
       "projectedMonthly": 5.66,
       "measuredMonthly7d": 6,
       "divergenceRatio": 1.061,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 2139,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1069,
+      "runCountPrior": 1070
     },
     {
       "checkId": 196,
@@ -240,7 +325,12 @@
       "projectedMonthly": 4.45,
       "measuredMonthly7d": 4.79,
       "divergenceRatio": 1.077,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 2171,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1085,
+      "runCountPrior": 1086
     },
     {
       "checkId": 220,
@@ -253,7 +343,12 @@
       "projectedMonthly": 3.74,
       "measuredMonthly7d": 3,
       "divergenceRatio": 0.801,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 807,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 403,
+      "runCountPrior": 404
     },
     {
       "checkId": 224,
@@ -266,7 +361,12 @@
       "projectedMonthly": 3.07,
       "measuredMonthly7d": 2.46,
       "divergenceRatio": 0.8,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 806,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 403,
+      "runCountPrior": 403
     },
     {
       "checkId": 221,
@@ -279,7 +379,12 @@
       "projectedMonthly": 2.75,
       "measuredMonthly7d": 1.1,
       "divergenceRatio": 0.402,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 810,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 405,
+      "runCountPrior": 405
     },
     {
       "checkId": 352,
@@ -292,7 +397,12 @@
       "projectedMonthly": 2.66,
       "measuredMonthly7d": 0.56,
       "divergenceRatio": 0.21,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 423,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 211,
+      "runCountPrior": 212
     },
     {
       "checkId": 2,
@@ -305,7 +415,12 @@
       "projectedMonthly": 1.9,
       "measuredMonthly7d": 1.52,
       "divergenceRatio": 0.801,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 807,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 403,
+      "runCountPrior": 404
     },
     {
       "checkId": 59,
@@ -318,7 +433,12 @@
       "projectedMonthly": 0.88,
       "measuredMonthly7d": 1.57,
       "divergenceRatio": 1.784,
-      "divergenceFlag": true
+      "divergenceFlag": true,
+      "runCount7d": 3597,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1798,
+      "runCountPrior": 1799
     },
     {
       "checkId": 222,
@@ -331,7 +451,12 @@
       "projectedMonthly": 0.69,
       "measuredMonthly7d": 0.75,
       "divergenceRatio": 1.079,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 2175,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1087,
+      "runCountPrior": 1088
     },
     {
       "checkId": 194,
@@ -344,7 +469,12 @@
       "projectedMonthly": 0.36,
       "measuredMonthly7d": 0.77,
       "divergenceRatio": 2.116,
-      "divergenceFlag": true
+      "divergenceFlag": true,
+      "runCount7d": 1422,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 711,
+      "runCountPrior": 711
     },
     {
       "checkId": 192,
@@ -357,7 +487,12 @@
       "projectedMonthly": 0.29,
       "measuredMonthly7d": 0.88,
       "divergenceRatio": 3,
-      "divergenceFlag": true
+      "divergenceFlag": true,
+      "runCount7d": 1008,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 504,
+      "runCountPrior": 504
     },
     {
       "checkId": 193,
@@ -370,7 +505,12 @@
       "projectedMonthly": 0.28,
       "measuredMonthly7d": 0.43,
       "divergenceRatio": 1.574,
-      "divergenceFlag": true
+      "divergenceFlag": true,
+      "runCount7d": 529,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 264,
+      "runCountPrior": 265
     },
     {
       "checkId": 4,
@@ -383,7 +523,12 @@
       "projectedMonthly": 0.24,
       "measuredMonthly7d": 0.42,
       "divergenceRatio": 1.806,
-      "divergenceFlag": true
+      "divergenceFlag": true,
+      "runCount7d": 3641,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1820,
+      "runCountPrior": 1821
     },
     {
       "checkId": 33,
@@ -396,7 +541,12 @@
       "projectedMonthly": 0.22,
       "measuredMonthly7d": 0.13,
       "divergenceRatio": 0.6,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 3629,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1814,
+      "runCountPrior": 1815
     },
     {
       "checkId": 343,
@@ -409,7 +559,12 @@
       "projectedMonthly": 0.14,
       "measuredMonthly7d": 0.08,
       "divergenceRatio": 0.54,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 3266,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1633,
+      "runCountPrior": 1633
     },
     {
       "checkId": 351,
@@ -422,7 +577,12 @@
       "projectedMonthly": 0.14,
       "measuredMonthly7d": 0.09,
       "divergenceRatio": 0.637,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 1926,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 963,
+      "runCountPrior": 963
     },
     {
       "checkId": 195,
@@ -435,7 +595,12 @@
       "projectedMonthly": 0.13,
       "measuredMonthly7d": 0.4,
       "divergenceRatio": 2.97,
-      "divergenceFlag": true
+      "divergenceFlag": true,
+      "runCount7d": 998,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 499,
+      "runCountPrior": 499
     },
     {
       "checkId": 350,
@@ -448,7 +613,12 @@
       "projectedMonthly": 0.09,
       "measuredMonthly7d": 0.06,
       "divergenceRatio": 0.657,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 1325,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 662,
+      "runCountPrior": 663
     },
     {
       "checkId": 347,
@@ -461,7 +631,12 @@
       "projectedMonthly": 0.05,
       "measuredMonthly7d": 0.03,
       "divergenceRatio": 0.548,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 3314,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1657,
+      "runCountPrior": 1657
     },
     {
       "checkId": 346,
@@ -474,7 +649,12 @@
       "projectedMonthly": 0.03,
       "measuredMonthly7d": 0.02,
       "divergenceRatio": 0.545,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 3296,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1648,
+      "runCountPrior": 1648
     },
     {
       "checkId": 342,
@@ -487,7 +667,12 @@
       "projectedMonthly": 0.02,
       "measuredMonthly7d": 0.03,
       "divergenceRatio": 1.386,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 1863,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 931,
+      "runCountPrior": 932
     },
     {
       "checkId": 341,
@@ -500,7 +685,12 @@
       "projectedMonthly": 0.01,
       "measuredMonthly7d": 0.02,
       "divergenceRatio": 1.411,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 1896,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 948,
+      "runCountPrior": 948
     },
     {
       "checkId": 349,
@@ -513,7 +703,12 @@
       "projectedMonthly": 0.01,
       "measuredMonthly7d": 0.02,
       "divergenceRatio": 3.227,
-      "divergenceFlag": true
+      "divergenceFlag": true,
+      "runCount7d": 3253,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1626,
+      "runCountPrior": 1627
     },
     {
       "checkId": 348,
@@ -526,7 +721,12 @@
       "projectedMonthly": 0.01,
       "measuredMonthly7d": 0.02,
       "divergenceRatio": 3.194,
-      "divergenceFlag": true
+      "divergenceFlag": true,
+      "runCount7d": 3220,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 1610,
+      "runCountPrior": 1610
     },
     {
       "checkId": 306,
@@ -539,7 +739,12 @@
       "projectedMonthly": 0,
       "measuredMonthly7d": 0,
       "divergenceRatio": 0.827,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 139,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 69,
+      "runCountPrior": 70
     },
     {
       "checkId": 344,
@@ -552,7 +757,12 @@
       "projectedMonthly": 0,
       "measuredMonthly7d": 0,
       "divergenceRatio": 0.714,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 120,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 60,
+      "runCountPrior": 60
     },
     {
       "checkId": 345,
@@ -565,7 +775,12 @@
       "projectedMonthly": 0,
       "measuredMonthly7d": 0,
       "divergenceRatio": 0.72,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 121,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 60,
+      "runCountPrior": 61
     },
     {
       "checkId": 10,
@@ -578,7 +793,12 @@
       "projectedMonthly": 0,
       "measuredMonthly7d": 0,
       "divergenceRatio": 0.827,
-      "divergenceFlag": false
+      "divergenceFlag": false,
+      "runCount7d": 139,
+      "confirmationCount7d": 0,
+      "sandboxCount7d": 0,
+      "runCountRecent": 69,
+      "runCountPrior": 70
     }
   ]
 }

@@ -23,7 +23,7 @@ export function money(n: number): string {
 
 /** The estimate provenance line, read from the endpoint's echoed rate (never hardcoded). */
 export function costEstimateLabel(r: CostReport): string {
-  return `Estimate · rate $${r.rate_used}/vCPU-s (${r.rate_source}, set ${r.rate_set_date}). The Azure bill is ground truth.`;
+  return `Estimate · rate $${r.rate_used}/active-s (${r.rate_source}, set ${r.rate_set_date}). The Azure bill is ground truth.`;
 }
 
 /**
@@ -35,23 +35,66 @@ export function projectedMonthlyCost(
   avgDurationS: number,
   intervalSeconds: number,
   regionCount: number,
-  ratePerVcpuSecond: number,
+  ratePerActiveSecond: number,
 ): number {
   if (intervalSeconds <= 0) return 0;
-  return avgDurationS * (SECONDS_PER_MONTH / intervalSeconds) * regionCount * ratePerVcpuSecond;
+  return avgDurationS * (SECONDS_PER_MONTH / intervalSeconds) * regionCount * ratePerActiveSecond;
+}
+
+const SECONDS_PER_WEEK = 604800;
+
+/**
+ * Attribute a divergence FLAG from data, never from retries. The algebra: since Σduration = avg × N over the
+ * SAME 7d run set, duration cancels EXACTLY and `divergence = run_count_7d / expected` — a PURE RUN-COUNT
+ * ratio. So retries (which persist no extra row/duration) and slow/failing runs (which inflate measured AND
+ * projected identically) CANNOT move it. Only EXTRA ROWS do: a config (interval) change straddling the 7d
+ * window, confirmation re-runs (0077), or sandbox/on-demand fires (0065). We name only those, from the count
+ * columns — and back the run count out of divergence×expected if the API predates them.
+ */
+function divergenceInfo(c: CostCheck): { badge: string; detail: string; title: string } | null {
+  if (!c.divergence_flag) return null;
+  const x = c.divergence_ratio != null ? `${c.divergence_ratio.toFixed(1)}×` : "";
+  const expected = c.interval_seconds > 0 ? Math.round((SECONDS_PER_WEEK / c.interval_seconds) * c.region_count) : 0;
+  // run_count_7d is authoritative; if the API predates it, divergence = M/expected ⇒ M = divergence×expected.
+  const m =
+    c.run_count_7d > 0
+      ? c.run_count_7d
+      : c.divergence_ratio != null && expected > 0
+        ? Math.round(c.divergence_ratio * expected)
+        : 0;
+  const plural = (n: number, s: string) => `${n} ${s}${n === 1 ? "" : "s"}`;
+
+  const causes: string[] = [];
+  // A cadence step between the two 3.5d halves ⇒ a recent interval change (the dominant real cause).
+  const { run_count_recent: rec, run_count_prior: pri } = c;
+  if (rec > 0 && pri > 0 && (rec < pri * 0.7 || rec > pri * 1.3)) {
+    causes.push("its interval changed recently — measured still holds the old cadence; this self-clears as the 7d window rolls");
+  }
+  if (c.confirmation_count_7d > 0) causes.push(plural(c.confirmation_count_7d, "confirmation re-run"));
+  if (c.sandbox_count_7d > 0) causes.push(plural(c.sandbox_count_7d, "sandbox/on-demand fire"));
+
+  const counts = expected > 0 ? `${m} runs in the last 7d vs ${expected} its schedule predicts` : `${m} runs in the last 7d`;
+  const why = causes.length
+    ? ` — ${causes.join("; ")}`
+    : " — more runs than its current schedule predicts (a recent interval change, confirmation re-runs, or sandbox fires)";
+  return {
+    badge: expected > 0 ? `⚠ ${m}/${expected} runs (${x})` : `⚠ ${x}`,
+    detail: `⚠ ${counts}${why}`,
+    title: `Divergence is a pure RUN-COUNT ratio (duration cancels) — EXTRA runs vs the schedule, not longer runs. ${counts}${why}.`,
+  };
 }
 
 function DivergenceFlag({ c }: { c: CostCheck }) {
-  if (!c.divergence_flag) return null;
-  const x = c.divergence_ratio != null ? `${c.divergence_ratio.toFixed(1)}×` : "";
+  const info = divergenceInfo(c);
+  if (!info) return null;
   return (
     <span
       data-testid={`cost-divergence-${c.check_id}`}
       className="sw-mono text-[10px]"
       style={{ color: "var(--color-warn)" }}
-      title={`Measured 7d cost is ${x} the projection — retries or failing runs are costing more than the config implies.`}
+      title={info.title}
     >
-      ⚠ costing {x} projected — check for retries/failures
+      {info.badge}
     </span>
   );
 }
@@ -184,13 +227,12 @@ export function MonitorCostPanel({ checkId }: { checkId: number }) {
           {/* ★ Inspectable breakdown — every factor is a real endpoint field, not a magic number. */}
           <p className="mt-2 sw-mono text-[11px] text-[var(--color-ink-dim)]" data-testid="monitor-cost-breakdown">
             {c.avg_duration_s!.toFixed(2)}s avg × {runsPerMonth.toLocaleString()} runs/mo × {c.region_count} region
-            {c.region_count === 1 ? "" : "s"} × ${data.rate_used}/vCPU-s
+            {c.region_count === 1 ? "" : "s"} × ${data.rate_used}/active-s
           </p>
 
-          {c.divergence_flag && (
-            <p className="mt-2 text-[11px]" style={{ color: "var(--color-warn)" }} data-testid="monitor-cost-divergence">
-              ⚠ Measured cost is {c.divergence_ratio != null ? `${c.divergence_ratio.toFixed(1)}× ` : ""}the projection
-              — check for retries / failing runs.
+          {divergenceInfo(c) && (
+            <p className="mt-2 text-[11px]" style={{ color: "var(--color-warn)" }} data-testid="monitor-cost-divergence" title={divergenceInfo(c)!.title}>
+              {divergenceInfo(c)!.detail}
             </p>
           )}
         </>
@@ -250,7 +292,7 @@ export function MonitorCostEstimate({
       {valid && (
         <p className="mt-1 sw-mono text-[10px] text-[var(--color-ink-dim)]" data-testid="modal-cost-breakdown">
           {avg.toFixed(2)}s avg × {runsPerMonth.toLocaleString()} runs/mo × {regionCount} region
-          {regionCount === 1 ? "" : "s"} × ${data.rate_used}/vCPU-s
+          {regionCount === 1 ? "" : "s"} × ${data.rate_used}/active-s
         </p>
       )}
       <p className="mt-1 text-[10px] text-[var(--color-ink-faint)]">

@@ -2365,6 +2365,13 @@ function mapCostCheck(r: Record<string, unknown>): CostCheck {
     measured_monthly_7d: num(r.measuredMonthly7d),
     divergence_ratio: nul(r.divergenceRatio),
     divergence_flag: Boolean(r.divergenceFlag),
+    // 0078 run-count columns — tolerant of an API that predates them (→ 0, and the divergence copy
+    // gracefully backs the run count out of divergence×expected instead).
+    run_count_7d: num(r.runCount7d),
+    confirmation_count_7d: num(r.confirmationCount7d),
+    sandbox_count_7d: num(r.sandboxCount7d),
+    run_count_recent: num(r.runCountRecent),
+    run_count_prior: num(r.runCountPrior),
   };
 }
 

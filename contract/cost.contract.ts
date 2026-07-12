@@ -46,7 +46,7 @@ test.describe("API contract — /reports/cost mapper vs the real response", () =
     const raw = real("reports_cost");
     const rows = (raw.checks as Record<string, unknown>[]);
     expect(rows.length, "capture has ≥1 check").toBeGreaterThan(0);
-    for (const f of ["checkId", "sourceKey", "name", "kind", "intervalSeconds", "regionCount", "avgDurationS", "projectedMonthly", "measuredMonthly7d", "divergenceRatio", "divergenceFlag"]) {
+    for (const f of ["checkId", "sourceKey", "name", "kind", "intervalSeconds", "regionCount", "avgDurationS", "projectedMonthly", "measuredMonthly7d", "divergenceRatio", "divergenceFlag", "runCount7d", "confirmationCount7d", "sandboxCount7d", "runCountRecent", "runCountPrior"]) {
       expect(rows[0], `check row has ${f}`).toHaveProperty(f);
     }
     const rep = await withRealResponse(raw, () => getCostReport());
@@ -58,6 +58,9 @@ test.describe("API contract — /reports/cost mapper vs the real response", () =
       expect(m!.avg_duration_s).toBe(rr.avgDurationS == null ? null : Number(rr.avgDurationS)); // null preserved (no runs) — never a fake 0
       expect(m!.projected_monthly).toBe(Number(rr.projectedMonthly));
       expect(m!.divergence_flag).toBe(Boolean(rr.divergenceFlag));
+      expect(m!.run_count_7d).toBe(Number(rr.runCount7d)); // 0078 attribution counts mapped
+      expect(m!.confirmation_count_7d).toBe(Number(rr.confirmationCount7d));
+      expect(m!.sandbox_count_7d).toBe(Number(rr.sandboxCount7d));
     }
   });
 });
