@@ -568,10 +568,6 @@ export default function CheckDetailPage() {
         </div>
       )}
 
-      {/* env PR-3: the per-check environment override. Shows the effective env + why (override vs derived) and
-          lets an editor set/clear the override (dashboard-owned — survives reconcile). */}
-      <EnvironmentControl check={check} />
-
       {/* Live step-by-step checklist — shown only while a run is in flight (the run-history funnel takes
           over once it's terminal). Rides #108's fast poll; steps come from the runner's live run_steps. */}
       {latestRunStatus === "running" && (check.kind === "browser" || check.kind === "multistep") && (
@@ -583,6 +579,10 @@ export default function CheckDetailPage() {
         className="sw-panel flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2.5"
         data-testid="config-row"
       >
+        {/* env PR-3, demoted from a standalone card: environment is CONFIGURATION, so it lives here as the
+            first chip. Tap → the full override control (set/clear + precedence copy) opens inline below the
+            row; a manual override renders the chip warn-toned + marked, visible without opening anything. */}
+        <EnvironmentControl check={check} />
         <ConfigChip label="Interval" value={`${secondsToMinutesLabel(check.interval_seconds)} min`} />
         <ConfigChip
           label="Per-action timeout"
