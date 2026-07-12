@@ -186,17 +186,23 @@ export function deriveSystemStatus(checks: CheckWithStatus[]): SystemStatusMeta 
   return partial ? SYSTEM_META.partial : SYSTEM_META.operational;
 }
 
-/** Friendly per-component (per-check) status for stakeholders. */
+/**
+ * Friendly per-component (per-check) status for stakeholders.
+ *
+ * ★ Reads lastSettledStatus (the #201/#206 settled-status contract, same as the banner above): an in-flight
+ * run keeps the component on its last SETTLED verdict — a failing service that re-runs stays "Down" until a
+ * run completes green, and a never-settled check reads "No data", never a fabricated "Operational" (the old
+ * `running → Operational` branch was exactly that fake-green; #230 review follow-up).
+ */
 export function componentStatus(c: CheckWithStatus): { label: string; token: StatusMeta["token"] } {
   if (!c.enabled) return { label: "Paused", token: "idle" };
-  switch (c.current_status) {
+  switch (lastSettledStatus(c)) {
     case "fail":
     case "error":
       return { label: "Down", token: "fail" };
     case "warn":
       return { label: "Degraded", token: "warn" };
     case "pass":
-    case "running":
       return { label: "Operational", token: "pass" };
     default:
       return { label: "No data", token: "idle" };

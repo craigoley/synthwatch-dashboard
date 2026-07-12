@@ -105,3 +105,60 @@ test.describe("header roll-up — running checks keep their settled status", () 
     await expect(card.getByTestId("card-running-indicator")).toBeVisible();
   });
 });
+
+// #230 follow-up: the COMPONENT ROWS below the banner read the same settled contract. Pre-fix,
+// componentStatus mapped the LIVE current_status with `running → "Operational"` — a failing service
+// mid-re-run flipped its row green, and a never-settled first run showed Operational out of thin air.
+test.describe("status page component rows — settled status, not live running", () => {
+  test("★ MUST-GO-RED: settled-FAIL + running → the row stays Down (running must not read Operational)", async ({ page }) => {
+    // Revert componentStatus to switching on c.current_status and this FAILS: running → "Operational".
+    const w = defaultWorld();
+    w.checks = [
+      listItem({
+        id: 1,
+        name: "Checkout (failing, re-running)",
+        severity: "warning",
+        currentStatus: "running",
+        spark: [
+          { t: T0, d: 100, s: "pass" },
+          { t: T1, d: 100, s: "fail" },
+        ],
+      }),
+      listItem({ id: 2, name: "Healthy idle", currentStatus: "pass", severity: "warning" }),
+    ];
+    await mockApi(page, w);
+    await page.goto("/status");
+
+    const row = page.getByTestId("component-row-1");
+    await expect(row.getByText("Down", { exact: true })).toBeVisible();
+    await expect(row.getByText("Operational", { exact: true })).toHaveCount(0);
+    // control: the settled-pass row still reads Operational
+    const healthy = page.getByTestId("component-row-2");
+    await expect(healthy.getByText("Operational", { exact: true })).toBeVisible();
+  });
+
+  test("never-settled + first run in flight → 'No data', never a fabricated Operational", async ({ page }) => {
+    const w = defaultWorld();
+    w.checks = [
+      listItem({ id: 1, name: "Brand new (first run in flight)", currentStatus: "running", spark: [], severity: "warning" }),
+      listItem({ id: 2, name: "Healthy idle", currentStatus: "pass", severity: "warning" }),
+    ];
+    await mockApi(page, w);
+    await page.goto("/status");
+
+    const row = page.getByTestId("component-row-1");
+    await expect(row.getByText("No data", { exact: true })).toBeVisible();
+    await expect(row.getByText("Operational", { exact: true })).toHaveCount(0);
+  });
+
+  test("running with a settled PASS behind it → still Operational (no regression for the healthy re-run)", async ({ page }) => {
+    const w = defaultWorld();
+    w.checks = [
+      listItem({ id: 1, name: "Healthy runner", currentStatus: "running", spark: [{ t: T0, d: 100, s: "pass" }], severity: "warning" }),
+    ];
+    await mockApi(page, w);
+    await page.goto("/status");
+    const row = page.getByTestId("component-row-1");
+    await expect(row.getByText("Operational", { exact: true })).toBeVisible();
+  });
+});

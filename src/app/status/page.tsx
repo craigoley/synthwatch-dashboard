@@ -236,7 +236,7 @@ function ComponentRow({
 }) {
   const cs = componentStatus(check);
   return (
-    <div className="flex items-center justify-between gap-4 px-4 py-3.5">
+    <div className="flex items-center justify-between gap-4 px-4 py-3.5" data-testid={`component-row-${check.id}`}>
       <div className="flex min-w-0 items-center gap-2.5">
         <span className="sw-dot" style={{ background: TONE_VAR[cs.token], boxShadow: `0 0 8px -2px ${TONE_VAR[cs.token]}` }} />
         <span className="truncate text-sm font-medium text-[var(--color-ink)]">{check.name}</span>
