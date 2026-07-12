@@ -22,6 +22,8 @@ export const TRUST_RULES = {
   RETRY_PROVEN_MAX: 0.1, // proven-live requires retry rate < 10%
   RETRY_FLAKY_MIN: 0.5, // flaky if retry rate ≥ 50%
   GREEN_INTERVALS: 2, // proven-live requires a green within the last 2 run intervals
+  FLAP_FLAKY_MIN: 0.1, // flaky if flap rate ≥ 10% (confirmation-retry P2) …
+  FLAP_FLAKY_MIN_COUNT: 2, // … AND ≥ 2 transient failures (one flap is noise; a pattern repeats)
 } as const;
 
 // chip → { label, tone }. tone maps to the status-color law: pass=green(calm-good), warn=amber(attention),
@@ -36,7 +38,7 @@ export const TRUST_META: Record<TrustChip, { label: string; tone: "pass" | "warn
   flaky: {
     label: "Flaky",
     tone: "warn",
-    blurb: `retry ≥ ${TRUST_RULES.RETRY_FLAKY_MIN * 100}% OR any monitor-noise (flaky/selector-drift)`,
+    blurb: `retry ≥ ${TRUST_RULES.RETRY_FLAKY_MIN * 100}% OR any monitor-noise (flaky/selector-drift) OR flap ≥ ${TRUST_RULES.FLAP_FLAKY_MIN * 100}% (≥${TRUST_RULES.FLAP_FLAKY_MIN_COUNT} transient failures)`,
   },
   unverified: { label: "Unverified", tone: "idle", blurb: "never green OR no runs — unproven, not broken" },
 };
@@ -80,6 +82,29 @@ export function RetriedPassesNote({ retriedPasses, window }: { retriedPasses: nu
     >
       <span className="h-1 w-1 rounded-full" style={{ background: TONE_VAR.warn }} />
       {retriedPasses} {retriedPasses === 1 ? "pass" : "passes"} needed retries · {window}
+    </span>
+  );
+}
+
+/**
+ * Confirmation-retry P2: transient failures made VISIBLE. A scheduled run FAILED, but a fresh confirmation run
+ * PASSED, so it was confirmed NOT-real and excluded from availability/the SLO — it DID happen (the check
+ * flapped), it just did not count. Surfaced so a check flapping N×/window TELLS you rather than silently
+ * self-healing. The copy is explicit that the platform MEASURED a self-healed failure, never HID one. Hidden
+ * when 0. (Unlike RetriedPassesNote, a REPEATED flap also feeds the chip server-side — this note explains it.)
+ */
+export function FlapNote({ flapCount, scheduledCount, window }: { flapCount: number; scheduledCount: number; window: string }) {
+  if (flapCount <= 0) return null;
+  const pct = scheduledCount > 0 ? `${((flapCount / scheduledCount) * 100).toFixed(1)}%` : "—";
+  return (
+    <span
+      className="mt-0.5 inline-flex items-center gap-1 text-[11px]"
+      style={{ color: TONE_VAR.warn }}
+      data-testid="trust-flap-note"
+      title={`${flapCount} transient failure(s) in ${scheduledCount} scheduled runs (${pct}) over the last ${window}. Each FAILED, then a confirmation run PASSED — confirmed not-real, so it does NOT count toward availability or the SLO. The platform didn't hide a failure; it measured one that self-healed.`}
+    >
+      <span className="h-1 w-1 rounded-full" style={{ background: TONE_VAR.warn }} />
+      {flapCount} transient {flapCount === 1 ? "failure" : "failures"} / {scheduledCount} runs ({pct}) · didn&apos;t count · {window}
     </span>
   );
 }
@@ -158,6 +183,11 @@ export function RedTestStatus({
 export function retryRateText(row: Pick<TrustRow, "retry_rate" | "retry_count" | "run_count">): string {
   if (row.retry_rate == null) return "—"; // no runs → em-dash, NEVER 0%
   return `${Math.round(row.retry_rate * 100)}% (${row.retry_count}/${row.run_count})`;
+}
+// Confirmation-retry P2: "4.2% (6/142)" — transient failures ÷ scheduled runs. Null denominator → "—", never 0%.
+export function flapRateText(row: Pick<TrustRow, "flap_rate" | "flap_count" | "scheduled_count">): string {
+  if (row.flap_rate == null) return "—"; // no scheduled runs → em-dash, NEVER 0%
+  return `${(row.flap_rate * 100).toFixed(1)}% (${row.flap_count}/${row.scheduled_count})`;
 }
 export function lastGreenText(iso: string | null): string {
   return iso == null ? "never verified" : formatRelative(iso);
@@ -276,10 +306,14 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
         </div>
       </div>
 
-      {/* degrading-but-green early warning — a distinct annotation, NOT a chip demotion (the chip stays as-is) */}
-      {m.retried_passes >= RETRIED_PASSES_MIN_TO_WARN && (
+      {/* degrading-but-green early warning + transient-flap note — distinct annotations, NOT a chip demotion.
+          Each self-hides (RetriedPassesNote when < MIN, FlapNote when 0), so gate on EITHER having something to
+          say — otherwise a check that flaps but has no retried passes would silently drop the flap note here
+          while the fleet scorecard still shows it. */}
+      {(m.retried_passes >= RETRIED_PASSES_MIN_TO_WARN || m.flap_count > 0) && (
         <div className="mb-3">
           <RetriedPassesNote retriedPasses={m.retried_passes} window={window} />
+          <FlapNote flapCount={m.flap_count} scheduledCount={m.scheduled_count} window={window} />
         </div>
       )}
 
@@ -298,6 +332,16 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
         <div>
           <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Retry rate</div>
           <div className="sw-mono text-[13px] text-[var(--color-ink)]" data-testid="trust-retry-rate">{retryRateText(m)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Flap rate</div>
+          <div
+            className="sw-mono text-[13px] text-[var(--color-ink)]"
+            data-testid="trust-flap-rate"
+            title="Transient failures (a run that failed, then a confirmation passed → confirmed not-real, excluded from availability/the SLO) ÷ scheduled runs. These didn't count — but they DID happen."
+          >
+            {flapRateText(m)}
+          </div>
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Runs</div>
@@ -484,8 +528,9 @@ export function TrustScorecard({ window }: { window: ReportWindow }) {
                     >
                       {row.check_name}
                     </Link>
-                    {/* degrading-but-green annotation — under the name, distinct from the Trust chip (last column) */}
+                    {/* degrading-but-green + transient-flap annotations — under the name, distinct from the chip */}
                     <RetriedPassesNote retriedPasses={row.retried_passes} window={window} />
+                    <FlapNote flapCount={row.flap_count} scheduledCount={row.scheduled_count} window={window} />
                   </div>
                   <span
                     className={`text-[12px] ${neverGreen ? "font-medium text-[var(--color-ink-dim)]" : "text-[var(--color-ink-dim)]"}`}
