@@ -140,6 +140,8 @@ test.describe("trust card — monitor detail", () => {
     await expect(card).toBeVisible();
     await expect(card.getByTestId("trust-chip-nominal")).toBeVisible();
     await expect(page.getByTestId("trust-redtest")).toContainText("not captured");
+    // forensic detail (sparkline / by-cause / full hash) lives behind the ONE "Details" disclosure — one tap
+    await page.getByTestId("trust-details-toggle").click();
     await expect(page.getByTestId("trust-retry-sparkline")).toBeVisible();
     // ★ every bucket shown separately — perf-regression and unclassified are NOT merged into real-outage
     await expect(page.getByTestId("trust-incident-real_outage")).toContainText("1");

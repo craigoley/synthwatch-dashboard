@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 
 import { useTrustDetail, useTrustReport } from "@/lib/client";
@@ -225,18 +226,27 @@ function RetrySparkline({ series }: { series: TrustRetryPoint[] }) {
 
 /**
  * Per-check Trust card for the monitor detail page. Self-fetching + null-safe: 404 / no trust data → renders
- * nothing (mirrors the SLO/deploys self-hide). Shows the chip + the honest red-test gap, last-green, the
- * retry-rate sparkline, the full incident breakdown, and the spec-provenance hash (an INTEGRITY fact — the
- * committed assertion code that ran — explicitly NOT a red-test).
+ * nothing (mirrors the SLO/deploys self-hide). Split into a GLANCE layer + ONE disclosure:
+ *
+ *   always visible — the chip, the honest red-test slot, LAST GREEN, RETRY RATE, RUNS, the degrading-but-green
+ *   annotation, and (only when non-zero) an INCIDENTS count. Collapse the boring; NEVER collapse the alarming:
+ *   every bad state (not-captured, flaky/unverified chip, incidents > 0, retried passes) stays in the summary.
+ *
+ *   deferred behind one "Details" disclosure (the Metrics-section mechanism) — the daily retry SPARKLINE (flat
+ *   0% on most monitors; drill-down value only), the INCIDENTS-BY-CAUSE breakdown (its count is already in the
+ *   summary when non-zero), and the FULL spec-integrity sha256 + path (forensic — nobody reads a 64-char hash
+ *   at a glance; the summary carries the short form + a copy affordance instead of a two-line wrap on mobile).
  */
 export function TrustCard({ checkId, window = "30d" }: { checkId: number; window?: "7d" | "30d" | "90d" }) {
   const { data, error, isValidating, mutate } = useTrustDetail(checkId, window);
   const fetchedAt = useFetchedAt(isValidating, data != null); // before early returns (hooks rule)
+  const [detailsOpen, setDetailsOpen] = useState(false);
   // ★ Loud-not-silent: a 500/network error shows a visible state; a 404 → data null → hide (feature absent).
   if (error) return <ErrorState testId="trust-card-error" message="Trust data failed to load — retry." />;
   if (!data) return null;
   const m = data.monitor;
   const neverGreen = m.last_green_at == null;
+  const sha = m.spec_provenance.executed_sha256;
 
   return (
     <section className="sw-panel p-4" data-testid="trust-card">
@@ -262,7 +272,8 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
         </div>
       )}
 
-      <div className="mb-4 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+      {/* the glance layer: a compact wrapping stat row, not a tall stack */}
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
         <div>
           <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Last green</div>
           <div
@@ -281,31 +292,89 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
           <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Runs</div>
           <div className="sw-mono text-[13px] text-[var(--color-ink)]">{m.run_count}</div>
         </div>
-      </div>
-
-      <div className="mb-4">
-        <RetrySparkline series={data.retry_series} />
-      </div>
-
-      <div className="mb-4">
-        <h4 className="mb-2 text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">Incidents by cause</h4>
-        <IncidentBreakdown incidents={m.incidents} />
-      </div>
-
-      {/* Spec provenance — an INTEGRITY fact (the committed assertion code that actually ran), NOT a red-test. */}
-      {m.spec_provenance.executed_sha256 && (
-        <div className="border-t border-[var(--color-border)] pt-3" data-testid="trust-provenance">
-          <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
-            Spec integrity · executed code
+        {/* ★ exception-visibility: a non-zero incident count NEVER hides in the disclosure — it sits in the
+            summary, warn-toned, and tapping it opens the by-cause breakdown (one tap to the detail). */}
+        {m.incidents.total > 0 && (
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(true)}
+            className="cursor-pointer text-left"
+            title="Incidents in this window — tap for the by-cause breakdown"
+            data-testid="trust-incidents-count"
+          >
+            <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Incidents</div>
+            <div className="sw-mono text-[13px] font-medium" style={{ color: TONE_VAR.warn }}>
+              {m.incidents.total} ›
+            </div>
+          </button>
+        )}
+        {/* spec integrity, short form — the full 64-char hash wrapped to two lines on mobile for a value
+            nobody reads at a glance. Short sha here + copy affordance; the full hash lives in Details. */}
+        {sha && (
+          <div data-testid="trust-spec-short">
+            <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Spec</div>
+            <button
+              type="button"
+              onClick={() => void navigator.clipboard?.writeText(sha)}
+              className="sw-mono cursor-pointer text-[13px] text-[var(--color-ink)]"
+              title={`SHA-256 of the assertion code that ran — tap to copy the full hash\n${sha}`}
+              data-testid="trust-spec-copy"
+            >
+              {sha.slice(0, 8)} <span aria-hidden className="text-[var(--color-ink-faint)]">⧉</span>
+            </button>
           </div>
-          {m.spec_provenance.spec_path && (
-            <div className="sw-mono text-[11px] text-[var(--color-ink-dim)]">{m.spec_provenance.spec_path}</div>
-          )}
-          <div className="sw-mono break-all text-[11px] text-[var(--color-ink)]" title="SHA-256 of the assertion code that ran">
-            {m.spec_provenance.executed_sha256}
+        )}
+      </div>
+
+      {/* ONE disclosure over the forensic layer — the same chevron mechanism as the Metrics section. */}
+      <div className="mt-3 border-t border-[var(--color-border)] pt-2.5">
+        <button
+          type="button"
+          onClick={() => setDetailsOpen(!detailsOpen)}
+          aria-expanded={detailsOpen}
+          aria-controls="trust-details-body"
+          data-testid="trust-details-toggle"
+          className="group flex w-full items-center gap-2 text-left text-[12px] font-medium text-[var(--color-ink)]"
+        >
+          <svg
+            aria-hidden
+            viewBox="0 0 16 16"
+            className="h-3 w-3 shrink-0 text-[var(--color-ink-dim)] transition-transform"
+            style={{ transform: detailsOpen ? "rotate(90deg)" : "none" }}
+          >
+            <path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Details
+          <span className="ml-0.5 text-[10px] font-normal uppercase tracking-wider text-[var(--color-ink-faint)]">
+            retry trend · incidents by cause · spec integrity
+          </span>
+        </button>
+        {detailsOpen && (
+          <div id="trust-details-body" data-testid="trust-details-body" className="mt-3 space-y-4">
+            <RetrySparkline series={data.retry_series} />
+
+            <div>
+              <h4 className="mb-2 text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">Incidents by cause</h4>
+              <IncidentBreakdown incidents={m.incidents} />
+            </div>
+
+            {/* Spec provenance — an INTEGRITY fact (the committed assertion code that actually ran), NOT a red-test. */}
+            {sha && (
+              <div className="border-t border-[var(--color-border)] pt-3" data-testid="trust-provenance">
+                <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+                  Spec integrity · executed code
+                </div>
+                {m.spec_provenance.spec_path && (
+                  <div className="sw-mono text-[11px] text-[var(--color-ink-dim)]">{m.spec_provenance.spec_path}</div>
+                )}
+                <div className="sw-mono break-all text-[11px] text-[var(--color-ink)]" title="SHA-256 of the assertion code that ran">
+                  {sha}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </section>
   );
 }
