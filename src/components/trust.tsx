@@ -309,8 +309,14 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
           <button
             type="button"
             onClick={() => {
-              scrollToDetails.current = true;
-              setDetailsOpen(true);
+              // Already open → the effect won't re-fire (no state change); scroll now instead of arming the
+              // ref, which would otherwise go stale and cause a spurious scroll on a later toggle-open.
+              if (detailsOpen) {
+                document.getElementById("trust-details-body")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              } else {
+                scrollToDetails.current = true;
+                setDetailsOpen(true);
+              }
             }}
             className="cursor-pointer text-left"
             title="Incidents in this window — tap for the by-cause breakdown"
