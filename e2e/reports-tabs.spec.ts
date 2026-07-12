@@ -130,3 +130,59 @@ test.describe("reports — sub-tabs", () => {
     expect(count(paths, "/reports/performance")).toBe(perfAfterLoad);
   });
 });
+
+const TAB_IDS = ["summary", "performance", "reliability", "monitors", "trust", "cost"] as const;
+
+test.describe("reports — sub-tabs on MOBILE (no clipped tab, ever)", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("★ deep-link to Cost at 390px: EVERY tab fully inside the viewport, none half-clipped (the bisected-Cost bug)", async ({ page }) => {
+    await mockApi(page, defaultWorld());
+    await page.goto("/reports?tab=cost"); // Craig's exact failure: landing on the tab that was off-screen
+
+    await expect(page.getByTestId("reports-tab-cost")).toHaveAttribute("aria-selected", "true");
+
+    // ★ no tab may render half-clipped at rest — each button's box sits entirely within the 390px viewport
+    for (const id of TAB_IDS) {
+      const tab = page.getByTestId(`reports-tab-${id}`);
+      await expect(tab).toBeVisible();
+      const box = (await tab.boundingBox())!;
+      expect(box.x, `${id} left edge`).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width, `${id} right edge`).toBeLessThanOrEqual(390);
+    }
+
+    // the wrap fixes the row itself — the page must not gain a horizontal scroll
+    const overflowX = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflowX).toBe(0);
+
+    // touch target: ≥44px tall on mobile
+    const costBox = (await page.getByTestId("reports-tab-cost").boundingBox())!;
+    expect(costBox.height).toBeGreaterThanOrEqual(44);
+  });
+
+  test("every tab is directly tappable at 390px (nothing hidden behind a scroll)", async ({ page }) => {
+    await mockApi(page, defaultWorld());
+    await page.goto("/reports");
+    for (const id of ["cost", "trust", "summary"] as const) {
+      await page.getByTestId(`reports-tab-${id}`).click();
+      await expect(page.getByTestId(`reports-tab-${id}`)).toHaveAttribute("aria-selected", "true");
+    }
+  });
+});
+
+test.describe("reports — sub-tabs on DESKTOP (no regression)", () => {
+  test("at 1280px the bar still renders as ONE compact row", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await mockApi(page, defaultWorld());
+    await page.goto("/reports");
+    const bar = page.getByRole("tablist", { name: "Report sections" });
+    await expect(bar).toBeVisible();
+    const barBox = (await bar.boundingBox())!;
+    expect(barBox.height, "single row (wrap must not engage at desktop width)").toBeLessThan(40);
+    const first = (await page.getByTestId("reports-tab-summary").boundingBox())!;
+    const last = (await page.getByTestId("reports-tab-cost").boundingBox())!;
+    expect(Math.abs(first.y - last.y), "first and last tab on the same row").toBeLessThan(2);
+  });
+});
