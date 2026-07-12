@@ -726,6 +726,108 @@ export async function getSpecCache(id: number): Promise<SpecCache | null> {
   }
 }
 
+/** One diffed error (P1 fingerprint + P2 severity). `origin` = "first-party" | "third-party"; `status` is the
+ *  network status (e.g. 400, -1 abort), null for console/page errors. `message` is the canonical (normalized) text. */
+export interface ErrorItem {
+  fingerprint: string;
+  kind: string;
+  origin: string;
+  level: string | null;
+  status: number | null;
+  source_host: string;
+  message: string;
+  count: number;
+  severity: number;
+  severity_label: string;
+  first_seen_run_id: number | null;
+}
+
+/** First-party vs third-party counts per bucket (so the UI can label the third-party toggle without re-counting). */
+export interface ErrorDiffCounts {
+  new_first_party: number;
+  new_third_party: number;
+  persistent_first_party: number;
+  persistent_third_party: number;
+  resolved_first_party: number;
+  resolved_third_party: number;
+}
+
+/** GET /checks/{id}/error-diff — this run's errors vs the union of the last N settled runs. NEW = the regression. */
+export interface ErrorDiff {
+  check_id: number;
+  run_id: number;
+  run_started_at: string | null;
+  location: string | null;
+  baseline_run_ids: number[];
+  new_errors: ErrorItem[];
+  persistent: ErrorItem[];
+  resolved: ErrorItem[];
+  counts: ErrorDiffCounts;
+  /** true when this run or any baseline run hit the console cap — the diff is INCOMPLETE above the cap. */
+  truncated: boolean;
+  baseline_run_count: number;
+}
+
+function mapErrorItem(r: Record<string, unknown>): ErrorItem {
+  return {
+    fingerprint: String(r.fingerprint ?? ""),
+    kind: String(r.kind ?? ""),
+    origin: String(r.origin ?? "third-party"),
+    level: (r.level as string | null) ?? null,
+    status: (r.status as number | null) ?? null,
+    source_host: String(r.sourceHost ?? ""),
+    message: String(r.message ?? ""),
+    count: Number(r.count ?? 0),
+    severity: Number(r.severity ?? 0),
+    severity_label: String(r.severityLabel ?? ""),
+    first_seen_run_id: (r.firstSeenRunId as number | null) ?? null,
+  };
+}
+
+const asItems = (v: unknown): ErrorItem[] =>
+  Array.isArray(v) ? (v as Record<string, unknown>[]).map(mapErrorItem) : [];
+
+/**
+ * GET /checks/{id}/error-diff?runId=&baseline=N — the error diff for the latest settled run (or `runId`) vs the
+ * union of the last N settled runs. Items arrive already severity-sorted. 404 → null (no signals for this run →
+ * the panel self-hides). Session-gated + Cache-Control: no-store (don't cache a live diff).
+ */
+export async function getErrorDiff(
+  checkId: number,
+  opts: { runId?: number; baseline?: number } = {},
+): Promise<ErrorDiff | null> {
+  try {
+    const raw = await request<Record<string, unknown>>(`/checks/${checkId}/error-diff`, {
+      runId: opts.runId,
+      baseline: opts.baseline,
+    });
+    const counts = (raw?.counts ?? {}) as Record<string, unknown>;
+    return {
+      check_id: Number(raw?.checkId ?? checkId),
+      run_id: Number(raw?.runId ?? 0),
+      run_started_at: (raw?.runStartedAt as string | null) ?? null,
+      location: (raw?.location as string | null) ?? null,
+      baseline_run_ids: Array.isArray(raw?.baselineRunIds) ? (raw.baselineRunIds as number[]) : [],
+      new_errors: asItems(raw?.new),
+      persistent: asItems(raw?.persistent),
+      resolved: asItems(raw?.resolved),
+      counts: {
+        new_first_party: Number(counts.newFirstParty ?? 0),
+        new_third_party: Number(counts.newThirdParty ?? 0),
+        persistent_first_party: Number(counts.persistentFirstParty ?? 0),
+        persistent_third_party: Number(counts.persistentThirdParty ?? 0),
+        resolved_first_party: Number(counts.resolvedFirstParty ?? 0),
+        resolved_third_party: Number(counts.resolvedThirdParty ?? 0),
+      },
+      truncated: Boolean(raw?.truncated),
+      baseline_run_count: Number(raw?.baselineRunCount ?? 0),
+    };
+  } catch (err) {
+    if (err instanceof ApiRequestError && err.status === 404) return null;
+    throw err;
+  }
+}
+
 /** The masked echo the write endpoint (and every read) returns: { key -> "set" }, never a value/ciphertext. */
 export interface MaskedCredentials {
   secret_headers: Record<string, string> | null;
