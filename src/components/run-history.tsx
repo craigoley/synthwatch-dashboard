@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { useRunHistory } from "@/lib/client";
+import { getRunTraceSas } from "@/lib/api-client";
 import { FunnelBar } from "@/components/funnel-bar";
 import { StatusDot, TONE_VAR } from "@/components/status-badge";
 import { DateRangeControl, useDateRange } from "@/components/date-range-control";
@@ -34,12 +35,10 @@ function RunArtifacts({ run }: { run: Run }) {
   // must never render a red-sounding "Failure screenshot" header. (A pass run has no screenshot in practice.)
   const failed = run.status === "fail" || run.status === "error";
   const screenshot = failed && run.screenshot_url ? `/screenshot-proxy/${run.id}` : null;
-  // ★ Serve the trace SAME-ORIGIN via the dashboard's own proxy (app/trace-proxy/[id]).
-  // The viewer fetch()es the trace, and fetching the cross-origin (API-origin) trace is
-  // the documented-broken CORS trap (Playwright #38622); same-origin dodges it entirely
-  // and works on prod / preview / localhost alike.
-  const traceProxy = run.trace_url ? `/trace-proxy/${run.id}` : null;
-  if (!screenshot && !traceProxy) return null;
+  // ★ The trace is fetched DIRECTLY from Blob via a short-TTL SAS the API mints (getRunTraceSas) — off the
+  // Vercel proxy, which can't stream a 124MB trace. The viewer/Download mint on demand; auth stays on the mint.
+  const hasTrace = !!run.trace_url;
+  if (!screenshot && !hasTrace) return null;
   return (
     <div className="mt-3 space-y-3">
       {screenshot && (
@@ -63,15 +62,16 @@ function RunArtifacts({ run }: { run: Run }) {
           )}
         </div>
       )}
-      {traceProxy && (
+      {hasTrace && (
         <div>
           <div className="mb-1 sw-eyebrow">Playwright trace — forensics</div>
           <TraceViewer
-            proxyPath={traceProxy}
+            mintSas={() => getRunTraceSas(run.id)}
             openLabel="▸ View trace"
             iframeTitle={`Playwright trace for run ${run.id}`}
             viewTestId={`view-trace-${run.id}`}
             iframeTestId={`trace-viewer-${run.id}`}
+            downloadTestId={`download-trace-${run.id}`}
           />
           <p className="mt-1.5 text-[11px] text-[var(--color-ink-faint)]">
             Per-action screenshots, console, network waterfall &amp; DOM time-travel — from the captured

@@ -1001,6 +1001,20 @@ export async function mockApi(
         body: Buffer.from("PK\x05\x06" + "\x00".repeat(18)),
       });
     }
+    // ★ Trace SAS mint (the primary path): the viewer/Download fetch the blob DIRECTLY via this short-TTL,
+    // read-only SAS URL — off the serverless proxy. Return a fake blob SAS URL the iframe points at.
+    if ((m = path.match(/^\/api\/runs\/(\d+)\/trace-sas$/))) {
+      return json(route, {
+        url: `https://mockblob.blob.core.windows.net/synthwatch-artifacts/traces/run-${m[1]}.zip?sv=2024&sp=r&sig=fake`,
+        expiresAt: new Date(Date.now() + 120_000).toISOString(),
+      });
+    }
+    if ((m = path.match(/^\/api\/checks\/(\d+)\/success-trace-sas$/))) {
+      return json(route, {
+        url: `https://mockblob.blob.core.windows.net/synthwatch-artifacts/success-latest/check-${m[1]}.zip?sv=2024&sp=r&sig=fake`,
+        expiresAt: new Date(Date.now() + 120_000).toISOString(),
+      });
+    }
     if (path === "/api/sla") {
       const win = url.searchParams.get("window") ?? "24h";
       const resp = world.slaByWindow?.[win] ?? world.sla;

@@ -29,9 +29,10 @@ export interface Session {
 const STORAGE_KEY = "synthwatch.session";
 
 /**
- * ★ Same-origin cookie mirroring JUST the bearer token, for the trace-proxy ONLY (app/trace-proxy/*). Those
- * routes run SERVER-side and stream forensic artifacts from the C# API, which (synthwatch-api #154) now gates
- * behind a bearer. A server route can't read localStorage, and the browser attaches nothing to the viewer's
+ * ★ Same-origin cookie mirroring JUST the bearer token, for the screenshot-proxy (app/screenshot-proxy/*).
+ * That route runs SERVER-side and streams a forensic screenshot from the C# API, which (synthwatch-api #154)
+ * now gates behind a bearer. (Traces no longer use a proxy — they're fetched directly via a short-TTL SAS; see
+ * TraceViewer.) A server route can't read localStorage, and the browser attaches nothing to the viewer's
  * iframe/download/fetch — so the token is also mirrored here where the proxy can read it (req.cookies) and
  * forward it as `Authorization: Bearer`. SameSite=Lax + same-origin: it is NEVER sent to the cross-origin API,
  * only to the dashboard's own proxy. Not httpOnly (set client-side) — SAME XSS exposure as the localStorage
@@ -100,7 +101,7 @@ export function setSession(session: Session): void {
     } catch {
       /* storage full / disabled — in-memory still works for this tab */
     }
-    writeProxyCookie(session); // mirror the bearer for the server-side trace-proxy
+    writeProxyCookie(session); // mirror the bearer for the server-side screenshot-proxy
   }
   emitSession();
 }

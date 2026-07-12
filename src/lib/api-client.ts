@@ -88,6 +88,7 @@ import type {
   IncidentsResponse,
   IncidentWithCheck,
   LocationStatus,
+  TraceSas,
   MetricPoint,
   Run,
   RunStatus,
@@ -193,8 +194,8 @@ type QueryValue = string | number | boolean | null | undefined | string[];
  * /runs/{id}/screenshot, /checks/{id}/success-trace, trace-signals): a bare
  * <a href>/<img src> to the cross-origin API carries neither the bearer header
  * nor the proxy cookie, so it 401s even for logged-in users (synthwatch-api #154).
- * Those go through the same-origin proxies: /trace-proxy/{runId},
- * /trace-proxy/check/{checkId}, /screenshot-proxy/{runId}.
+ * The screenshot goes through the same-origin /screenshot-proxy/{runId}; traces are fetched directly from
+ * Blob via a short-TTL SAS (getRunTraceSas / getCheckSuccessTraceSas), so they need no proxy.
  */
 export function apiUrl(path: string): string {
   if (/^https?:\/\//i.test(path)) return path;
@@ -1182,6 +1183,24 @@ interface RawNearbyDeploy {
   sha: string;
   fingerprint: string;
   offsetMinutes: number;
+}
+
+interface RawTraceSas {
+  url: string;
+  expiresAt: string;
+}
+
+/** GET /api/runs/{id}/trace-sas — mint a short-TTL read-only SAS so the browser fetches the trace blob
+ *  DIRECTLY (off the Vercel proxy that can't stream 124MB). Auth-gated on the API side (401/403 → throws). */
+export async function getRunTraceSas(runId: number): Promise<TraceSas> {
+  const raw = await request<RawTraceSas>(`/runs/${runId}/trace-sas`);
+  return { url: raw.url, expires_at: raw.expiresAt };
+}
+
+/** GET /api/checks/{id}/success-trace-sas — same, for a monitor's last-known-good success trace. */
+export async function getCheckSuccessTraceSas(checkId: number): Promise<TraceSas> {
+  const raw = await request<RawTraceSas>(`/checks/${checkId}/success-trace-sas`);
+  return { url: raw.url, expires_at: raw.expiresAt };
 }
 
 /** GET /api/incidents/{id} — the incident investigation payload. */

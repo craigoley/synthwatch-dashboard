@@ -77,13 +77,13 @@ test.describe("incident detail page", () => {
     await expect(page.getByText("Real outage")).toBeVisible();
     await expect(page.getByText("Observed · facts")).toBeVisible();
 
-    // ★ timeline centerpiece: rows + screenshot/trace links out — SAME-ORIGIN proxy paths, never the raw
-    // cross-origin API (bearer-gated per synthwatch-api #154 → a bare href would 401 even signed-in).
+    // ★ timeline centerpiece: rows + screenshot (same-origin proxy) / trace (mints a short-TTL SAS on click,
+    // then opens the blob directly) links out — never a bare cross-origin API href (bearer-gated #154 → 401).
     await expect(page.getByRole("heading", { name: "Run timeline" })).toBeVisible();
     await expect(page.getByText("503 Service Unavailable from westus2")).toBeVisible();
     const shot = page.getByRole("link", { name: /screenshot/ });
     await expect(shot).toHaveAttribute("href", "/screenshot-proxy/1001");
-    await expect(page.getByRole("link", { name: /trace/ })).toHaveAttribute("href", "/trace-proxy/1001");
+    await expect(page.getByRole("button", { name: /trace/ })).toBeVisible(); // SAS on click, no proxy path
     // ★ each timeline row deep-links into the check's run history — the #run-<id> anchor is where
     // the funnel, AI insights, baseline-diff, and embedded trace viewer live
     await expect(page.getByTestId("timeline-run-link-1001")).toHaveAttribute("href", "/checks/10#run-1001");

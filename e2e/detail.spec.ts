@@ -98,13 +98,13 @@ test.describe("check detail", () => {
     await expect
       .poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth))
       .toBeGreaterThan(0);
-    // download fallback + the new in-app "View trace" affordance both present
-    await expect(page.getByRole("link", { name: /Download/ })).toBeVisible();
+    // download (mints a SAS on click) + the in-app "View trace" affordance both present
+    await expect(page.getByRole("button", { name: /Download/ })).toBeVisible();
     await expect(page.getByTestId("view-trace-200")).toBeVisible();
   });
 
   // ★ Phase 10: embed the self-hosted Playwright trace viewer for failed runs.
-  test("embeds the trace viewer in-app (forensics), pointed at the proxied trace", async ({ page }) => {
+  test("embeds the trace viewer in-app (forensics), pointed at the direct SAS blob URL", async ({ page }) => {
     await mockApi(page);
     await page.goto("/checks/2");
 
@@ -117,18 +117,16 @@ test.describe("check detail", () => {
     const src = await viewer.getAttribute("src");
     const decoded = decodeURIComponent(src ?? "");
     expect(src).toContain("/trace-viewer/index.html?trace=");
-    // ★ SAME-ORIGIN: the viewer fetches the dashboard's own /trace-proxy, NOT the
-    // cross-origin API — the documented CORS trap (Playwright #38622) is dodged.
-    expect(decoded).toContain("/trace-proxy/200");
+    // ★ DIRECT SAS: the viewer fetches the blob DIRECTLY via the short-TTL read-only SAS URL the API minted
+    // (off the Vercel proxy that can't stream 124MB). CORS is solved because auth lives IN the SAS URL.
+    expect(decoded).toContain("traces/run-200.zip"); // the run-200 trace blob
+    expect(decoded).toContain("sp=r"); // read-only SAS
     expect(decoded).not.toContain("mock.synthwatch.test"); // not the API origin
-    const pageOrigin = new URL(page.url()).origin;
-    expect(decoded).toContain(`${pageOrigin}/trace-proxy/200`); // absolute, same-origin
 
     // the vendored viewer bundle is served on-domain
     expect((await page.request.get("/trace-viewer/index.html")).status()).toBe(200);
-    // the same-origin trace proxy route is wired (server-side; upstream is unreachable
-    // in the hermetic mock → 502, NOT 404 — proving the route exists and proxies).
-    expect((await page.request.get("/trace-proxy/200")).status()).not.toBe(404);
+    // ★ the trace proxy route is GONE — full cutover to SAS (one path for all sizes; no serverless size trap).
+    expect((await page.request.get("/trace-proxy/200")).status()).toBe(404);
   });
 
   // ★ Resilience patch (scripts/vendor-trace-viewer.mjs): the vendored viewer must SKIP an
