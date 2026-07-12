@@ -151,6 +151,16 @@ export interface Check {
    * are badged, filterable, and excluded from the fleet status banner (a staging fail must not flip it).
    */
   environment: string;
+  /**
+   * env PR-3 (runner 0074): the per-check MANUAL env override — dashboard-owned, WINS over `environment` and
+   * SURVIVES reconcile (in neither reconcile write allow-list). null = no override → use `environment`. Set
+   * via PUT /checks/{id}/environment. The badge/rollups read the EFFECTIVE env via envOf() (which coalesces).
+   */
+  environment_override?: string | null;
+  /** The EFFECTIVE env the API computed = environment_override ?? environment. */
+  effective_environment?: string;
+  /** Why the effective env is what it is: "override" (manual) | "derived" (git manifest / domain map / default). */
+  environment_source?: "override" | "derived";
   created_at: string;
   /**
    * Reversible, dashboard-owned ARCHIVE (api/runner 0071). null = active; an ISO timestamp = archived (the
