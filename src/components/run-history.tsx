@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react";
 
 import { useRunHistory } from "@/lib/client";
 import { getRunTraceSas } from "@/lib/api-client";
@@ -113,9 +113,16 @@ function RunRow({
   // Each badge links to its pair (the run rows carry id={run-<id>}) so the pair is legible, not two mysteries.
   const supersededBy = run.superseded_by_run_id ?? null;
   const confirmationOf = run.confirmation_of_run_id ?? null;
-  const jumpToRun = (runId: number) => (e: MouseEvent) => {
+  const jumpToRun = (runId: number) => (e: MouseEvent | KeyboardEvent) => {
     e.stopPropagation(); // don't toggle THIS row
     document.getElementById(`run-${runId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  // These badges are role="link" + tabIndex={0}, so keyboard users can focus them — wire Enter/Space to the
+  // same jump (preventDefault on Space so it doesn't scroll the page) so they're OPERABLE, not just focusable.
+  const jumpToRunKey = (runId: number) => (e: KeyboardEvent) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    jumpToRun(runId)(e);
   };
   return (
     <>
@@ -146,6 +153,7 @@ function RunRow({
               role="link"
               tabIndex={0}
               onClick={jumpToRun(supersededBy)}
+              onKeyDown={jumpToRunKey(supersededBy)}
               data-testid="transient-badge"
               title="Transient failure — a confirmation run PASSED, so this was confirmed not-real and does NOT count toward availability or the SLO. It still shows as a failure here for honesty. Click to see the confirmation run."
               className="sw-mono ml-2 inline-flex cursor-pointer items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px]"
@@ -159,6 +167,7 @@ function RunRow({
               role="link"
               tabIndex={0}
               onClick={jumpToRun(confirmationOf)}
+              onKeyDown={jumpToRunKey(confirmationOf)}
               data-testid="confirmation-badge"
               title="Confirmation run — fired automatically to confirm an earlier failure. Its verdict owns the outcome. Click to see the original run."
               className="sw-mono ml-2 inline-flex cursor-pointer items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px]"
