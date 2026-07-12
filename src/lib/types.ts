@@ -600,15 +600,29 @@ export interface CostCheck {
   avg_duration_s: number | null;
   projected_monthly: number;
   measured_monthly_7d: number;
-  /** measured/projected; null when projected is 0 / no runs. */
+  /** measured/projected; null when projected is 0 / no runs. ★ This is a PURE run-count ratio: since
+   *  Σduration = avg × N over the same 7d set, duration cancels and divergence = run_count_7d / expected. */
   divergence_ratio: number | null;
-  /** measured/projected > 1.5 (server threshold) — retry-amplification / a failing flow costing more than config implies. */
+  /** divergence > 1.5 (server threshold) — EXTRA runs vs the current schedule (a config-change straddle,
+   *  confirmation re-runs, or sandbox fires). NOT retries: retries persist no extra row/duration, so they
+   *  are structurally invisible to this metric. Attribute from the count fields below. */
   divergence_flag: boolean;
+  /** runs (duration_ms NOT NULL) in the last 7d — the N in divergence = N/expected (0078; 0 if the API predates it). */
+  run_count_7d: number;
+  /** of those, confirmation re-runs (0077) — a real "extra rows" cause. */
+  confirmation_count_7d: number;
+  /** of those, sandbox / on-demand fires (0065). */
+  sandbox_count_7d: number;
+  /** runs in the recent half (last 3.5d) — a step vs run_count_prior ⇒ a recent interval change. */
+  run_count_recent: number;
+  /** runs in the prior half (3.5–7d ago). */
+  run_count_prior: number;
 }
 
 export interface CostReport {
   generated_at: string;
-  /** $/vCPU-second used for this response (echoed so the UI shows provenance, never hardcodes it). */
+  /** $/active-second used for this response — DERIVED (two ACA meters × the live allocation), echoed so the
+   *  UI shows provenance and never hardcodes it. (Was mislabeled "$/vCPU-second": the scalar was a blend.) */
   rate_used: number;
   rate_source: string;
   rate_set_date: string;
