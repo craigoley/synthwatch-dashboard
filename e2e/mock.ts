@@ -296,6 +296,9 @@ export async function mockApi(
   const detailSeqIdx = new Map<number, number>();
   // Per-check cursor into world.runsSequence — advances each GET /checks/{id}/runs (the live run-history list).
   const runsSeqIdx = new Map<number, number>();
+  // P4 error-mutes: stateful per-check fingerprint → mute row. POST adds, DELETE removes; GET error-diff filters
+  // its NEW bucket through this (matches leave NEW + join muted[]), so the mute lifecycle is exercised e2e.
+  const mutedByCheck = new Map<number, Map<string, RawObj>>();
 
   // ★ SAME-ORIGIN screenshot proxy (app/screenshot-proxy/[runId]). The app loads screenshots through its own
   // origin (cookie→bearer, like /trace-proxy) — in the hermetic harness the Next route would fetch the mock
@@ -929,7 +932,43 @@ export async function mockApi(
     if ((m = path.match(/^\/api\/checks\/(\d+)\/error-diff$/)) && method === "GET") {
       const cid = Number(m[1]);
       const diff = world.errorDiff?.[cid];
-      return diff ? json(route, diff) : json(route, { error: "not_found" }, 404);
+      if (!diff) return json(route, { error: "not_found" }, 404);
+      // P4: apply the live mute set — matching NEW items leave `new` and join `muted`, counts.muted updates.
+      const bag = mutedByCheck.get(cid);
+      if (!bag || bag.size === 0) return json(route, diff);
+      const newArr = (diff.new as RawObj[]) ?? [];
+      const stillNew = newArr.filter((i) => !bag.has(String(i.fingerprint)));
+      const mutedItems = newArr.filter((i) => bag.has(String(i.fingerprint)));
+      const cf = (arr: RawObj[], first: boolean) => arr.filter((i) => (i.origin === "first-party") === first).length;
+      const counts = { ...(diff.counts as RawObj), newFirstParty: cf(stillNew, true), newThirdParty: cf(stillNew, false), muted: mutedItems.length };
+      return json(route, { ...diff, new: stillNew, muted: mutedItems, counts });
+    }
+    // P4 error-mutes CRUD (stateful). GET lists; POST mutes (idempotent); DELETE unmutes by ?fingerprint=.
+    // Writes are gated by the central enforceAuth block above.
+    if ((m = path.match(/^\/api\/checks\/(\d+)\/error-mutes$/))) {
+      const cid = Number(m[1]);
+      const bag = mutedByCheck.get(cid) ?? new Map<string, RawObj>();
+      if (method === "GET") {
+        const mutes = [...bag.values()].sort((a, b) => String(b.mutedAt).localeCompare(String(a.mutedAt)));
+        return json(route, { mutes });
+      }
+      if (method === "POST") {
+        const b = JSON.parse(req.postData() || "{}");
+        const fp = String(b.fingerprint ?? "");
+        if (!fp) return json(route, { error: "bad_request", message: "fingerprint is required." }, 400);
+        const existing = bag.get(fp);
+        if (existing) return json(route, existing); // idempotent → 200 echo
+        const row: RawObj = { fingerprint: fp, mutedAt: new Date().toISOString(), mutedBy: bearerEmail(), note: b.note ?? null };
+        bag.set(fp, row);
+        mutedByCheck.set(cid, bag);
+        return json(route, row, 201);
+      }
+      if (method === "DELETE") {
+        const fp = url.searchParams.get("fingerprint") ?? "";
+        bag.delete(fp);
+        mutedByCheck.set(cid, bag);
+        return route.fulfill({ status: 204 });
+      }
     }
     if ((m = path.match(/^\/api\/checks\/(\d+)\/spec-cache$/)) && method === "GET") {
       const cid = Number(m[1]);
