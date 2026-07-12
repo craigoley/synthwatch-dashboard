@@ -124,7 +124,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
 
-          <nav className="order-last w-full flex items-center gap-1 overflow-x-auto sm:order-none sm:ml-2 sm:w-auto">
+          {/* ★ MOBILE: the nav WRAPS instead of scrolling. The old overflow-x-auto clipped items at the
+              viewport edge with no fade/chevron/any affordance ("Catalog" rendered as "atalog") — hidden
+              navigation, the same failure #253 fixed on the Reports sub-tabs. Wrapping means every item is
+              always visible; sm: is unchanged (single row on the h-14 bar). */}
+          <nav className="order-last w-full flex flex-wrap items-center gap-1 sm:order-none sm:ml-2 sm:w-auto sm:flex-nowrap">
             {NAV.filter((item) => !item.adminOnly || isAdmin).map((item) => {
               const active = item.match(pathname);
               return (
