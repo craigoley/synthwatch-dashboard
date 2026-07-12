@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { useIncident, useCheckTags } from "@/lib/client";
+import { getRunTraceSas } from "@/lib/api-client";
 import { StatusBadge, ToneBadge, TONE_VAR } from "@/components/status-badge";
 import { RcaPanel } from "@/components/rca-panel";
 import { TagChips } from "@/components/tag-chips";
@@ -116,14 +117,21 @@ function Timeline({ runs, checkId, total }: { runs: IncidentTimelineRun[]; check
                     </a>
                   )}
                   {r.trace_url && (
-                    <a
-                      href={`/trace-proxy/${r.run_id}`}
-                      target="_blank"
-                      rel="noreferrer"
+                    // Mint a short-TTL SAS on click, then open the trace zip directly (off the Vercel proxy).
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const sas = await getRunTraceSas(r.run_id);
+                          window.open(sas.url, "_blank", "noopener");
+                        } catch {
+                          /* best-effort link — the full viewer (run history) surfaces load errors */
+                        }
+                      }}
                       className="sw-mono text-[11px] text-[var(--color-brand)] hover:underline"
                     >
                       ↗ trace
-                    </a>
+                    </button>
                   )}
                 </span>
               </div>

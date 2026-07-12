@@ -14,6 +14,7 @@ import { TrustCard } from "@/components/trust";
 import { RunHistory } from "@/components/run-history";
 import { LiveStepsChecklist } from "@/components/live-steps";
 import { TraceViewer } from "@/components/trace-viewer";
+import { getCheckSuccessTraceSas } from "@/lib/api-client";
 import { StatusBadge, TONE_VAR } from "@/components/status-badge";
 
 // The host of a check's target_url → the deploy-marker overlay key (a deploy is per host). undefined when
@@ -277,11 +278,12 @@ function SuccessTracePanel({ check }: { check: Check }) {
         </span>
       </div>
       <TraceViewer
-        proxyPath={`/trace-proxy/check/${check.id}`}
+        mintSas={() => getCheckSuccessTraceSas(check.id)}
         openLabel="▸ View last success trace"
         iframeTitle={`Last successful trace for ${check.name}`}
         viewTestId={`view-success-trace-${check.id}`}
         iframeTestId={`success-trace-viewer-${check.id}`}
+        downloadTestId={`download-success-trace-${check.id}`}
       />
       <p className="mt-1.5 text-[11px] text-[var(--color-ink-faint)]">
         The most recent SUCCESSFUL run&apos;s full trace — a baseline to diff against failures.

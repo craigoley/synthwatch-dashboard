@@ -455,6 +455,17 @@ export interface IncidentDetail {
 }
 
 /**
+ * A short-lived, read-only, single-blob SAS URL for a trace zip (api GET /runs/{id}/trace-sas or
+ * /checks/{id}/success-trace-sas). The browser fetches the blob DIRECTLY with this URL — off the Vercel
+ * serverless proxy that can't stream a 124MB trace. `url` carries a bearer credential for its ~2-min TTL;
+ * `expires_at` is when it lapses (re-mint on each open/download).
+ */
+export interface TraceSas {
+  url: string;
+  expires_at: string;
+}
+
+/**
  * One cursor-paginated page of run history. Mirrors the API's CursorPage envelope:
  * `next_cursor` is an opaque token to pass back as the next request's cursor, and is
  * null once the date-range window is exhausted. No total — counting an append-only

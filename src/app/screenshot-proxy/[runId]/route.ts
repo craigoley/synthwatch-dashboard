@@ -2,7 +2,8 @@ import type { NextRequest } from "next/server";
 
 import { PROXY_COOKIE } from "@/lib/auth";
 
-// SAME-ORIGIN screenshot proxy — the sibling of /trace-proxy/[id]. synthwatch-api #154
+// SAME-ORIGIN screenshot proxy (screenshots are small — no size problem; traces cut over to a direct SAS
+// fetch and no longer use a proxy). synthwatch-api #154
 // gates the artifact endpoints (screenshot included) behind a bearer, and a bare
 // <img src> / <a href> to the cross-origin API can carry neither the bearer header nor
 // the proxy cookie — so raw links 401 for EVERYONE, logged-in or not. This route streams
