@@ -29,6 +29,7 @@ function hostFromUrl(u: string | null | undefined): string | undefined {
 }
 import { TagChips } from "@/components/tag-chips";
 import { EnvBadge } from "@/components/env-badge";
+import { EnvironmentControl } from "@/components/environment-control";
 import { RedactionBadge } from "@/components/redaction";
 import { Modal } from "@/components/modal";
 import { MonitorForm } from "@/components/monitor-form";
@@ -566,6 +567,10 @@ export default function CheckDetailPage() {
           </span>
         </div>
       )}
+
+      {/* env PR-3: the per-check environment override. Shows the effective env + why (override vs derived) and
+          lets an editor set/clear the override (dashboard-owned — survives reconcile). */}
+      <EnvironmentControl check={check} />
 
       {/* Live step-by-step checklist — shown only while a run is in flight (the run-history funnel takes
           over once it's terminal). Rides #108's fast poll; steps come from the runner's live run_steps. */}

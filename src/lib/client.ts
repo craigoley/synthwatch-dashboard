@@ -74,6 +74,8 @@ import {
   createCheck as apiCreateCheck,
   updateCheck as apiUpdateCheck,
   deleteCheck as apiDeleteCheck,
+  setEnvironmentOverride as apiSetEnvironmentOverride,
+  type EnvValue,
 } from "@/lib/api-client";
 import type { CreateCheckInput, UpdateCheckInput } from "@/lib/schemas";
 import { runsDebug } from "@/lib/debug";
@@ -731,6 +733,13 @@ export async function createCheck(input: CreateCheckInput) {
 
 export async function updateCheck(id: number, input: UpdateCheckInput) {
   const result = await apiUpdateCheck(id, input);
+  await revalidateChecks(id);
+  return result;
+}
+
+/** env PR-3: set/clear a check's env override (null = clear → revert to the derived env), then refresh caches. */
+export async function setEnvironmentOverride(id: number, environmentOverride: EnvValue | null) {
+  const result = await apiSetEnvironmentOverride(id, environmentOverride);
   await revalidateChecks(id);
   return result;
 }

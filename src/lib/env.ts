@@ -6,11 +6,17 @@
 /** Anything carrying the authoritative environment column (Check, CheckWithStatus, ReportRow, …). */
 export interface HasEnvironment {
   environment?: string | null;
+  /**
+   * env PR-3: the per-check MANUAL override (prod|staging|dev) — WINS over `environment`. undefined/null =
+   * no override → use the derived env. Coalesced here so EVERY surface (grid/detail/report/incident) reads
+   * the EFFECTIVE env from the one helper; an object that doesn't carry it just falls back to `environment`.
+   */
+  environment_override?: string | null;
 }
 
-/** The check's environment with a safe fallback — undefined/null → "prod". */
+/** The check's EFFECTIVE environment: the manual override WINS, else the derived env, else "prod". */
 export function envOf(x: HasEnvironment): string {
-  return x.environment ?? "prod";
+  return x.environment_override ?? x.environment ?? "prod";
 }
 
 /** True when the check is NOT in the prod fleet (staging/dev/…). The one definition of "non-prod". */

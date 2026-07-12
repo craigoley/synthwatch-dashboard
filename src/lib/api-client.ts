@@ -337,6 +337,9 @@ interface RawCheck {
   severity: string;
   enabled: boolean;
   environment?: string | null; // authoritative checks.environment column (api #205); absent → default "prod"
+  environmentOverride?: string | null; // env PR-3: dashboard-owned manual override; wins over environment
+  effectiveEnvironment?: string | null; // env PR-3: override ?? environment (the effective env)
+  environmentSource?: "override" | "derived" | null; // env PR-3: why the effective env is what it is
   lighthouseEnabled: boolean;
   lighthouseIntervalSeconds?: number | null;
   lighthouseFormFactor?: string | null;
@@ -512,6 +515,9 @@ function mapCheck(raw: RawCheck): Check {
     severity: raw.severity,
     enabled: raw.enabled,
     environment: raw.environment ?? "prod", // authoritative column (api #205); default prod when absent
+    environment_override: raw.environmentOverride ?? null, // env PR-3 manual override (wins); null = none
+    effective_environment: raw.effectiveEnvironment ?? raw.environment ?? "prod", // override ?? environment
+    environment_source: raw.environmentSource ?? "derived", // "override" | "derived"
     created_at: raw.createdAt,
     archived_at: raw.archivedAt ?? null, // reversible archive (0071); null = active
     removed_at: raw.removedAt ?? null, // git-removal purge clock (0072); null = present in git
@@ -2400,6 +2406,73 @@ export async function updateCheck(id: number, input: UpdateCheckInput): Promise<
     body: JSON.stringify(toCamelBody(input as Record<string, unknown>)),
   });
   return mapCheck(raw);
+}
+
+// ─── env PR-3: per-check override + the domain→env map management ──────────────────────────────────────────
+export type EnvValue = "prod" | "staging" | "dev";
+
+/** PUT /checks/{id}/environment — set the manual env override, or CLEAR it (null → revert to the derived env). */
+export async function setEnvironmentOverride(id: number, environmentOverride: EnvValue | null): Promise<Check> {
+  const raw = await request<RawCheck>(`/checks/${id}/environment`, undefined, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ environmentOverride }),
+  });
+  return mapCheck(raw);
+}
+
+/** One domain→env inference rule (env_domain_map). id for edit/delete; ordered by priority asc. */
+export interface EnvDomainRule {
+  id: number;
+  pattern: string;
+  environment: EnvValue;
+  priority: number;
+}
+interface RawEnvDomainRule {
+  id: number;
+  pattern: string;
+  environment: string;
+  priority: number;
+}
+function mapEnvRule(r: RawEnvDomainRule): EnvDomainRule {
+  return { id: r.id, pattern: r.pattern, environment: (r.environment as EnvValue) ?? "prod", priority: r.priority };
+}
+
+/** GET /env-domain-map — the ordered inference rules (priority asc, id asc — the runner's match order). */
+export async function getEnvDomainMap(): Promise<EnvDomainRule[]> {
+  const raw = await request<{ rules?: RawEnvDomainRule[] }>("/env-domain-map");
+  return (raw.rules ?? []).map(mapEnvRule);
+}
+
+export interface EnvRuleInput {
+  pattern: string;
+  environment: EnvValue;
+  priority?: number;
+}
+
+/** POST /env-domain-map — create a rule. */
+export async function createEnvDomainRule(input: EnvRuleInput): Promise<EnvDomainRule> {
+  const raw = await request<RawEnvDomainRule>("/env-domain-map", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return mapEnvRule(raw);
+}
+
+/** PUT /env-domain-map/{id} — replace a rule's pattern/environment/priority. */
+export async function updateEnvDomainRule(id: number, input: EnvRuleInput): Promise<EnvDomainRule> {
+  const raw = await request<RawEnvDomainRule>(`/env-domain-map/${id}`, undefined, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return mapEnvRule(raw);
+}
+
+/** DELETE /env-domain-map/{id}. */
+export async function deleteEnvDomainRule(id: number): Promise<void> {
+  await request<void>(`/env-domain-map/${id}`, undefined, { method: "DELETE" });
 }
 
 /** DELETE /api/checks/:id — soft delete by default; hard=true for permanent. */
