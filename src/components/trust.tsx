@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import { useTrustDetail, useTrustReport } from "@/lib/client";
@@ -241,6 +241,17 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
   const { data, error, isValidating, mutate } = useTrustDetail(checkId, window);
   const fetchedAt = useFetchedAt(isValidating, data != null); // before early returns (hooks rule)
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // Set when the disclosure is opened FROM the summary's incidents count: the tapped element stays put while
+  // the body expands below, possibly off-screen on a long page — so bring the answer to the question into view.
+  const scrollToDetails = useRef(false);
+  useEffect(() => {
+    if (detailsOpen && scrollToDetails.current) {
+      scrollToDetails.current = false;
+      document.getElementById("trust-details-body")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [detailsOpen]);
+  // Transient "copied" confirmation on the short-sha copy affordance (auto-clears).
+  const [copied, setCopied] = useState(false);
   // ★ Loud-not-silent: a 500/network error shows a visible state; a 404 → data null → hide (feature absent).
   if (error) return <ErrorState testId="trust-card-error" message="Trust data failed to load — retry." />;
   if (!data) return null;
@@ -297,7 +308,16 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
         {m.incidents.total > 0 && (
           <button
             type="button"
-            onClick={() => setDetailsOpen(true)}
+            onClick={() => {
+              // Already open → the effect won't re-fire (no state change); scroll now instead of arming the
+              // ref, which would otherwise go stale and cause a spurious scroll on a later toggle-open.
+              if (detailsOpen) {
+                document.getElementById("trust-details-body")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              } else {
+                scrollToDetails.current = true;
+                setDetailsOpen(true);
+              }
+            }}
             className="cursor-pointer text-left"
             title="Incidents in this window — tap for the by-cause breakdown"
             data-testid="trust-incidents-count"
@@ -315,12 +335,23 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
             <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Spec</div>
             <button
               type="button"
-              onClick={() => void navigator.clipboard?.writeText(sha)}
+              onClick={() => {
+                void navigator.clipboard?.writeText(sha);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
               className="sw-mono cursor-pointer text-[13px] text-[var(--color-ink)]"
               title={`SHA-256 of the assertion code that ran — tap to copy the full hash\n${sha}`}
               data-testid="trust-spec-copy"
             >
-              {sha.slice(0, 8)} <span aria-hidden className="text-[var(--color-ink-faint)]">⧉</span>
+              {sha.slice(0, 8)}{" "}
+              {copied ? (
+                <span className="text-[11px]" style={{ color: TONE_VAR.pass }} data-testid="trust-spec-copied">
+                  ✓ copied
+                </span>
+              ) : (
+                <span aria-hidden className="text-[var(--color-ink-faint)]">⧉</span>
+              )}
             </button>
           </div>
         )}
