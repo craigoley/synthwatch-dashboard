@@ -1,0 +1,84 @@
+name: CI unstick
+
+# Safety net for PARKED pipelines. When a head commit is pushed by a bot
+# (github-actions[bot]), GitHub creates the PR's pull_request workflow runs in
+# "action_required" (awaiting approval) instead of running them — every check,
+# including Auto-merge, silently stalls while the PR still SHOWS the previous
+# commit's green checks (how #248/#251 stranded). The primary fix is upstream:
+# claude-review.yml is now comment-only and cannot push. This workflow is the
+# net for any OTHER path that parks runs: on a schedule (and on demand) it finds
+# action_required runs on open TRUSTED PRs and tries to approve/re-run them.
+#
+# ★ TRUST GATE (mirrors auto-merge.yml exactly): only PRs whose author is in the
+# allowlist, whose base is main, and whose head lives in THIS repo (no forks) are
+# touched. Unsticking CI is not authorization to merge — auto-merge.yml's own
+# gate still decides that; this only lets the checks RUN.
+#
+# ★ BEST-EFFORT, loudly honest: approve/re-run issued with GITHUB_TOKEN may
+# itself be refused or re-parked by the same Actions loop-prevention that caused
+# the stall (verified fix path is a re-run by a real user). Every attempt and
+# outcome is logged; a run this workflow could not unstick emits a ::warning::
+# so the stall is at least VISIBLE in the Actions list instead of silent.
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *" # every 15 min, off the :00/:30 marks
+  workflow_dispatch: {}
+
+permissions:
+  actions: write # approve / re-run parked workflow runs
+  pull-requests: read # list open PRs
+  contents: read
+
+concurrency:
+  group: ci-unstick
+  cancel-in-progress: false
+
+jobs:
+  unstick:
+    name: Approve or re-run parked runs (trusted PRs only)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find and unstick action_required runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          # Trusted authors — keep in lockstep with auto-merge.yml's allowlist.
+          TRUSTED='["craigoley","cao825","craigoleyagent","dependabot","app/dependabot"]'
+
+          prs=$(gh pr list --repo "$REPO" --state open --limit 100 \
+            --json number,author,baseRefName,headRefOid,isCrossRepository \
+            -q ".[] | select(.baseRefName==\"main\" and .isCrossRepository==false)
+                    | select(.author.login as \$a | $TRUSTED | index(\$a))
+                    | \"\(.number) \(.headRefOid)\"")
+
+          if [ -z "$prs" ]; then
+            echo "[unstick] no open trusted PRs — nothing to do."
+            exit 0
+          fi
+
+          stuck_total=0
+          cleared_total=0
+          while read -r pr sha; do
+            [ -z "$pr" ] && continue
+            run_ids=$(gh api "repos/$REPO/actions/runs?head_sha=$sha&per_page=100" \
+              -q '.workflow_runs[] | select(.conclusion=="action_required") | .id' || echo "")
+            [ -z "$run_ids" ] && continue
+            for id in $run_ids; do
+              stuck_total=$((stuck_total + 1))
+              echo "[unstick] PR #$pr head $sha: run $id is action_required — attempting approve, then re-run."
+              if gh api -X POST "repos/$REPO/actions/runs/$id/approve" >/dev/null 2>&1; then
+                echo "[unstick] run $id: approved."
+                cleared_total=$((cleared_total + 1))
+              elif gh api -X POST "repos/$REPO/actions/runs/$id/rerun" >/dev/null 2>&1; then
+                echo "[unstick] run $id: re-run requested."
+                cleared_total=$((cleared_total + 1))
+              else
+                echo "::warning::[unstick] PR #$pr: run $id is parked (action_required) and could not be approved or re-run with GITHUB_TOKEN. It needs a manual 'Re-run' by a user (Actions tab), or: gh api -X POST repos/$REPO/actions/runs/$id/rerun"
+              fi
+            done
+          done <<< "$prs"
+
+          echo "[unstick] done — $stuck_total parked run(s) found, $cleared_total unstick attempt(s) accepted."
