@@ -399,6 +399,8 @@ interface RawRun {
   retryCount?: number | null; // runner 0048; optional → tolerant of pre-deploy API responses without it
   sandbox?: boolean; // runner 0065; optional → tolerant of pre-deploy API responses without it
   hasTraceSignals?: boolean; // persisted trace_signals present, independent of traceUrl; optional → tolerant of pre-deploy API
+  confirmationOfRunId?: number | null; // runner 0077: set on a CONFIRMATION run → the original failed run it confirms
+  supersededByRunId?: number | null; // runner 0077: set on a TRANSIENT original → its confirmation (which passed → excluded from health)
 }
 
 interface RawCheckDetail extends RawCheck {
@@ -589,6 +591,8 @@ function mapRun(raw: RawRun): Run {
     retry_count: raw.retryCount ?? null, // null when the API predates 0048 → row shows nothing
     sandbox: raw.sandbox ?? false, // false when the API predates 0065 → no badge
     has_trace_signals: raw.hasTraceSignals ?? false, // false when the API predates the flag → no summary offered
+    confirmation_of_run_id: raw.confirmationOfRunId ?? null, // null (pre-0077 API) → no confirmation badge
+    superseded_by_run_id: raw.supersededByRunId ?? null, // null → not a transient → no transient badge
   };
 }
 
@@ -2216,6 +2220,9 @@ function mapTrustRow(r: Record<string, unknown>): TrustRow {
     retry_count: num(r.retryCount),
     retry_rate: nul(r.retryRate), // null preserved → "—", never a fake 0%
     retried_passes: num(r.retriedPasses), // absent (pre-deploy API) → 0 → annotation hidden; forward-compatible
+    flap_count: num(r.flapCount), // confirmation-retry P2: transient failures; absent (pre-deploy) → 0 → hidden
+    scheduled_count: num(r.scheduledCount),
+    flap_rate: nul(r.flapRate), // null preserved → "—", never a fake 0%
     incidents: {
       total: num(inc.total),
       real_outage: num(inc.realOutage),

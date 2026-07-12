@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 
 import { useRunHistory } from "@/lib/client";
 import { getRunTraceSas } from "@/lib/api-client";
@@ -107,6 +107,16 @@ function RunRow({
   // evaluate() (no incident/alert, and it does NOT count toward the SLO), so it is NOT a real health signal.
   // Badge it so a resumed monitor's history reads honestly and these rows aren't mistaken for real runs.
   const sandbox = run.sandbox === true;
+  // Confirmation-retry (runner 0077, P2). A TRANSIENT: this run failed but a fresh confirmation PASSED, so it
+  // was confirmed NOT-real and excluded from availability/SLO — it STILL shows as fail/error (no new status),
+  // the badge is what says "this didn't count". A CONFIRMATION: this run was fired to confirm an earlier fail.
+  // Each badge links to its pair (the run rows carry id={run-<id>}) so the pair is legible, not two mysteries.
+  const supersededBy = run.superseded_by_run_id ?? null;
+  const confirmationOf = run.confirmation_of_run_id ?? null;
+  const jumpToRun = (runId: number) => (e: MouseEvent) => {
+    e.stopPropagation(); // don't toggle THIS row
+    document.getElementById(`run-${runId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   return (
     <>
       <button
@@ -129,6 +139,32 @@ function RunRow({
               }}
             >
               ⧉ sandbox
+            </span>
+          )}
+          {supersededBy != null && (
+            <span
+              role="link"
+              tabIndex={0}
+              onClick={jumpToRun(supersededBy)}
+              data-testid="transient-badge"
+              title="Transient failure — a confirmation run PASSED, so this was confirmed not-real and does NOT count toward availability or the SLO. It still shows as a failure here for honesty. Click to see the confirmation run."
+              className="sw-mono ml-2 inline-flex cursor-pointer items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px]"
+              style={{ color: "var(--color-warn)", background: "color-mix(in srgb, var(--color-warn) 14%, transparent)" }}
+            >
+              ⤺ transient → #{supersededBy}
+            </span>
+          )}
+          {confirmationOf != null && (
+            <span
+              role="link"
+              tabIndex={0}
+              onClick={jumpToRun(confirmationOf)}
+              data-testid="confirmation-badge"
+              title="Confirmation run — fired automatically to confirm an earlier failure. Its verdict owns the outcome. Click to see the original run."
+              className="sw-mono ml-2 inline-flex cursor-pointer items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px]"
+              style={{ color: "var(--color-ink-dim)", background: "color-mix(in srgb, var(--color-ink-dim) 12%, transparent)" }}
+            >
+              ⤳ confirmation of #{confirmationOf}
             </span>
           )}
           {run.http_status !== null && (

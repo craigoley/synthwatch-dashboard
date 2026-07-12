@@ -586,6 +586,37 @@ test.describe("check detail", () => {
     await expect(page.getByTestId("sandbox-badge")).toHaveAttribute("title", /paused.*does not count.*SLO/i);
   });
 
+  // ★ confirmation-retry P2 (runner 0077): a TRANSIENT failure (superseded — its confirmation passed) stays
+  // visible as fail/error but is badged "transient" (didn't count) + linked to the confirmation; the
+  // confirmation run is badged back to the original. A silently-suppressed failure becomes acknowledged.
+  test("run-history: a transient (superseded) run is badged + linked; its confirmation is badged back", async ({ page }) => {
+    const w = defaultWorld();
+    const at = new Date(Date.now() - 60_000).toISOString();
+    const confirmationRun = run({ id: 701, checkId: 1, status: "pass", startedAt: new Date(Date.now() - 57_000).toISOString(), confirmationOfRunId: 700 });
+    const transientRun = run({ id: 700, checkId: 1, status: "error", startedAt: at, supersededByRunId: 701 });
+    const normalRun = run({ id: 699, checkId: 1, status: "pass", startedAt: at }); // no confirmation/superseded → no badge
+    w.details[1] = detail({ id: 1, name: "API health", kind: "http", currentStatus: "pass" }, [
+      confirmationRun,
+      transientRun,
+      normalRun,
+    ]);
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+    await expect(page.getByTestId("run-history")).toBeVisible();
+
+    // the transient run (700): badged, links to the confirmation (701), honesty tooltip = "didn't count"
+    const transient = page.getByTestId("transient-badge");
+    await expect(transient).toHaveCount(1);
+    await expect(transient).toContainText(/transient.*701/i);
+    await expect(transient).toHaveAttribute("title", /does not count.*(availability|SLO)/i);
+    // the confirmation run (701): badged back to the original (700)
+    const confirmation = page.getByTestId("confirmation-badge");
+    await expect(confirmation).toHaveCount(1);
+    await expect(confirmation).toContainText(/confirmation of.*700/i);
+    // the transient still reads as a failure (no new status invented) — the badge sits on the real error row
+    await expect(page.locator("#run-700")).toBeVisible();
+  });
+
   // ★ RCA verdict badge (#118): the baseline-diff insight's verdict ("which layer failed") renders as an
   // at-a-glance badge — additive to the existing cause/summary; absent on legacy insights → no badge.
   function baselineDiffBody(verdict?: string) {

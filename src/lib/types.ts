@@ -311,6 +311,15 @@ export interface Run {
    */
   sandbox?: boolean;
   /**
+   * Confirmation-retry (runner migration 0077). `superseded_by_run_id`: set on a TRANSIENT original — this run
+   * failed, but a fresh confirmation run PASSED, so it was confirmed NOT-real and excluded from health signal
+   * (availability/SLO). It STILL shows as fail/error (no new status) — the transient badge is what says "this
+   * didn't count", linked to the confirmation. `confirmation_of_run_id`: set on the CONFIRMATION run → the
+   * original it confirms. Both null/absent on a normal run (tolerant of a pre-0077 API).
+   */
+  superseded_by_run_id?: number | null;
+  confirmation_of_run_id?: number | null;
+  /**
    * True when the run has PERSISTED trace_signals (the compact, redacted network/console summary),
    * INDEPENDENT of `trace_url`. A sensitive monitor's green run stores no downloadable trace (`trace_url`
    * null, by B10 design) but does persist signals — so the UI surfaces the redacted summary (via
@@ -871,6 +880,13 @@ export interface TrustRow {
   // ★ "degrading-but-green" early warning: PASS/WARN runs that STILL needed a real retry. DISPLAY-ONLY — it
   // does NOT feed `trust` (a proven-live monitor with retried passes stays proven-live). 0 → annotation hidden.
   retried_passes: number;
+  // ★ Confirmation-retry P2 — flakiness surfaced: transient failures (a scheduled run that failed then a fresh
+  // confirmation passed → confirmed not-real, excluded from availability/SLO) ÷ scheduled (non-sandbox) runs.
+  // Raw counts + the rate so the UI can say "6 transient failures / 142 runs (4.2%)". flap_rate null = no
+  // scheduled runs → "—", never a fake 0%. A REPEATED flap (≥2 & ≥10%) also feeds the flaky chip server-side.
+  flap_count: number;
+  scheduled_count: number;
+  flap_rate: number | null;
   incidents: TrustIncidents;
   red_test_captured: boolean; // true ONLY when a harness-confirmed red_tests row exists (else the honest gap)
   red_test_tested_at: string | null; // ISO when captured; null when not

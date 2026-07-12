@@ -47,6 +47,18 @@ test.describe("trust scorecard — Reports 'Trust' tab", () => {
     expect(order).toEqual(["trust-row-4", "trust-row-2", "trust-row-3", "trust-row-1"]);
   });
 
+  test("★ flap rate (confirmation-retry P2) is surfaced — transient failures that didn't count are visible", async ({ page }) => {
+    await mockApi(page, defaultWorld());
+    await page.goto("/reports?tab=trust");
+    await expect(page.getByTestId("trust-table")).toBeVisible();
+    // the flaky monitor (checkId 2) has 6 transient failures / 142 scheduled → the flap note surfaces them,
+    // making clear they did NOT count (not a hidden failure).
+    const flap = page.getByTestId("trust-flap-note").first();
+    await expect(flap).toContainText(/6 transient failures \/ 142 runs/i);
+    await expect(flap).toContainText(/didn.t count/i);
+    await expect(flap).toHaveAttribute("title", /confirmed not-real.*does NOT count|measured one that self-healed/i);
+  });
+
   test("★ redTest is rendered as an honest GAP — 'not captured', never a checkmark/pass", async ({ page }) => {
     await mockApi(page, defaultWorld());
     await page.goto("/reports?tab=trust");
