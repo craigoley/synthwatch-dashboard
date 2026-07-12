@@ -10,6 +10,7 @@ import { AvailabilityChart, LatencyChart, MetricsCharts } from "@/components/cha
 import { CheckSlaPanel, SloPanel } from "@/components/sla";
 import { MonitorCostPanel } from "@/components/cost";
 import { CredentialsPanel } from "@/components/credentials-panel";
+import { ErrorDiff } from "@/components/error-diff";
 import { TrustCard } from "@/components/trust";
 import { RunHistory } from "@/components/run-history";
 import { LiveStepsChecklist } from "@/components/live-steps";
@@ -642,6 +643,12 @@ export default function CheckDetailPage() {
       )}
       {check.kind === "multistep" && (
         <StepChainPanel steps={check.steps ?? []} latest={recent_runs[0] ?? null} />
+      )}
+
+      {/* Error diff (P3) — "what's newly broken since the last runs?" Browser/multistep only (trace-derived
+          error signals); self-hides (404) until a run has signals. Defaults to the latest settled run. */}
+      {(check.kind === "browser" || check.kind === "multistep") && (
+        <ErrorDiff checkId={check.id} runId={recent_runs[0]?.id ?? null} />
       )}
 
       {/* Model-B credential editor (Step C). Editor-only (canWrite); the API also nulls the masked slots for

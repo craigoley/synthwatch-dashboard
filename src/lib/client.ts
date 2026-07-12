@@ -18,6 +18,7 @@ import {
   listChecks,
   getCheck,
   getSpecCache,
+  getErrorDiff,
   getRuns,
   getSteps,
   getMetrics,
@@ -106,6 +107,7 @@ const keys = {
   locations: ["locations"] as const,
   checkLocations: (id: number) => ["check-locations", id] as const,
   specCache: (id: number) => ["spec-cache", id] as const,
+  errorDiff: (id: number, runId: number | null) => ["error-diff", id, runId] as const,
   channels: ["channels"] as const,
   routing: ["routing"] as const,
   deliveryReadiness: ["delivery-readiness"] as const,
@@ -416,6 +418,15 @@ export function useSpecCache(id: number | null) {
   return useSWR(
     id ? keys.specCache(id) : null,
     () => getSpecCache(id as number),
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+}
+
+/** The error diff for a check's latest settled run (or `runId`) vs its last-N baseline. */
+export function useErrorDiff(id: number | null, runId?: number | null) {
+  return useSWR(
+    id ? keys.errorDiff(id, runId ?? null) : null,
+    () => getErrorDiff(id as number, runId != null ? { runId } : {}),
     { revalidateOnFocus: false, shouldRetryOnError: false },
   );
 }

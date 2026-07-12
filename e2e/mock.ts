@@ -151,6 +151,8 @@ export interface World {
   narratives?: { fleet?: RawObj; monitor?: Record<string, RawObj> };
   /** GET /checks/{id}/spec-cache body per check id. Unset → derived from the detail's specPath (see handler). */
   specCache?: Record<number, RawObj>;
+  /** GET /checks/{id}/error-diff body per check id. Unset → 404 (the panel self-hides — no error signals). */
+  errorDiff?: Record<number, RawObj>;
   /**
    * Monitors-as-code drift (Phase 6b). Unset → /api/reconcile/drift 404 → the surface hides.
    * Set to { items: [] } for the "in sync" empty state, or with rows to list drift.
@@ -923,6 +925,12 @@ export async function mockApi(
     }
     // GET /checks/{id}/spec-cache — read-only cached-spec identity. Explicit world.specCache override wins;
     // otherwise derive from the detail's specPath (git-managed → a stable fake sha; else not git-managed).
+    // GET /checks/{id}/error-diff — P3 panel source. Explicit world.errorDiff wins; unset → 404 (self-hide).
+    if ((m = path.match(/^\/api\/checks\/(\d+)\/error-diff$/)) && method === "GET") {
+      const cid = Number(m[1]);
+      const diff = world.errorDiff?.[cid];
+      return diff ? json(route, diff) : json(route, { error: "not_found" }, 404);
+    }
     if ((m = path.match(/^\/api\/checks\/(\d+)\/spec-cache$/)) && method === "GET") {
       const cid = Number(m[1]);
       const override = world.specCache?.[cid];
