@@ -194,7 +194,22 @@ export function FlapNote({ flapCount, scheduledCount, window }: { flapCount: num
 // an operator never confuses "my monitor is unreliable" with "Wegmans is down". The consequence is the DIRECTED
 // FIX TASK (a string), never a mute. Indeterminate is surfaced with the honest partial-data caveat.
 const MONITOR_TONE = "var(--color-brand)"; // distinct from the status-law tones (pass/warn/fail) on purpose
-export function FlakeBudgetNote({ fb }: { fb: TrustFlakeBudget }) {
+export function FlakeBudgetNote({ fb }: { fb: TrustFlakeBudget | null }) {
+  // ★ Absence is a STATE, not health. A null budget = the API sent no flake-budget object; render it
+  // EXPLICITLY (never nothing, never a crash) so a data gap can't read as "healthy monitor". Distinct from
+  // the healthy self-hide below — healthy and absent must not be the same render.
+  if (fb == null) {
+    return (
+      <div className="mt-0.5" data-testid="trust-flake-budget-absent">
+        <span
+          className="sw-mono text-[10px] text-[var(--color-ink-faint)]"
+          title="The API returned no flake-budget object for this monitor (feature absent or an older API). This is MISSING DATA, not a healthy budget — the monitor-side trust budget could not be evaluated."
+        >
+          — no flake-budget data
+        </span>
+      </div>
+    );
+  }
   const degraded = fb.state === "degraded-as-a-monitor";
   const hasIndeterminate = fb.indeterminate > 0;
   if (!degraded && !hasIndeterminate) return null; // healthy + fully-classified → nothing to say

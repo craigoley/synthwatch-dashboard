@@ -266,11 +266,65 @@ test.describe("trust card — monitor detail", () => {
     await expect(card.getByTestId("trust-directed-task")).toContainText("Stabilise the add-to-cart selector");
   });
 
-  test("flake budget note self-hides on the card when healthy (state ok, no indeterminate)", async ({ page }) => {
-    // defaultWorld's check 1 omits flakeBudget → the tolerant mapper reads state "ok" → nothing to say.
+  test("flake budget note self-hides on the card when HEALTHY (state ok, no indeterminate) — and is NOT absence", async ({ page }) => {
+    // defaultWorld's check 1 carries an explicit state:"ok" flakeBudget → nothing to say. Distinct from the
+    // absent case below: healthy renders NEITHER the degraded note NOR the "no data" note.
     await mockApi(page, defaultWorld());
     await page.goto("/checks/1");
     await expect(page.getByTestId("trust-card")).toBeVisible();
     await expect(page.getByTestId("trust-flake-budget")).toHaveCount(0);
+    await expect(page.getByTestId("trust-flake-budget-absent")).toHaveCount(0); // healthy ≠ absent
+  });
+
+  // ★ THE FIX: an ABSENT flake budget (API sent no flakeBudget object) must render EXPLICIT absence — never
+  // nothing, never a synthetic "ok". If the API stopped sending flakeBudget, the card SAYS so. (#177 class.)
+  test("★ absent flake budget: a null/missing flakeBudget renders an EXPLICIT 'no data', not a healthy self-hide", async ({ page }) => {
+    const w = defaultWorld();
+    w.trustMonitors = [
+      // A monitor row with NO flakeBudget field at all → mapFlakeBudget(undefined) → null → explicit absence.
+      {
+        checkId: 1, checkName: "API health", sensitive: false,
+        lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
+        runCount: 500, retryCount: 6, retryRate: 0.012, retriedPasses: 0,
+        incidents: { total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0 },
+        redTest: { captured: false },
+        specProvenance: { executedSha256: "abc123def456", specPath: "monitors/api/health.spec.ts" },
+        dimensions: { flap: { state: "ok" }, retry: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "ok" } },
+        trust: "proven-live",
+        // flakeBudget deliberately OMITTED — models the API dropping the field.
+      },
+    ];
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+
+    const card = page.getByTestId("trust-card");
+    await expect(card).toBeVisible();
+    await expect(card.getByTestId("trust-flake-budget-absent")).toBeVisible();
+    await expect(card.getByTestId("trust-flake-budget-absent")).toContainText(/no flake-budget data/i);
+    // ★ NOT the healthy self-hide and NOT the degraded note: absence is its own render.
+    await expect(card.getByTestId("trust-flake-budget")).toHaveCount(0);
+    await expect(card.getByTestId("trust-degraded-as-monitor")).toHaveCount(0);
+    // the chip still renders (absence of the budget must not blank the card)
+    await expect(card.getByTestId("trust-chip-proven-live")).toBeVisible();
+  });
+
+  test("absent flake budget renders on the FLEET table row too (both mount sites inherit it)", async ({ page }) => {
+    const w = defaultWorld();
+    // One row omits flakeBudget → the fleet table row shows explicit absence, not a clean/healthy row.
+    w.trustMonitors = [
+      {
+        checkId: 7, checkName: "Budget-less monitor", sensitive: false,
+        lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
+        runCount: 100, retryCount: 1, retryRate: 0.01, incidents: { total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0 },
+        redTest: { captured: false }, specProvenance: { executedSha256: "0007", specPath: "monitors/x.spec.ts" },
+        dimensions: { flap: { state: "ok" }, retry: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "ok" } },
+        trust: "proven-live",
+        // flakeBudget OMITTED
+      },
+    ];
+    await mockApi(page, w);
+    await page.goto("/reports?tab=trust");
+    await expect(page.getByTestId("trust-flake-budget-absent").first()).toBeVisible();
+    await expect(page.getByTestId("trust-flake-budget-absent").first()).toContainText(/no flake-budget data/i);
   });
 });
