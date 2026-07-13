@@ -385,15 +385,28 @@ export function ErrorDiff({ checkId, runId }: { checkId: number; runId?: number 
         {context}
       </p>
 
-      {data.truncated && (
-        <p
-          className="mb-2 rounded border border-[var(--color-warn)] px-2 py-1 text-[11px] text-[var(--color-ink-dim)]"
-          style={{ borderColor: `color-mix(in srgb, ${TONE_VAR.warn} 40%, transparent)`, background: `color-mix(in srgb, ${TONE_VAR.warn} 8%, transparent)` }}
-          data-testid="error-diff-truncated"
-        >
-          Some errors were dropped from capture (cap reached) — this diff may be incomplete.
-        </p>
-      )}
+      {/* TRUNCATION, BY CLASS — honest AND informative. If the cap dropped a FIRST-PARTY message the diff may
+          have lost real signal, so stay LOUD (warn tone). If only third-party (tracker) noise was dropped,
+          first-party capture is complete — say so calmly rather than implying the diff is untrustworthy. */}
+      {data.truncated &&
+        (data.first_party_truncated ? (
+          <p
+            className="mb-2 rounded border border-[var(--color-warn)] px-2 py-1 text-[11px] text-[var(--color-ink-dim)]"
+            style={{ borderColor: `color-mix(in srgb, ${TONE_VAR.warn} 40%, transparent)`, background: `color-mix(in srgb, ${TONE_VAR.warn} 8%, transparent)` }}
+            data-testid="error-diff-truncated"
+          >
+            First-party errors were dropped from capture (cap reached) — this diff may be incomplete.
+          </p>
+        ) : (
+          <p
+            className="mb-2 rounded border border-[var(--color-border)] px-2 py-1 text-[11px] text-[var(--color-ink-faint)]"
+            data-testid="error-diff-truncated-third-party"
+          >
+            {data.dropped_third_party > 0
+              ? `${data.dropped_third_party} third-party ${data.dropped_third_party === 1 ? "error was" : "errors were"} dropped from capture — first-party capture is complete.`
+              : "Only third-party errors were dropped from capture — first-party capture is complete."}
+          </p>
+        ))}
 
       {/* NEW — leads, always expanded (the regression signal). Each row can be muted (editor). */}
       <div data-testid="error-diff-new">
