@@ -2269,8 +2269,31 @@ function mapTrustRow(r: Record<string, unknown>): TrustRow {
       indeterminate: num(tr.indeterminate),
       spurious_red_rate: nul(tr.spuriousRedRate),
     },
+    // ★ B3-3: the MONITOR trust budget. Absent (pre-deploy API) → a safe "ok" default (never a false "degraded").
+    flake_budget: mapFlakeBudget(r.flakeBudget),
     // Coerce to a known chip; an unknown/absent value → "unverified" (null-safe, never crashes the table).
     trust: (TRUST_CHIPS as readonly string[]).includes(String(r.trust)) ? (r.trust as TrustChip) : "unverified",
+  };
+}
+
+function mapFlakeBudget(v: unknown): TrustRow["flake_budget"] {
+  const fb = (v ?? {}) as Record<string, unknown>;
+  const num = (x: unknown) => Number(x ?? 0);
+  return {
+    target: num(fb.target),
+    target_is_default: Boolean(fb.targetIsDefault ?? true), // absent → assume the fleet default
+    scheduled_runs: num(fb.scheduledRuns),
+    monitor_side: num(fb.monitorSide),
+    service_side: num(fb.serviceSide),
+    indeterminate: num(fb.indeterminate),
+    budget: num(fb.budget),
+    consumed: num(fb.consumed),
+    remaining: num(fb.remaining),
+    remaining_pct: fb.remainingPct == null ? null : Number(fb.remainingPct),
+    burn_rate: num(fb.burnRate),
+    // Only the API's two states are valid; anything else (absent/unknown) → "ok" (never a false "degraded").
+    state: fb.state === "degraded-as-a-monitor" ? "degraded-as-a-monitor" : "ok",
+    directed_task: fb.directedTask == null ? null : String(fb.directedTask),
   };
 }
 

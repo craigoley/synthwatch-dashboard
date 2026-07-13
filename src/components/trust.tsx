@@ -8,7 +8,7 @@ import { TONE_VAR } from "@/components/status-badge";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { StalenessStamp, useFetchedAt } from "@/components/staleness";
 import { formatRelative } from "@/lib/format";
-import type { ReportWindow, TrustChip, TrustDimensionState, TrustIncidents, TrustRetryPoint, TrustRow } from "@/lib/types";
+import type { ReportWindow, TrustChip, TrustDimensionState, TrustFlakeBudget, TrustIncidents, TrustRetryPoint, TrustRow } from "@/lib/types";
 
 /**
  * §D1 monitor-trust — the "every green shown with its proof" surface. NO composite score: the chip is
@@ -186,6 +186,49 @@ export function FlapNote({ flapCount, scheduledCount, window }: { flapCount: num
       <span className="h-1 w-1 rounded-full" style={{ background: TONE_VAR.warn }} />
       {flapCount} transient {flapCount === 1 ? "failure" : "failures"} / {scheduledCount} runs ({pct}) · didn&apos;t count · {window}
     </span>
+  );
+}
+
+// ★ B3-3 — the MONITOR trust budget. Rendered in a DELIBERATELY DISTINCT idiom from a service alert: the brand
+// accent + a "⚑ degraded as a MONITOR" label + the copy "this is a MONITOR problem, not a service outage" — so
+// an operator never confuses "my monitor is unreliable" with "Wegmans is down". The consequence is the DIRECTED
+// FIX TASK (a string), never a mute. Indeterminate is surfaced with the honest partial-data caveat.
+const MONITOR_TONE = "var(--color-brand)"; // distinct from the status-law tones (pass/warn/fail) on purpose
+export function FlakeBudgetNote({ fb }: { fb: TrustFlakeBudget }) {
+  const degraded = fb.state === "degraded-as-a-monitor";
+  const hasIndeterminate = fb.indeterminate > 0;
+  if (!degraded && !hasIndeterminate) return null; // healthy + fully-classified → nothing to say
+  return (
+    <div className="mt-0.5 space-y-0.5" data-testid="trust-flake-budget">
+      {degraded && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span
+            className="sw-mono rounded px-1 text-[10px] font-semibold uppercase tracking-wider"
+            style={{ color: MONITOR_TONE, background: `color-mix(in srgb, ${MONITOR_TONE} 14%, transparent)` }}
+            data-testid="trust-degraded-as-monitor"
+            title="The MONITOR is unreliable — a different problem, and a different owner, from a service outage. It is NOT muted: a monitor that flaps because the service is flaky is telling the truth."
+          >
+            ⚑ degraded as a monitor
+          </span>
+          <span className="sw-mono text-[10px] text-[var(--color-ink-faint)]">
+            {fb.consumed}/{fb.budget.toFixed(1)} monitor-side budget · burn {fb.burn_rate.toFixed(1)}×
+            {fb.target_is_default ? " · fleet default 2%" : ` · override ${(fb.target * 100).toFixed(1)}%`}
+          </span>
+        </div>
+      )}
+      {degraded && fb.directed_task && (
+        <div className="text-[10px] text-[var(--color-ink-dim)]" data-testid="trust-directed-task">
+          → {fb.directed_task}
+        </div>
+      )}
+      {hasIndeterminate && (
+        <div className="text-[10px] text-[var(--color-ink-faint)]" data-testid="trust-indeterminate-note">
+          {fb.indeterminate} transient{fb.indeterminate === 1 ? "" : "s"} unclassified — this budget is computed over
+          partial data. (http/dns/ssl read indeterminate until they accumulate first-party error-signal history —
+          expected, not a fault.)
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -642,6 +685,9 @@ export function TrustScorecard({ window }: { window: ReportWindow }) {
                     {/* degrading-but-green + transient-flap annotations — distinct from the chip + the dimensions */}
                     <RetriedPassesNote retriedPasses={row.retried_passes} window={window} />
                     <FlapNote flapCount={row.flap_count} scheduledCount={row.scheduled_count} window={window} />
+                    {/* ★ B3-3: the MONITOR trust budget — "degraded as a monitor" + the directed fix task (distinct
+                        from a service alert), and the honest indeterminate caveat. */}
+                    <FlakeBudgetNote fb={row.flake_budget} />
                   </div>
                   <span
                     className={`text-[12px] ${neverGreen ? "font-medium text-[var(--color-ink-dim)]" : "text-[var(--color-ink-dim)]"}`}
