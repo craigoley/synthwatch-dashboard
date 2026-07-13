@@ -240,8 +240,14 @@ const trustInc = (o: Partial<Record<string, number>> = {}) => ({
 });
 // ★ B3-2: the API's per-dimension states (wire shape: { flap:{state}, retry:{state}, monitorNoise:{state} }).
 // Defaults all-ok; override per axis. Absent entirely → the tolerant mapper reads "ok" (pre-deploy-API safe).
-const trustDims = (o: { flap?: string; retry?: string; monitorNoise?: string } = {}) => ({
+const trustDims = (o: { flap?: string; retry?: string; monitorNoise?: string; spuriousRed?: string } = {}) => ({
   flap: { state: o.flap ?? "ok" }, retry: { state: o.retry ?? "ok" }, monitorNoise: { state: o.monitorNoise ?? "ok" },
+  spuriousRed: { state: o.spuriousRed ?? "ok" }, // ★ B3-2 stage 2
+});
+// ★ B3-2 stage 2: the transient split. Absent (pre-deploy API) → the tolerant mapper reads 0/null.
+const trustTransients = (o: { monitorSide?: number; serviceSide?: number; indeterminate?: number; spuriousRedRate?: number | null } = {}) => ({
+  monitorSide: o.monitorSide ?? 0, serviceSide: o.serviceSide ?? 0, indeterminate: o.indeterminate ?? 0,
+  spuriousRedRate: o.spuriousRedRate ?? null,
 });
 const DEFAULT_TRUST: RawObj[] = [
   // ★ proven-live WITH retriedPasses > 0 — the coexistence case: a healthy chip + the degrading-but-green
@@ -255,9 +261,11 @@ const DEFAULT_TRUST: RawObj[] = [
     runCount: 400, retryCount: 240, retryRate: 0.6, retriedPasses: 0, flapCount: 6, scheduledCount: 142, flapRate: 0.0423,
     incidents: trustInc({ total: 3, flakyTransient: 3 }), redTest: { captured: false },
     specProvenance: { executedSha256: "beef0001", specPath: "monitors/home/flow.spec.ts" },
-    // ★ B3-2: retry flaky (60%) AND monitor-noise flaky (3 flaky-transient), flap elevated (4.2%) — the chip
-    // names WHICH axes; the OR-collapse used to hide them behind one "flaky".
-    dimensions: trustDims({ flap: "elevated", retry: "flaky", monitorNoise: "flaky" }), trust: "flaky" },
+    // ★ B3-2: retry flaky (60%) AND monitor-noise flaky (3 flaky-transient), flap elevated (4.2%), spurious-red
+    // flaky (3 monitor-side transients / 142 = 2.1%). The chip names WHICH axes.
+    dimensions: trustDims({ flap: "elevated", retry: "flaky", monitorNoise: "flaky", spuriousRed: "flaky" }),
+    transients: trustTransients({ monitorSide: 3, serviceSide: 1, indeterminate: 2, spuriousRedRate: 0.0211 }),
+    trust: "flaky" },
   { checkId: 3, checkName: "Checkout (nominal + perf)", sensitive: false, lastGreenAt: "2026-07-01T18:00:00Z", lastRunAt: "2026-07-01T20:00:00Z",
     runCount: 300, retryCount: 9, retryRate: 0.03, incidents: trustInc({ total: 3, realOutage: 1, perfRegression: 1, unclassified: 1 }),
     redTest: { captured: false }, specProvenance: { executedSha256: "cafe0002", specPath: "monitors/shop/checkout.spec.ts" },
@@ -265,7 +273,16 @@ const DEFAULT_TRUST: RawObj[] = [
     dimensions: trustDims({ retry: "elevated" }), trust: "nominal" },
   { checkId: 4, checkName: "New monitor (never run)", sensitive: false, lastGreenAt: null, lastRunAt: null,
     runCount: 0, retryCount: 0, retryRate: null, incidents: trustInc(), redTest: { captured: false },
-    specProvenance: { executedSha256: null, specPath: null }, dimensions: trustDims(), trust: "unverified" },
+    specProvenance: { executedSha256: null, specPath: null }, dimensions: trustDims(), transients: trustTransients(), trust: "unverified" },
+  // ★★ B3-2 stage 2 SAFETY DEMO: a SERVICE-flaky monitor (Wegmans blips it caught). It flaps (flap flaky), but
+  // its transients are SERVICE-side → spurious-red is OK: the monitor's TRUST is intact, never penalised for
+  // the service being flaky. 3 service-side + 1 indeterminate, ZERO monitor-side → spurious-red rate 0%.
+  { checkId: 5, checkName: "Wegmans shop (service-flaky)", sensitive: false, lastGreenAt: "2026-07-01T19:55:00Z", lastRunAt: "2026-07-01T20:00:00Z",
+    runCount: 50, retryCount: 0, retryRate: 0, flapCount: 4, scheduledCount: 48, flapRate: 0.0833,
+    incidents: trustInc(), redTest: { captured: false }, specProvenance: { executedSha256: "5ecc0005", specPath: "monitors/wegmans/shop.spec.ts" },
+    dimensions: trustDims({ flap: "flaky", spuriousRed: "ok" }),
+    transients: trustTransients({ monitorSide: 0, serviceSide: 3, indeterminate: 1, spuriousRedRate: 0 }),
+    trust: "flaky" },
 ];
 // Detail retry series: 4 days, incl. a NULL day (no runs) → a gap in the sparkline, never a 0.
 const DEFAULT_TRUST_SERIES: RawObj[] = [

@@ -27,6 +27,9 @@ export const TRUST_RULES = {
   FLAP_MIN_COUNT: 2, // … both gated on ≥ 2 transient failures (one flap is noise; a pattern repeats)
   RETRY_ELEVATED_MIN: 0.02, // retry dimension elevated at ≥ 2% …
   RETRY_FLAKY_MIN: 0.1, // … flaky at ≥ 10% (matches the old proven-live boundary; the dead 50% floor is gone)
+  SPURIOUS_ELEVATED_MIN: 0.01, // ★ B3-2 stage 2: spurious-red (monitor-side transients ÷ scheduled) elevated ≥ 1% …
+  SPURIOUS_FLAKY_MIN: 0.05, // … flaky at ≥ 5% …
+  SPURIOUS_MIN_COUNT: 2, // … with ≥ 2 monitor-side transients (one is noise)
 } as const;
 
 // chip → { label, tone }. tone maps to the status-color law: pass=green(calm-good), warn=amber(attention),
@@ -51,7 +54,7 @@ export const TRUST_META: Record<TrustChip, { label: string; tone: "pass" | "warn
 // tone by state: ok = calm/neutral, elevated = amber (watch), flaky = amber-loud (the axis that demotes the chip).
 const DIM_STATE_TONE: Record<TrustDimensionState, "pass" | "warn" | "idle"> = { ok: "idle", elevated: "warn", flaky: "warn" };
 
-type DimKey = "flap" | "retry" | "monitor_noise";
+type DimKey = "flap" | "retry" | "monitor_noise" | "spurious_red";
 // Each dimension: its label, the exact formula + threshold (rendered verbatim in the legend), and how to read
 // its current value off a row. monitor-noise is a COUNT (selector-drift + flaky-transient), not a rate.
 const DIMENSION_META: {
@@ -77,6 +80,14 @@ const DIMENSION_META: {
     label: "Monitor-noise",
     rule: "RCA flaky-transient + selector-drift incidents — flaky at ≥ 1 (a count, not a rate)",
     value: (row) => `${row.incidents.flaky_transient + row.incidents.selector_drift}`,
+  },
+  {
+    key: "spurious_red",
+    label: "Spurious-red",
+    // ★ ONLY monitor-side transients — a service-side transient (a real brief outage the monitor caught) is
+    // deliberately excluded, so the budget never penalises a monitor for its service being flaky.
+    rule: `MONITOR-SIDE transients ÷ scheduled runs — elevated ≥ ${TRUST_RULES.SPURIOUS_ELEVATED_MIN * 100}%, flaky ≥ ${TRUST_RULES.SPURIOUS_FLAKY_MIN * 100}% (with ≥ ${TRUST_RULES.SPURIOUS_MIN_COUNT}). Service-side transients never count.`,
+    value: (row) => spuriousRedText(row),
   },
 ];
 
@@ -271,6 +282,13 @@ export function retryRateText(row: Pick<TrustRow, "retry_rate" | "retry_count" |
 export function flapRateText(row: Pick<TrustRow, "flap_rate" | "flap_count" | "scheduled_count">): string {
   if (row.flap_rate == null) return "—"; // no scheduled runs → em-dash, NEVER 0%
   return `${(row.flap_rate * 100).toFixed(1)}% (${row.flap_count}/${row.scheduled_count})`;
+}
+// ★ B3-2 stage 2: spurious-red = MONITOR-SIDE transients ÷ scheduled. The (m/s/i) tail exposes the split so the
+// service-side share (never counted) and the indeterminate share (unclassified) are visible, not hidden.
+export function spuriousRedText(row: Pick<TrustRow, "transients" | "scheduled_count">): string {
+  const t = row.transients;
+  if (row.transients.spurious_red_rate == null) return "—"; // no scheduled runs → em-dash, NEVER 0%
+  return `${(row.transients.spurious_red_rate * 100).toFixed(1)}% (${t.monitor_side}m/${t.service_side}s/${t.indeterminate}i)`;
 }
 export function lastGreenText(iso: string | null): string {
   return iso == null ? "never verified" : formatRelative(iso);
