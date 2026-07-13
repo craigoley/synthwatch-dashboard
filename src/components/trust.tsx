@@ -8,7 +8,7 @@ import { TONE_VAR } from "@/components/status-badge";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { StalenessStamp, useFetchedAt } from "@/components/staleness";
 import { formatRelative } from "@/lib/format";
-import type { ReportWindow, TrustChip, TrustIncidents, TrustRetryPoint, TrustRow } from "@/lib/types";
+import type { ReportWindow, TrustChip, TrustDimensionState, TrustIncidents, TrustRetryPoint, TrustRow } from "@/lib/types";
 
 /**
  * §D1 monitor-trust — the "every green shown with its proof" surface. NO composite score: the chip is
@@ -17,31 +17,100 @@ import type { ReportWindow, TrustChip, TrustIncidents, TrustRetryPoint, TrustRow
  * it isn't broken, it's unproven.
  */
 
-// Named-constant thresholds — the SAME rule the API applies, rendered verbatim in the legend below.
+// ★ B3-2 — the SAME per-dimension thresholds the API applies (TrustReportProjection), DERIVED FROM THE MEASURED
+// 30d FLEET DISTRIBUTION (not round numbers), rendered verbatim in the legend below. Two cutoffs per rate
+// dimension: `elevated` (above the well-behaved fleet band → blocks proven-live) and `flaky` (pathological).
 export const TRUST_RULES = {
-  RETRY_PROVEN_MAX: 0.1, // proven-live requires retry rate < 10%
-  RETRY_FLAKY_MIN: 0.5, // flaky if retry rate ≥ 50%
   GREEN_INTERVALS: 2, // proven-live requires a green within the last 2 run intervals
-  FLAP_FLAKY_MIN: 0.1, // flaky if flap rate ≥ 10% (confirmation-retry P2) …
-  FLAP_FLAKY_MIN_COUNT: 2, // … AND ≥ 2 transient failures (one flap is noise; a pattern repeats)
+  FLAP_ELEVATED_MIN: 0.01, // flap dimension elevated at ≥ 1% …
+  FLAP_FLAKY_MIN: 0.05, // … flaky at ≥ 5% …
+  FLAP_MIN_COUNT: 2, // … both gated on ≥ 2 transient failures (one flap is noise; a pattern repeats)
+  RETRY_ELEVATED_MIN: 0.02, // retry dimension elevated at ≥ 2% …
+  RETRY_FLAKY_MIN: 0.1, // … flaky at ≥ 10% (matches the old proven-live boundary; the dead 50% floor is gone)
 } as const;
 
 // chip → { label, tone }. tone maps to the status-color law: pass=green(calm-good), warn=amber(attention),
 // running=blue(neutral-active/in-between), idle=grey(neutral-unknown). NONE are red — unverified ≠ broken.
+// ★ B3-2: the chip is now DERIVED over distinct dimensions (below), never an OR-collapse that hides which axis.
 export const TRUST_META: Record<TrustChip, { label: string; tone: "pass" | "warn" | "running" | "idle"; blurb: string }> = {
   "proven-live": {
     label: "Proven live",
     tone: "pass",
-    blurb: `green within ${TRUST_RULES.GREEN_INTERVALS} intervals AND retry < ${TRUST_RULES.RETRY_PROVEN_MAX * 100}% AND no monitor-noise`,
+    blurb: `green within ${TRUST_RULES.GREEN_INTERVALS} intervals AND EVERY dimension ok (no elevated, no flaky)`,
   },
-  nominal: { label: "Nominal", tone: "running", blurb: "in between — recent green, retry acceptable, no clear flakiness" },
+  nominal: { label: "Nominal", tone: "running", blurb: "green is stale, OR a dimension is elevated — worth watching, not yet flaky" },
   flaky: {
     label: "Flaky",
     tone: "warn",
-    blurb: `retry ≥ ${TRUST_RULES.RETRY_FLAKY_MIN * 100}% OR any monitor-noise (flaky/selector-drift) OR flap ≥ ${TRUST_RULES.FLAP_FLAKY_MIN * 100}% (≥${TRUST_RULES.FLAP_FLAKY_MIN_COUNT} transient failures)`,
+    blurb: "ANY dimension flaky — the chip names which (flap / retry / monitor-noise)",
   },
   unverified: { label: "Unverified", tone: "idle", blurb: "never green OR no runs — unproven, not broken" },
 };
+
+// ── ★ B3-2 the DISTINCT DIMENSIONS (the surfaced replacement for the OR-collapse) ──────────────────────────
+// tone by state: ok = calm/neutral, elevated = amber (watch), flaky = amber-loud (the axis that demotes the chip).
+const DIM_STATE_TONE: Record<TrustDimensionState, "pass" | "warn" | "idle"> = { ok: "idle", elevated: "warn", flaky: "warn" };
+
+type DimKey = "flap" | "retry" | "monitor_noise";
+// Each dimension: its label, the exact formula + threshold (rendered verbatim in the legend), and how to read
+// its current value off a row. monitor-noise is a COUNT (selector-drift + flaky-transient), not a rate.
+const DIMENSION_META: {
+  key: DimKey;
+  label: string;
+  rule: string;
+  value: (row: TrustRow) => string;
+}[] = [
+  {
+    key: "flap",
+    label: "Flap",
+    rule: `transient failures ÷ scheduled runs — elevated ≥ ${TRUST_RULES.FLAP_ELEVATED_MIN * 100}%, flaky ≥ ${TRUST_RULES.FLAP_FLAKY_MIN * 100}% (with ≥ ${TRUST_RULES.FLAP_MIN_COUNT})`,
+    value: (row) => flapRateText(row),
+  },
+  {
+    key: "retry",
+    label: "Retry",
+    rule: `runs needing a real retry ÷ runs — elevated ≥ ${TRUST_RULES.RETRY_ELEVATED_MIN * 100}%, flaky ≥ ${TRUST_RULES.RETRY_FLAKY_MIN * 100}%`,
+    value: (row) => retryRateText(row),
+  },
+  {
+    key: "monitor_noise",
+    label: "Monitor-noise",
+    rule: "RCA flaky-transient + selector-drift incidents — flaky at ≥ 1 (a count, not a rate)",
+    value: (row) => `${row.incidents.flaky_transient + row.incidents.selector_drift}`,
+  },
+];
+
+/**
+ * ★ B3-2 — the distinct dimensions rendered as a compact strip: one labelled state dot per axis (flap / retry /
+ * monitor-noise), tinted by its state, each carrying its current value + formula in the title. This is the
+ * SURFACED replacement for the OR-collapse — you see WHICH axis flags, not a single verdict. Always shown (a
+ * clean monitor reads three faint "ok" dots), so "proven live" is legible as "clean on every axis".
+ */
+export function DimensionStrip({ row }: { row: TrustRow }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="trust-dimensions">
+      {DIMENSION_META.map((d) => {
+        const state = row.dimensions[d.key];
+        const tone = DIM_STATE_TONE[state];
+        const dim = state === "ok"; // an ok dimension reads faint; elevated/flaky read amber (attention)
+        return (
+          <span
+            key={d.key}
+            className="inline-flex items-center gap-1 text-[11px]"
+            style={{ color: dim ? "var(--color-ink-faint)" : TONE_VAR[tone] }}
+            data-testid={`trust-dim-${d.key}`}
+            data-state={state}
+            title={`${d.label}: ${state.toUpperCase()} (${d.value(row)}) — ${d.rule}`}
+          >
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: dim ? "var(--color-border)" : TONE_VAR[tone] }} />
+            {d.label} {d.value(row)}
+            {state !== "ok" && <span className="font-medium"> · {state}</span>}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
 
 // Worst-first sort rank: a Director scans the problems first (unverified + flaky on top, proven-live last).
 export const TRUST_RANK: Record<TrustChip, number> = { unverified: 0, flaky: 1, nominal: 2, "proven-live": 3 };
@@ -109,14 +178,28 @@ export function FlapNote({ flapCount, scheduledCount, window }: { flapCount: num
   );
 }
 
-/** The rule legend — load-bearing: the chip is only trustworthy because the rule is inspectable. */
+/** The rule legend — load-bearing: the chip is only trustworthy because the rule is inspectable. ★ B3-2: it
+ *  now states each DIMENSION's formula + threshold verbatim (the thresholds are derived from the measured fleet
+ *  distribution), then the chip derivation over them. */
 export function TrustLegend() {
   return (
     <div className="sw-panel p-4 text-[12px]" data-testid="trust-legend">
       <h3 className="mb-2 text-sm font-semibold text-[var(--color-ink)]">How the chip is derived</h3>
       <p className="mb-3 text-[var(--color-ink-dim)]">
-        No composite score — measured facts + an auditable rule. Each chip is exactly:
+        No composite score, and no OR-collapse — each dimension is graded on its own axis (thresholds derived
+        from the measured fleet distribution), and the chip is a derivation over them that names what flagged:
       </p>
+      <ul className="mb-3 space-y-2" data-testid="trust-legend-dimensions">
+        {DIMENSION_META.map((d) => (
+          <li key={d.key} className="flex flex-wrap items-baseline gap-2">
+            <span className="sw-mono rounded bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)] px-1.5 py-0.5 text-[11px] text-[var(--color-ink)]">
+              {d.label}
+            </span>
+            <span className="text-[var(--color-ink-dim)]">{d.rule}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mb-2 text-[var(--color-ink-dim)]">Then the chip is exactly:</p>
       <ul className="space-y-2">
         {(Object.keys(TRUST_META) as TrustChip[]).map((chip) => (
           <li key={chip} className="flex flex-wrap items-baseline gap-2">
@@ -316,6 +399,11 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
           <FlapNote flapCount={m.flap_count} scheduledCount={m.scheduled_count} window={window} />
         </div>
       )}
+
+      {/* ★ B3-2: the distinct dimensions — WHICH axis flags, surfaced (never the OR-collapse). */}
+      <div className="mb-3" data-testid="trust-card-dimensions">
+        <DimensionStrip row={m} />
+      </div>
 
       {/* the glance layer: a compact wrapping stat row, not a tall stack */}
       <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
@@ -528,7 +616,12 @@ export function TrustScorecard({ window }: { window: ReportWindow }) {
                     >
                       {row.check_name}
                     </Link>
-                    {/* degrading-but-green + transient-flap annotations — under the name, distinct from the chip */}
+                    {/* ★ B3-2: the distinct dimensions — the surfaced replacement for the OR-collapse. Under the
+                        name so a Director sees WHICH axis flags at a glance, not just the collapsed chip. */}
+                    <div className="mt-0.5">
+                      <DimensionStrip row={row} />
+                    </div>
+                    {/* degrading-but-green + transient-flap annotations — distinct from the chip + the dimensions */}
                     <RetriedPassesNote retriedPasses={row.retried_passes} window={window} />
                     <FlapNote flapCount={row.flap_count} scheduledCount={row.scheduled_count} window={window} />
                   </div>
