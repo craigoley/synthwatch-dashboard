@@ -66,7 +66,9 @@ export default function StatusPage() {
     "90d": w90.data,
   };
 
-  const enabled = useMemo(() => (checks ?? []).filter((c) => c.enabled), [checks]);
+  // ★ Archived (= retired, 0071) checks are excluded from the PUBLIC components list — an archived
+  // monitor otherwise rendered a "No data" row here, fake presence on the stakeholder-facing page.
+  const enabled = useMemo(() => (checks ?? []).filter((c) => c.enabled && !c.archived_at), [checks]);
   const system = deriveSystemStatus(checks ?? []);
   const sla = slaByWindow[slaWindow];
   const uptimeByCheck = useMemo(() => {

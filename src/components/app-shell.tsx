@@ -37,7 +37,10 @@ function FleetPulse() {
     return <span className="sw-mono text-xs text-[var(--color-ink-faint)]">syncing…</span>;
   }
 
-  const enabled = data.filter((c) => c.enabled);
+  // ★ Archived monitors never count in the header pulse. Today the api's 0071 projection masks their
+  // current_status to "archived" (matching no bucket below), but the exclusion must be structural, not an
+  // artifact of that projection — a retired monitor's stale fail/pass must never move the fleet counts.
+  const enabled = data.filter((c) => c.enabled && !c.archived_at);
   const failing = enabled.filter(
     (c) => c.current_status === "fail" || c.current_status === "error",
   ).length;
