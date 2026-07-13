@@ -79,7 +79,7 @@ const DIMENSION_META: {
     key: "monitor_noise",
     label: "Monitor-noise",
     rule: "RCA flaky-transient + selector-drift incidents — flaky at ≥ 1 (a count, not a rate)",
-    value: (row) => `${row.incidents.flaky_transient + row.incidents.selector_drift}`,
+    value: (row) => (row.incidents ? `${row.incidents.flaky_transient + row.incidents.selector_drift}` : "—"),
   },
   {
     key: "spurious_red",
@@ -380,7 +380,12 @@ const INCIDENT_META: { key: keyof TrustIncidents; label: string; tone: "fail" | 
   { key: "unclassified", label: "Unclassified", tone: "idle" },
 ];
 
-function IncidentBreakdown({ incidents }: { incidents: TrustIncidents }) {
+function IncidentBreakdown({ incidents }: { incidents: TrustIncidents | null }) {
+  // ★ null = the API sent no incident rollup → EXPLICIT "no data", distinct from a genuine total:0 (which is
+  // the truthful "No incidents in this window"). Absence must never read as the healthy zero.
+  if (incidents == null) {
+    return <p className="text-[12px] text-[var(--color-ink-faint)]" data-testid="trust-incidents-nodata">No incident data — the API returned no incident rollup for this monitor.</p>;
+  }
   if (incidents.total === 0) {
     return <p className="text-[12px] text-[var(--color-ink-dim)]" data-testid="trust-incidents-none">No incidents in this window.</p>;
   }
@@ -534,8 +539,15 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
           <div className="sw-mono text-[13px] text-[var(--color-ink)]">{m.run_count}</div>
         </div>
         {/* ★ exception-visibility: a non-zero incident count NEVER hides in the disclosure — it sits in the
-            summary, warn-toned, and tapping it opens the by-cause breakdown (one tap to the detail). */}
-        {m.incidents.total > 0 && (
+            summary, warn-toned, and tapping it opens the by-cause breakdown (one tap to the detail). A NULL
+            rollup (API sent no incidents object) surfaces as an explicit "no data" here, never as absence. */}
+        {m.incidents == null && (
+          <div data-testid="trust-incidents-nodata-summary">
+            <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Incidents</div>
+            <div className="sw-mono text-[13px] text-[var(--color-ink-faint)]">— no data</div>
+          </div>
+        )}
+        {m.incidents != null && m.incidents.total > 0 && (
           <button
             type="button"
             onClick={() => {
@@ -645,7 +657,7 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
 // reds: real-outage vs everything-else (monitor-noise + env/perf/unclassified). ★ real is ONLY real_outage —
 // perf-regression + unclassified are NEVER folded into "real" (the honesty the scorecard exists for).
 function redsText(row: TrustRow): string {
-  if (row.incidents.total === 0) return "—";
+  if (row.incidents == null || row.incidents.total === 0) return "—"; // null (no rollup) + zero both → "—"
   const other = row.incidents.total - row.incidents.real_outage;
   return `${row.incidents.real_outage} / ${other}`;
 }

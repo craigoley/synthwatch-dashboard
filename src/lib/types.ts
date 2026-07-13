@@ -948,7 +948,10 @@ export interface TrustRow {
   // spurious_red (the monitor cried wolf); service_side is a real brief outage the monitor caught (must NOT
   // penalise it); indeterminate had no signals to tell. spurious_red_rate = monitor_side ÷ scheduled.
   transients: TrustTransients;
-  incidents: TrustIncidents;
+  // null = the API sent no incident rollup (absent object). Absence is UNKNOWN, never a synthetic all-zero
+  // rollup that reads "no incidents" (the fake-quiet class). IncidentBreakdown renders null as "no incident
+  // data", distinct from a genuine total:0 → "No incidents in this window".
+  incidents: TrustIncidents | null;
   red_test_captured: boolean; // true ONLY when a harness-confirmed red_tests row exists (else the honest gap)
   red_test_tested_at: string | null; // ISO when captured; null when not
   red_test_method: string | null; // 'executed-red-fixture' | 'attested-manual' | null — rendered distinctly
