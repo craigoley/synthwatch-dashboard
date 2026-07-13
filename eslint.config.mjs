@@ -18,6 +18,7 @@ export default tseslint.config(
     ignores: [
       "node_modules/**",
       ".next/**",
+      ".worktrees/**", // local git worktrees nested in the repo carry their own built .next/ — never lint them
       "out/**",
       "build/**",
       "next-env.d.ts",

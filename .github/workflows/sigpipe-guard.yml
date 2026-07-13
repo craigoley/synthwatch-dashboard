@@ -1,0 +1,35 @@
+name: SIGPIPE guard
+
+# Fail-closed static check for the SIGPIPE FAIL-OPEN class (fixed 4× in the fleet: #275/#279/#281/#283).
+# `<streaming-writer> | grep -q PAT` (or `| grep -m1`, `| head -n1`) under `set -o pipefail`: the early-exit
+# consumer closes the pipe while the writer is still streaming → the writer takes SIGPIPE → the pipeline
+# exits 141 → a MATCH that should BLOCK instead throws non-zero and flips to the fail-open branch. It only
+# bites on LARGE inputs (small ones finish before grep -q closes), so it passes every small test and fails at
+# 2am on a big diff — the exact shape of a BLOCK becoming a silent merge.
+#
+# The fix is a here-string, never a pipe: `grep -qE PAT <<<"$x"`. This gate bans the piped form so the next
+# one fails at author time. A failure fails ci-gate (this job is in ci-gate's REQUIRED wait-set). Pure
+# sub-second static parse — no build, runs on every PR (no path filter).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sigpipe-guard:
+    name: SIGPIPE guard (no fail-open piped grep -q)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Assert no piped early-exit consumer (grep -q/-m, head) in workflows or shell
+        run: node scripts/check-sigpipe.mjs

@@ -39,3 +39,8 @@ yarn-error.log*
 
 # npm lockfile — this repo is pnpm-only (packageManager pin + pnpm-lock.yaml)
 package-lock.json
+
+# Local git worktrees nested in the repo (git worktree add .worktrees/<x>). Untracked, but they carry their
+# own built .next/, so `eslint .` recursed into them and threw thousands of errors — FOUR PRs carried a "clean
+# local lint is impossible" caveat. Ignored here AND in eslint.config.mjs so a local worktree can't break lint.
+.worktrees/
