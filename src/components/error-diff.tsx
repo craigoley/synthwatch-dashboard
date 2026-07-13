@@ -422,3 +422,83 @@ export function ErrorDiff({ checkId, runId }: { checkId: number; runId?: number 
     </Shell>
   );
 }
+
+/**
+ * ★ The RUN-SCOPED join: the NEW FIRST-PARTY errors captured DURING THIS run, rendered inline on a FAILED
+ * run (next to the failed step / error message) so the operator sees the step failure AND the run's new
+ * error signal WITHOUT opening the monitor-level <ErrorDiff> panel. (Run 955866: `add-bread` failed while a
+ * first-party `Failed to fetch` fired — both facts were already in the UI, in different panels, and nobody
+ * joined them.) Reuses the same `getErrorDiff(checkId,{runId})` read + the same rows/badges as the panel.
+ *
+ * Contract — this IS the point:
+ *  - CITES, never GUESSES. Shows only errors actually captured in this run; NEVER asserts a cause — the facts
+ *    sit adjacent, the operator concludes. (An inferred cause would be a new lying signal — the one we refuse.)
+ *  - FIRST-PARTY only by default; third-party stays behind the existing counted toggle (tracker noise would
+ *    drown the signal, exactly as in the panel).
+ *  - Per-RUN, not per-step: error items carry no per-occurrence timestamp (steps have `startedAt`; the diff
+ *    aggregates by fingerprint), so an error can't be pinned to one step — the honest scope is "this run".
+ *  - "No new first-party errors" is stated EXPLICITLY (itself diagnostic — the failure carried no new error
+ *    signal), but ONLY when capture was COMPLETE; a truncated capture says so instead of implying "none".
+ */
+export function RunNewFirstPartyErrors({ checkId, runId }: { checkId: number; runId: number }) {
+  const { data, error, isLoading } = useErrorDiff(checkId, runId);
+  // Broken ≠ absent: a failed load says so quietly (the monitor-level panel carries the loud state) rather
+  // than render a blank that would read as "no errors".
+  if (error) {
+    return (
+      <p className="sw-mono mt-3 text-[11px] text-[var(--color-ink-dim)]" data-testid="run-new-errors-error">
+        Couldn’t load this run’s new-error signal.
+      </p>
+    );
+  }
+  // Quiet until loaded (the run body already shows the failure), and self-hide when there are NO error
+  // signals for this run at all (404 → null: a non-browser check, or a run with no captured trace) — nothing
+  // to cite, and we can't distinguish that from "no new errors".
+  if ((isLoading && data === undefined) || !data) return null;
+
+  const firstParty = data.new_errors.filter(isFirstParty);
+  const third = data.new_errors.filter((i) => !isFirstParty(i));
+
+  return (
+    <div
+      className="mt-3 rounded border-l-2 px-3 py-2"
+      style={{
+        borderColor: `color-mix(in srgb, ${TONE_VAR.warn} 45%, transparent)`,
+        background: `color-mix(in srgb, ${TONE_VAR.warn} 6%, transparent)`,
+      }}
+      data-testid="run-new-errors"
+    >
+      <div className="mb-1 sw-eyebrow">New first-party errors this run</div>
+      {firstParty.length > 0 ? (
+        <>
+          <div data-testid="run-new-errors-list">
+            {firstParty.map((i) => (
+              <ErrorRow key={i.fingerprint} item={i} />
+            ))}
+          </div>
+          <ThirdPartyItems items={third} />
+          {data.truncated && (
+            <p className="sw-mono mt-1.5 text-[10px] text-[var(--color-warn)]" data-testid="run-new-errors-truncated">
+              ⚠ Error capture was truncated (cap reached) — there may be more first-party errors than shown.
+            </p>
+          )}
+          <p className="sw-mono mt-1.5 text-[10px] text-[var(--color-ink-faint)]">
+            Captured during this run — shown next to the failure, not inferred as its cause.
+          </p>
+        </>
+      ) : data.truncated ? (
+        <p className="text-[12px] text-[var(--color-ink-dim)]" data-testid="run-new-errors-truncated">
+          Error capture was truncated this run (cap reached) — first-party errors may be incomplete, so “no
+          new errors” can’t be concluded.
+        </p>
+      ) : (
+        <>
+          <p className="text-[12px] text-[var(--color-ink)]" data-testid="run-new-errors-none">
+            No new first-party errors this run — the failure was not accompanied by a new error signal.
+          </p>
+          <ThirdPartyItems items={third} />
+        </>
+      )}
+    </div>
+  );
+}
