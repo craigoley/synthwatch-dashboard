@@ -41,6 +41,11 @@ export function CheckCard({
   // ★ Rail + pill read the last SETTLED outcome, NOT current_status — so a passing monitor stays green
   // mid-run. current_status is used only to flag that a run is in flight (a separate indicator below).
   const settled = lastSettledStatus(check);
+  // ★ Archived = retired (0071). The card must read as RETIRED, not WARMING UP: no live sparkline, no
+  // p50/p95 placeholders, no "24h avail building…" — those affordances promise future runs that will
+  // never come. (Archived cards render only under the opt-in Archived tab and anywhere else the fleet
+  // list is shown unfiltered.)
+  const isArchived = check.archived_at != null;
   const isRunning = check.current_status === "running";
   const meta = runStatusMeta(settled);
   // ★ Regional = some-but-not-all locations failing — a partial blip, visually
@@ -136,15 +141,19 @@ export function CheckCard({
             )}
             <StatusBadge status={settled} />
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="text-[9px] uppercase tracking-wider text-[var(--color-ink-faint)]">24h avail</span>
-            <AvailabilityValue
-              pct={availability}
-              insufficient={availabilityInsufficient}
-              compact
-              className="text-[11px]"
-            />
-          </span>
+          {/* Hidden for archived: "building…" / an em-dash under a 24H AVAIL label implies a warmup in
+              progress on a monitor that will never run again. */}
+          {!isArchived && (
+            <span className="flex items-center gap-1.5">
+              <span className="text-[9px] uppercase tracking-wider text-[var(--color-ink-faint)]">24h avail</span>
+              <AvailabilityValue
+                pct={availability}
+                insufficient={availabilityInsufficient}
+                compact
+                className="text-[11px]"
+              />
+            </span>
+          )}
         </div>
       </div>
 
@@ -161,13 +170,19 @@ export function CheckCard({
         </div>
       )}
 
-      <div className="mt-4 flex items-end justify-between gap-3">
-        <div className="grid grid-cols-2 gap-x-5 gap-y-1">
-          <Metric label="p50 24h" value={formatDuration(check.p50_ms)} />
-          <Metric label="p95 24h" value={formatDuration(check.p95_ms)} />
+      {isArchived ? (
+        <p className="mt-4 text-[11px] text-[var(--color-ink-faint)]" data-testid={`card-retired-${check.id}`}>
+          Retired — archived {formatRelative(check.archived_at)} · not scheduled. Reactivate from Monitors.
+        </p>
+      ) : (
+        <div className="mt-4 flex items-end justify-between gap-3">
+          <div className="grid grid-cols-2 gap-x-5 gap-y-1">
+            <Metric label="p50 24h" value={formatDuration(check.p50_ms)} />
+            <Metric label="p95 24h" value={formatDuration(check.p95_ms)} />
+          </div>
+          <Sparkline points={check.spark} />
         </div>
-        <Sparkline points={check.spark} />
-      </div>
+      )}
 
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--color-border)] pt-2.5">
         <span className="sw-mono text-[11px] text-[var(--color-ink-faint)]">

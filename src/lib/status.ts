@@ -173,7 +173,10 @@ export function lastSettledStatus(check: CheckWithStatus): RunStatus | null {
 export function deriveSystemStatus(checks: CheckWithStatus[]): SystemStatusMeta {
   let partial = false;
   for (const c of checks) {
-    if (!c.enabled || isNonProd(c)) continue;
+    // ★ Archived = deliberately retired (0071): nothing is happening on it by definition, so it must never
+    // influence the PUBLIC up/down signal. Without this guard, the open-incident branches below fire
+    // regardless of settled status — a lingering open incident on an archived check would flip the banner.
+    if (!c.enabled || c.archived_at || isNonProd(c)) continue;
     const settled = lastSettledStatus(c);
     const down = settled === "fail" || settled === "error";
     const degraded = settled === "warn";

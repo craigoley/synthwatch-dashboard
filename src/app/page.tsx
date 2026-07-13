@@ -55,7 +55,11 @@ function matches(
     case "removed":
       return check.removed_at != null;
     default:
-      return true;
+      // ★ "All" is the OPERATIONAL view — archived (= deliberately retired, 0071) monitors are excluded by
+      // default and OPT-IN via the Archived tab above: a retired check rendering a full live-looking card
+      // between healthy ones reads as a monitor mid-warmup, not one that will never run again. Removed
+      // (purge-clock) checks stay visible: their loud state is a call to action before the purge.
+      return check.archived_at == null;
   }
 }
 
