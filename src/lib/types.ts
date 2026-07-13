@@ -902,6 +902,26 @@ export interface TrustSpecProvenance {
   executed_sha256: string | null; // the committed assertion code that ran — an INTEGRITY fact, not a red-test
   spec_path: string | null;
 }
+// ★ B3-3 — the MONITOR trust budget (runner flake_status). consumed burns MONITOR-SIDE transients ONLY;
+// service_side + indeterminate are surfaced, never consumed. state = "degraded-as-a-monitor" is DISTINCT from a
+// service outage ("my monitor is unreliable" ≠ "Wegmans is down"). directed_task (non-null only when degraded)
+// is a FIX task, never a mute. target_is_default = the fleet default (2%) is in force.
+export type TrustFlakeBudgetState = "ok" | "degraded-as-a-monitor";
+export interface TrustFlakeBudget {
+  target: number;
+  target_is_default: boolean;
+  scheduled_runs: number;
+  monitor_side: number;
+  service_side: number;
+  indeterminate: number;
+  budget: number;
+  consumed: number; // = monitor_side (the ONLY thing that burns budget)
+  remaining: number;
+  remaining_pct: number | null;
+  burn_rate: number;
+  state: TrustFlakeBudgetState;
+  directed_task: string | null;
+}
 export interface TrustRow {
   check_id: number;
   check_name: string;
@@ -933,6 +953,8 @@ export interface TrustRow {
   // ★ B3-2: the distinct per-dimension states — the SURFACED replacement for the OR-collapse. The chip is
   // derived from these; the scorecard shows WHICH dimension flagged rather than a single collapsed verdict.
   dimensions: TrustDimensions;
+  // ★ B3-3: the MONITOR trust budget — "degraded as a monitor" + the directed fix task. Burns monitor-side ONLY.
+  flake_budget: TrustFlakeBudget;
   trust: TrustChip; // API-derived from the named-constant rule (rendered verbatim in the legend)
 }
 export interface TrustReport {
