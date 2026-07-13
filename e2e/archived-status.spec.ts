@@ -11,8 +11,6 @@ import { listItem } from "./fixtures";
  * exception unfindable.
  */
 
-const T0 = "2026-07-10T10:00:00Z";
-
 // The observed bug case: b2c-login-test, archived (still enabled — archive doesn't touch `enabled`),
 // api 0071 projects its current_status as "archived".
 const archived = (over: Record<string, unknown> = {}) =>
