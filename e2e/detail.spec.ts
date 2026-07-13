@@ -144,6 +144,44 @@ test.describe("check detail", () => {
     expect(sw).not.toContain("const e=this._modernize(JSON.parse(t));for(const n of e)");
   });
 
+  // ★ The trace SAS is a ~30-min credential for an INTERACTIVE viewer session (the viewer lazily range-fetches
+  // the SAS URL throughout the dig). When it lapses, Azure returns an XML signature 403 INSIDE the iframe that
+  // reads as "you lack permission" — a forensics tool lying about itself. The viewer must instead show a
+  // LEGIBLE "expired — re-open" (driven by expires_at, which it previously ignored), and re-open must mint a
+  // FRESH SAS (never re-load the dead URL).
+  test("★ a lapsed trace SAS shows a legible 'expired — re-open' (not an access error), and re-open mints fresh", async ({ page }) => {
+    let mints = 0;
+    await mockApi(page);
+    // Override the SAS mint AFTER mockApi so this route wins (Playwright matches most-recently-registered
+    // first): the FIRST mint lapses almost immediately; the re-open mint is long-lived.
+    await page.route("**/api/runs/*/trace-sas", async (route) => {
+      mints += 1;
+      const ttlMs = mints === 1 ? 600 : 120_000;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          url: "https://acct.blob.core.windows.net/synthwatch-artifacts/traces/run-200.zip?sp=r&sig=x",
+          expiresAt: new Date(Date.now() + ttlMs).toISOString(),
+        }),
+      });
+    });
+    await page.goto("/checks/2");
+    await page.getByTestId("view-trace-200").click();
+
+    // Past expiry → the legible panel appears, the dead iframe is gone, and it does NOT read as access-denied.
+    const expired = page.getByTestId("trace-viewer-200-expired");
+    await expect(expired).toBeVisible();
+    await expect(expired).toContainText(/expired/i);
+    await expect(expired).not.toContainText(/permission|denied|Signature|not valid/i);
+    await expect(page.getByTestId("trace-viewer-200")).toHaveCount(0);
+
+    // One click re-opens — and it MINTED A FRESH SAS (no dead-URL reuse) → the iframe returns.
+    await page.getByTestId("trace-viewer-200-reopen").click();
+    await expect(page.getByTestId("trace-viewer-200")).toBeVisible();
+    expect(mints).toBe(2);
+  });
+
   // ★ The vendored viewer forces html,body{min-width:550px;min-height:450px;overflow:auto}, so an embed
   // shorter than 450px makes IT render a scrollbar (which can cascade a second one). On a short viewport
   // h-[70vh] would be 420px (< 450) — the min-h floor must keep the embed above Playwright's minimum so it
