@@ -227,4 +227,50 @@ test.describe("trust card — monitor detail", () => {
     await expect(page.getByTestId("trust-card")).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible(); // page itself fine
   });
+
+  // ★ B3-3 on the INVESTIGATE surface: the flake budget + "degraded as a monitor" + the directed FIX TASK now
+  // render on the per-monitor card (previously only in the fleet Trust table). Same FlakeBudgetNote, data
+  // already on the card's monitor payload — no new fetch.
+  test("★ flake budget: 'degraded as a monitor' + the directed task render on the detail card", async ({ page }) => {
+    const w = defaultWorld();
+    w.trustMonitors = [
+      {
+        checkId: 1, checkName: "API health", sensitive: false,
+        lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
+        runCount: 500, retryCount: 6, retryRate: 0.012, retriedPasses: 0,
+        flapCount: 9, scheduledCount: 142, flapRate: 0.0634,
+        incidents: { total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0 },
+        redTest: { captured: false },
+        specProvenance: { executedSha256: "abc123def456", specPath: "monitors/api/health.spec.ts" },
+        dimensions: { flap: { state: "flaky" }, retry: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "flaky" } },
+        transients: { monitorSide: 9, serviceSide: 0, indeterminate: 0, spuriousRedRate: 0.0634 },
+        trust: "flaky",
+        flakeBudget: {
+          state: "degraded-as-a-monitor", target: 0.02, targetIsDefault: true, scheduledRuns: 142,
+          monitorSide: 9, serviceSide: 0, indeterminate: 0,
+          budget: 2.84, consumed: 9, remaining: -6.16, remainingPct: null, burnRate: 3.2,
+          directedTask: "Stabilise the add-to-cart selector — 9 monitor-side transients this window",
+        },
+      },
+    ];
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+
+    const card = page.getByTestId("trust-card");
+    await expect(card).toBeVisible();
+    const budget = card.getByTestId("trust-flake-budget");
+    await expect(budget).toBeVisible();
+    await expect(card.getByTestId("trust-degraded-as-monitor")).toContainText(/degraded as a monitor/i);
+    await expect(budget).toContainText("9/2.8 monitor-side budget"); // consumed / budget
+    await expect(budget).toContainText("burn 3.2×");
+    await expect(card.getByTestId("trust-directed-task")).toContainText("Stabilise the add-to-cart selector");
+  });
+
+  test("flake budget note self-hides on the card when healthy (state ok, no indeterminate)", async ({ page }) => {
+    // defaultWorld's check 1 omits flakeBudget → the tolerant mapper reads state "ok" → nothing to say.
+    await mockApi(page, defaultWorld());
+    await page.goto("/checks/1");
+    await expect(page.getByTestId("trust-card")).toBeVisible();
+    await expect(page.getByTestId("trust-flake-budget")).toHaveCount(0);
+  });
 });

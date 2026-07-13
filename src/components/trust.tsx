@@ -464,6 +464,11 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
       {/* ★ B3-2: the distinct dimensions — WHICH axis flags, surfaced (never the OR-collapse). */}
       <div className="mb-3" data-testid="trust-card-dimensions">
         <DimensionStrip row={m} />
+        {/* ★ B3-3: the MONITOR trust budget — "degraded as a monitor" + the directed FIX TASK (distinct from a
+            service alert) + the indeterminate caveat. The SAME note the fleet Trust table renders, mounted here
+            so the directed task is present on the surface where you INVESTIGATE one monitor (not only when
+            comparing the fleet). Self-hides when healthy + fully-classified; data is already on `m` — no fetch. */}
+        <FlakeBudgetNote fb={m.flake_budget} />
       </div>
 
       {/* the glance layer: a compact wrapping stat row, not a tall stack */}
