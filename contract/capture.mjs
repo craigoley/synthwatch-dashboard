@@ -50,7 +50,10 @@ const SEAMS = {
   // false-green class. Anchored by status.contract.ts. Open GET.
   status: "/status",
   specs: "/specs",
-  reconcile_drift: "/reconcile/drift",
+  // reconcile_drift MOVED to the token-gated block below: /reconcile/drift became session-gated (401
+  // unauthenticated), like its sibling /reconcile/plan. Leaving it here made every tokenless capture exit 1
+  // on this one seam — a check that ALWAYS fails trains you to ignore the exit code, waving through a REAL
+  // failure in the same run. It skips gracefully in the gated block instead (the 2026-06-26 fixture stands).
   // ★ Previously ORPHANED: flows.json is consumed by high-risk-seams.contract.ts (pins /flows is a BARE ARRAY)
   // but was missing here, so capture:contracts never refreshed it — the frozen-snapshot risk. Open GET, wired in.
   flows: "/flows",
@@ -95,7 +98,7 @@ for (const [name, path] of Object.entries(SEAMS)) {
   }
 }
 
-// ─── gated GET seams: channels + reconcile/plan (session-floor auth — 401 unauthenticated) ───────────
+// ─── gated GET seams: channels + reconcile/drift + reconcile/plan (session-floor auth — 401 unauthenticated) ───
 // These read seams require an authed GET (the SEAMS loop above is unauthenticated → they'd 401). The bearer
 // comes from SYNTHWATCH_API_TOKEN. Without it the seams are SKIPPED and the committed Option-B fixtures stand
 // (channels.json / reconcile_plan.json — derived from the authoritative server DTOs, anchored by
@@ -111,6 +114,7 @@ const CRED_CHECK_ID = process.env.SYNTHWATCH_CRED_CHECK_ID ?? "353";
 if (AI_TOKEN) {
   for (const [name, path] of Object.entries({
     channels: "/channels",
+    reconcile_drift: "/reconcile/drift",
     reconcile_plan: "/reconcile/plan",
     check_detail_creds: `/checks/${CRED_CHECK_ID}`,
   })) {
@@ -125,7 +129,7 @@ if (AI_TOKEN) {
     }
   }
 } else {
-  console.log("skipped  channels + reconcile/plan + check_detail_creds (set SYNTHWATCH_API_TOKEN to replace the Option-B fixtures)");
+  console.log("skipped  channels + reconcile/drift + reconcile/plan + check_detail_creds (set SYNTHWATCH_API_TOKEN to replace the Option-B fixtures)");
 }
 
 const AI_RUN_ID = process.env.SYNTHWATCH_AI_RUN_ID ?? "844515";
