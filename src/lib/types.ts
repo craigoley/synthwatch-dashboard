@@ -877,6 +877,9 @@ export interface TrustDimensions {
   flap: TrustDimensionState; // superseded transients ÷ scheduled runs (browser/multistep; 0 for http/dns/ssl)
   retry: TrustDimensionState; // runs needing a real retry ÷ runs (all kinds)
   monitor_noise: TrustDimensionState; // RCA flaky-transient + selector-drift "cry wolf" incidents (a count)
+  // ★ B3-2 stage 2: MONITOR-SIDE transients ÷ scheduled (the "cried wolf on a monitor-side red" axis). ONLY
+  // monitor-side counts — a service-side transient (a real brief outage the monitor caught) never flags this.
+  spurious_red: TrustDimensionState;
 }
 export interface TrustIncidents {
   total: number;
@@ -886,6 +889,14 @@ export interface TrustIncidents {
   environment_regional: number;
   perf_regression: number;
   unclassified: number;
+}
+// ★ B3-2 stage 2 — the window's superseded transients split by whose fault (runner 0079). indeterminate is
+// surfaced so an operator can judge trust: a spurious-red rate over mostly-indeterminate data is not reliable.
+export interface TrustTransients {
+  monitor_side: number;
+  service_side: number;
+  indeterminate: number;
+  spurious_red_rate: number | null; // monitor_side ÷ scheduled; null when no scheduled runs
 }
 export interface TrustSpecProvenance {
   executed_sha256: string | null; // the committed assertion code that ran — an INTEGRITY fact, not a red-test
@@ -910,6 +921,10 @@ export interface TrustRow {
   flap_count: number;
   scheduled_count: number;
   flap_rate: number | null;
+  // ★ B3-2 stage 2: the flap's superseded transients split by WHOSE FAULT (runner 0079). monitor_side feeds
+  // spurious_red (the monitor cried wolf); service_side is a real brief outage the monitor caught (must NOT
+  // penalise it); indeterminate had no signals to tell. spurious_red_rate = monitor_side ÷ scheduled.
+  transients: TrustTransients;
   incidents: TrustIncidents;
   red_test_captured: boolean; // true ONLY when a harness-confirmed red_tests row exists (else the honest gap)
   red_test_tested_at: string | null; // ISO when captured; null when not

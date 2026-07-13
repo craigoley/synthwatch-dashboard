@@ -2224,6 +2224,7 @@ function mapTrustRow(r: Record<string, unknown>): TrustRow {
   const rt = (r.redTest ?? {}) as Record<string, unknown>;
   const dim = (r.dimensions ?? {}) as Record<string, unknown>;
   const dimObj = (k: string) => ((dim[k] ?? {}) as Record<string, unknown>).state;
+  const tr = (r.transients ?? {}) as Record<string, unknown>;
   return {
     check_id: num(r.checkId),
     check_name: String(r.checkName ?? ""),
@@ -2259,6 +2260,14 @@ function mapTrustRow(r: Record<string, unknown>): TrustRow {
       flap: dimState(dimObj("flap")),
       retry: dimState(dimObj("retry")),
       monitor_noise: dimState(dimObj("monitorNoise")),
+      spurious_red: dimState(dimObj("spuriousRed")), // ★ B3-2 stage 2; absent (pre-deploy) → "ok"
+    },
+    // ★ B3-2 stage 2: the transient split. Absent (pre-deploy API) → all 0 / null → the row reads clean.
+    transients: {
+      monitor_side: num(tr.monitorSide),
+      service_side: num(tr.serviceSide),
+      indeterminate: num(tr.indeterminate),
+      spurious_red_rate: nul(tr.spuriousRedRate),
     },
     // Coerce to a known chip; an unknown/absent value → "unverified" (null-safe, never crashes the table).
     trust: (TRUST_CHIPS as readonly string[]).includes(String(r.trust)) ? (r.trust as TrustChip) : "unverified",
