@@ -843,6 +843,7 @@ export async function getErrorDiff(
       runId: opts.runId,
       baseline: opts.baseline,
     });
+    // eslint-disable-next-line no-restricted-syntax -- benign: the NEW/persistent/resolved rows render from the arrays; counts are display tallies only, and getErrorDiff 404s → null so the panel self-hides when there are no signals.
     const counts = (raw?.counts ?? {}) as Record<string, unknown>;
     return {
       check_id: Number(raw?.checkId ?? checkId),
@@ -915,6 +916,7 @@ export async function muteError(checkId: number, fingerprint: string, note?: str
       body: JSON.stringify({ fingerprint, note: note && note.trim() !== "" ? note.trim() : undefined }),
     },
   );
+  // eslint-disable-next-line no-restricted-syntax -- benign: a single mute-row read; absent ≡ an empty mute, and 'not muted' is the truthful absence (mutes are additive opt-in state).
   return mapMute(raw ?? {});
 }
 
@@ -1187,7 +1189,9 @@ const mapDiffLine = (r: RawDiffConsoleLine): DiffConsoleLine => ({
 });
 
 function mapBaselineDiff(r: RawBaselineDiffDto): BaselineDiff {
+  // eslint-disable-next-line no-restricted-syntax -- benign: forensic baseline-diff on an already-FAILED run; an absent console block ≡ no captured console delta — the failure is loud elsewhere, no healthy read.
   const c = r.diff?.console ?? {};
+  // eslint-disable-next-line no-restricted-syntax -- benign: same as console above — an absent network delta on an already-red forensic run.
   const n = r.diff?.network ?? {};
   return {
     failing: {
@@ -1497,6 +1501,7 @@ export async function getReconcileDrift(): Promise<ReconcileDrift | null> {
     const items: DriftRow[] = (raw?.items ?? []).map((d) => ({
       source_key: d.sourceKey,
       drift_type: d.driftType as DriftType,
+      // eslint-disable-next-line no-restricted-syntax -- benign: a drift row's descriptive detail (name/kind/url); the DRIFT is the signal — an empty detail is a display gap, not a health verdict.
       detail: d.detail ?? {},
       detected_at: d.detectedAt,
     }));
@@ -1734,6 +1739,7 @@ type RawRouting = {
 
 export async function getRouting(): Promise<Routing> {
   const raw = await request<RawRouting>("/routing");
+  // eslint-disable-next-line no-restricted-syntax -- benign: notification routing CONFIG, not a health/status read; empty ≡ 'no rules configured', which is truthful (both severity + perCheck on this line).
   return { severity: raw?.severity ?? {}, perCheck: raw?.perCheck ?? {}, tagRules: raw?.tagRules ?? [] };
 }
 
@@ -1963,7 +1969,9 @@ function toFactChips(fp: unknown): NarrativeFact[] {
   }
   if (!fp || typeof fp !== "object") return [];
   const o = fp as Record<string, unknown>;
+  // eslint-disable-next-line no-restricted-syntax -- benign: narrative fact-pack current metrics; every inner read is `!= null`-guarded before a fact is pushed → absent omits the fact, never renders 0.
   const c = (o.current ?? {}) as Record<string, number | null>;
+  // eslint-disable-next-line no-restricted-syntax -- benign: same — deltas are `!= null`-guarded before rendering.
   const d = (o.deltas ?? {}) as Record<string, number | null>;
   const signed = (n: number, unit: string) => `${n >= 0 ? "+" : ""}${n}${unit}`;
   const facts: NarrativeFact[] = [];
@@ -1981,6 +1989,7 @@ function toFactChips(fp: unknown): NarrativeFact[] {
   // Fleet-scoped only (guard on scopeType) so a monitor card never cites the whole fleet's cost; self-absent
   // when the pack predates cost (fleetProjected == null → no chips, never a fake $0). Cites the real keys
   // field-for-field, same discipline as the reliability chips above.
+  // eslint-disable-next-line no-restricted-syntax -- benign: narrative cost fact is gated on `cost.fleetProjected != null` before pushing → absent omits the fact, never a $0 read.
   const cost = (o.cost ?? {}) as {
     fleetProjected?: number | null;
     fleetMeasured?: number | null;
@@ -2054,10 +2063,12 @@ export async function getPerformanceReport(
       // why the whole chain dropped it. Read the Stage-2 fields below (inpP75Ms/inpCount/resourceCount, +
       // the existing sampleCount) — all `?? null`, so this self-degrades to honest "no data" (never crashes,
       // never fakes a 0).
+      // eslint-disable-next-line no-restricted-syntax -- benign: availability-group latency percentiles; inner avg/p50/p95 read via `?? null` → '—', never a fake 0ms.
       const lat = (g.latency ?? {}) as Record<string, unknown>;
       const wv = g.webVitals as Record<string, unknown> | null | undefined;
       const rawChecks = (g.checks as Record<string, unknown>[]) ?? [];
       const checks = rawChecks.map((c) => {
+        // eslint-disable-next-line no-restricted-syntax -- benign: per-check latency percentiles; inner reads `?? null` → '—', same as the group above.
         const cl = (c.latency ?? {}) as Record<string, unknown>;
         return {
           check_id: c.checkId as number,
@@ -2222,11 +2233,19 @@ const dimState = (v: unknown): TrustDimensionState | null =>
 function mapTrustRow(r: Record<string, unknown>): TrustRow {
   const num = (v: unknown) => Number(v ?? 0);
   const nul = (v: unknown) => (v == null ? null : Number(v));
-  const inc = (r.incidents ?? {}) as Record<string, unknown>;
+  // ★ The FOURTH fake-quiet instance (post-#267/#268): an absent incidents object had coalesced to `{}` →
+  // every bucket num()→0 → the row read "No incidents in this window" (green). Absence is UNKNOWN, not zero —
+  // preserve it as null and let IncidentBreakdown render "no incident data".
+  const incRaw = r.incidents == null ? null : (r.incidents as Record<string, unknown>);
+  // eslint-disable-next-line no-restricted-syntax -- benign: specProvenance's own fields are honest on absence — executedSha256/specPath map to null (no fake data), so `{}` only avoids a deref, never a healthy read.
   const sp = (r.specProvenance ?? {}) as Record<string, unknown>;
+  // eslint-disable-next-line no-restricted-syntax -- benign: redTest.captured → Boolean(undefined)=false renders the HONEST first-class "not captured" state (never a pass); absence≡{} is the intended not-captured.
   const rt = (r.redTest ?? {}) as Record<string, unknown>;
+  // eslint-disable-next-line no-restricted-syntax -- benign: dimState() (below) maps each extracted value to null on absence (#268) → "— no data"; this `{}` only prevents a deref before dimState runs, it does not create a healthy read.
   const dim = (r.dimensions ?? {}) as Record<string, unknown>;
+  // eslint-disable-next-line no-restricted-syntax -- benign: same as `dim` — the extracted .state feeds dimState() which nulls the absence; `{}` is a deref guard only.
   const dimObj = (k: string) => ((dim[k] ?? {}) as Record<string, unknown>).state;
+  // eslint-disable-next-line no-restricted-syntax -- benign: transients counts use num()→0 (a truthful "0 of this class") and spuriousRedRate uses nul()→null→"—"; no field reads healthy on absence.
   const tr = (r.transients ?? {}) as Record<string, unknown>;
   return {
     check_id: num(r.checkId),
@@ -2241,15 +2260,18 @@ function mapTrustRow(r: Record<string, unknown>): TrustRow {
     flap_count: num(r.flapCount), // confirmation-retry P2: transient failures; absent (pre-deploy) → 0 → hidden
     scheduled_count: num(r.scheduledCount),
     flap_rate: nul(r.flapRate), // null preserved → "—", never a fake 0%
-    incidents: {
-      total: num(inc.total),
-      real_outage: num(inc.realOutage),
-      flaky_transient: num(inc.flakyTransient),
-      selector_drift: num(inc.selectorDrift),
-      environment_regional: num(inc.environmentRegional),
-      perf_regression: num(inc.perfRegression),
-      unclassified: num(inc.unclassified),
-    },
+    incidents:
+      incRaw == null
+        ? null
+        : {
+            total: num(incRaw.total),
+            real_outage: num(incRaw.realOutage),
+            flaky_transient: num(incRaw.flakyTransient),
+            selector_drift: num(incRaw.selectorDrift),
+            environment_regional: num(incRaw.environmentRegional),
+            perf_regression: num(incRaw.perfRegression),
+            unclassified: num(incRaw.unclassified),
+          },
     red_test_captured: Boolean(rt.captured), // true only when a harness-confirmed red_tests row exists
     red_test_tested_at: rt.testedAt == null ? null : String(rt.testedAt),
     red_test_method: rt.method == null ? null : String(rt.method),
@@ -2806,6 +2828,7 @@ export async function getParseIntent(text: string): Promise<ParseIntentResult> {
     reason: (raw?.reason as string) ?? null,
     valid: (raw?.valid as boolean) ?? false,
     prefill,
+    // eslint-disable-next-line no-restricted-syntax -- benign: form-validation errors from a 4xx body; an absent map ≡ 'no field errors' — the truthful state of a submit with no per-field errors.
     fieldErrors: (raw?.fieldErrors as Record<string, string>) ?? {},
     notes: (raw?.notes as string) ?? null,
   };

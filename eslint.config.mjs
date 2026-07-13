@@ -63,6 +63,40 @@ export default tseslint.config(
   },
 
   {
+    // ★ FAKE-QUIET GUARD (the defining bug of this repo). The API boundary is 23 hand-mappers that each
+    // choose a default; "absent reads HEALTHY" (a synthetic `{}`/`0`/empty on a state/status/count/rate) is
+    // one typo away, forever. Killed three times (#267 flake budget, #268 dimensions, this PR trust
+    // incidents). This rule makes the NEXT one fail at AUTHOR TIME, not at 2am. It is NOT the architectural
+    // fix (that's a zod decoder boundary, later) — it stops the bleeding.
+    //
+    // A benign default is allowed, but ONLY with a justified inline carve-out:
+    //   // eslint-disable-next-line no-restricted-syntax -- benign: <why absence is truthful here>
+    // (`reportUnusedDisableDirectives: "error"` above means a stale carve-out can't rot.) An allowlist
+    // entry with no reason is how this class comes back — so every one below states WHY absent≡default.
+    files: ["src/lib/api-client.ts"],
+    rules: {
+      //
+      // ★ SCOPED to the empty-OBJECT coalesce (`?? {}` / `|| {}`) — the PROVEN vector. All four instances of
+      // this class were `?? {}`: an absent API object → a synthetic `{}` → every field read off it reads
+      // HEALTHY (0 / "ok" / empty). The other listed patterns (`?? []`, `?? 0`, `?? false`) fire 108× in this
+      // file and are benign BY CONSTRUCTION — an empty list is the truthful "none", and the count-vs-rate
+      // choice is already encoded (`num()` = 0 for counts, `nul()` = null → "—" for rates). Banning them would
+      // mean ~108 carve-outs — a rule that is 90% noise, which is itself how the class comes back (nobody reads
+      // 108 disables). The dangerous coalesce is the synthetic OBJECT; guard exactly that. (The handful of weak
+      // `?? 0` health-count sites — open_incident_count, reports incidentCount — are a manual watch-list for the
+      // eventual zod boundary, NOT worth 42 false positives here.) See the PR body for the full survey.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "LogicalExpression[operator=/^(\\?\\?|\\|\\|)$/] > ObjectExpression[properties.length=0]",
+          message:
+            "fake-quiet: `?? {}` / `|| {}` turns an ABSENT API object into a synthetic one whose fields then read HEALTHY (all 0/ok/empty) — the class killed in #267/#268 and again here. Map absence to null and render 'no data'. If genuinely benign, allowlist EXACTLY this line with `// eslint-disable-next-line no-restricted-syntax -- benign: <why absence≡{} is truthful here>` (a reason is mandatory — an unexplained carve-out is how this class returns).",
+        },
+      ],
+    },
+  },
+
+  {
     // The contract checks + capture script read/write FIXED local fixture paths (contract/real/*.json),
     // never user input — the non-literal-fs-filename security rule is a pure false positive here.
     files: ["contract/**"],

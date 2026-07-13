@@ -69,10 +69,11 @@ test.describe("API contract — trust scorecard mappers vs the real responses", 
       expect(m!.last_green_at).toBe(rm.lastGreenAt == null ? null : String(rm.lastGreenAt)); // ★ null-safe: never-green preserved
       expect(m!.retry_rate).toBe(rm.retryRate == null ? null : Number(rm.retryRate)); // ★ null preserved → "—"
       expect(m!.retried_passes).toBe(Number(rm.retriedPasses ?? 0));
-      // nested incidents mapped (camelCase → snake_case), NOT folded
-      expect(m!.incidents.real_outage).toBe(Number(rm.incidents.realOutage ?? 0));
-      expect(m!.incidents.perf_regression).toBe(Number(rm.incidents.perfRegression ?? 0));
-      expect(m!.incidents.unclassified).toBe(Number(rm.incidents.unclassified ?? 0));
+      // nested incidents mapped (camelCase → snake_case), NOT folded. The real capture always carries the
+      // incidents object → non-null here (the absent→null path is the teeth test below).
+      expect(m!.incidents!.real_outage).toBe(Number(rm.incidents.realOutage ?? 0));
+      expect(m!.incidents!.perf_regression).toBe(Number(rm.incidents.perfRegression ?? 0));
+      expect(m!.incidents!.unclassified).toBe(Number(rm.incidents.unclassified ?? 0));
       // the API's trust chip renders verbatim (it's a valid taxonomy value in the capture)
       expect(m!.trust).toBe(rm.trust);
     }
@@ -172,5 +173,20 @@ test.describe("API contract — trust scorecard mappers vs the real responses", 
     const m2 = rep2!.monitors.find((x) => x.check_id === 777003)!;
     expect(m2.dimensions.flap, "off-taxonomy → null, never 'ok'").toBeNull();
     expect(m2.dimensions.retry, "valid state still passes through").toBe("flaky");
+  });
+
+  // ★ THE FOURTH INSTANCE (this PR): an ABSENT incidents object maps to null (UNKNOWN), never a synthetic
+  // all-zero rollup that reads "No incidents in this window" (green). A mapper that re-adds `?? {}` produces
+  // a zeroed object here → fails.
+  test("teeth: an absent incidents rollup maps to null, never a synthetic all-zero (fake 'no incidents')", async () => {
+    const raw = real("reports_trust");
+    // present in the real capture → non-null with the real values.
+    const base = await withRealResponse(raw, () => getTrustReport("30d"));
+    expect(base!.monitors[0]!.incidents, "present incidents → non-null").not.toBeNull();
+    // omitted entirely → null (NOT { total: 0, ... }).
+    const stripped: Record<string, unknown> = { ...raw.monitors[0], checkId: 777004 };
+    delete stripped.incidents;
+    const rep = await withRealResponse({ ...raw, monitors: [stripped] }, () => getTrustReport("30d"));
+    expect(rep!.monitors.find((x) => x.check_id === 777004)!.incidents, "omitted incidents → null").toBeNull();
   });
 });

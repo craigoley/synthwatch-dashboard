@@ -370,4 +370,44 @@ test.describe("trust card — monitor detail", () => {
     await expect(row2.getByTestId("trust-dim-flap")).toHaveAttribute("data-state", "elevated");
     await expect(row2.locator('[data-state="unknown"]')).toHaveCount(0); // present payload → no unknowns
   });
+
+  // ★ THE FOURTH fake-quiet instance (this PR): an absent incidents rollup must render EXPLICIT "no data",
+  // never the healthy "No incidents in this window" / a zero count.
+  test("★ absent incidents rollup renders 'no incident data', not the healthy 'No incidents'", async ({ page }) => {
+    const w = defaultWorld();
+    w.trustMonitors = [
+      {
+        checkId: 1, checkName: "API health", sensitive: false,
+        lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
+        runCount: 500, retryCount: 6, retryRate: 0.012,
+        redTest: { captured: false }, specProvenance: { executedSha256: "abc123def456", specPath: "monitors/api/health.spec.ts" },
+        dimensions: { flap: { state: "ok" }, retry: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "ok" } },
+        flakeBudget: { state: "ok", target: 0.02, targetIsDefault: true, scheduledRuns: 500, monitorSide: 0, serviceSide: 0, indeterminate: 0, budget: 10, consumed: 0, remaining: 10, remainingPct: 1, burnRate: 0, directedTask: null },
+        trust: "proven-live",
+        // incidents DELIBERATELY OMITTED → maps to null → explicit "no data".
+      },
+    ];
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+
+    const card = page.getByTestId("trust-card");
+    await expect(card).toBeVisible();
+    // summary surfaces the absence loudly (not hidden, not a zero count)
+    await expect(card.getByTestId("trust-incidents-nodata-summary")).toContainText(/no data/i);
+    // ★ NOT the healthy "No incidents in this window", and no fake count
+    await expect(page.getByTestId("trust-incidents-none")).toHaveCount(0);
+    await expect(card.getByTestId("trust-incidents-count")).toHaveCount(0);
+    // the by-cause disclosure says "no incident data", distinct from a genuine zero
+    await card.getByTestId("trust-details-toggle").click();
+    await expect(card.getByTestId("trust-incidents-nodata")).toContainText(/no incident data/i);
+  });
+
+  test("a genuine zero-incident monitor still reads 'No incidents in this window' (not 'no data')", async ({ page }) => {
+    // regression guard: total:0 (present rollup) ≠ null (absent rollup). defaultWorld check 1 has trustInc() → 0.
+    await mockApi(page, defaultWorld());
+    await page.goto("/checks/1");
+    await page.getByTestId("trust-details-toggle").click();
+    await expect(page.getByTestId("trust-incidents-none")).toContainText(/no incidents in this window/i);
+    await expect(page.getByTestId("trust-incidents-nodata")).toHaveCount(0); // present-zero ≠ absent
+  });
 });
