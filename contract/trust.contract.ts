@@ -43,6 +43,20 @@ test.describe("API contract — trust scorecard mappers vs the real responses", 
     }
     for (const f of ["captured", "testedAt", "method"]) expect(r0.redTest, `redTest has ${f}`).toHaveProperty(f);
     for (const f of ["executedSha256", "specPath"]) expect(r0.specProvenance, `specProvenance has ${f}`).toHaveProperty(f);
+    // ★ STALENESS FIX: the B3-2/B3-3 seams the OLD (2026-07-07) capture never carried, so the gate never
+    // checked them. Now pinned — a rename of any of these drifts loudly here instead of silently mis-scoring.
+    for (const f of ["flakeBudget", "dimensions", "transients", "flapCount", "flapRate", "scheduledCount"]) {
+      expect(r0, `monitor has ${f} (B3 fields the stale capture lacked)`).toHaveProperty(f);
+    }
+    for (const f of ["state", "consumed", "budget", "burnRate", "directedTask", "targetIsDefault"]) {
+      expect(r0.flakeBudget, `flakeBudget has ${f}`).toHaveProperty(f);
+    }
+    for (const f of ["flap", "retry", "monitorNoise", "spuriousRed"]) {
+      expect(r0.dimensions[f], `dimensions.${f} has state`).toHaveProperty("state");
+    }
+    for (const f of ["monitorSide", "serviceSide", "indeterminate", "spuriousRedRate"]) {
+      expect(r0.transients, `transients has ${f}`).toHaveProperty(f);
+    }
 
     const report = await withRealResponse(raw, () => getTrustReport("30d"));
     expect(report, "getTrustReport returns a report (not null) for a 200").toBeTruthy();
@@ -98,22 +112,28 @@ test.describe("API contract — trust scorecard mappers vs the real responses", 
   // ★ MUST-GO-RED (the #177 fake-quiet fix): an ABSENT/null flakeBudget maps to `null` — ABSENCE — never a
   // synthetic state:"ok" object. A monitor with no trust-budget data must NOT read as a healthy budget. A
   // mapper that re-adds `v ?? {}` (→ a coalesced state:"ok") passes this bogus "healthy" value through → fails.
-  test("teeth: an absent/null flakeBudget maps to null (absence), never a synthetic 'ok' budget", async () => {
+  test("teeth: a null/absent flakeBudget maps to null (absence), never a synthetic 'ok' budget", async () => {
     const raw = real("reports_trust");
-    // (a) the REAL capture omits flakeBudget entirely (it predates B3-3) → the mapped monitor is null, not ok.
-    //     THIS is the exact scenario the concern names: "if the API stops sending flakeBudget, do we notice?"
-    const report = await withRealResponse(raw, () => getTrustReport("30d"));
-    expect(report!.monitors[0]!.flake_budget, "absent flakeBudget → null, not a synthetic ok").toBeNull();
-    // (b) an explicit null on the wire also maps to null (belt-and-suspenders across the boundary).
+    // Sanity — the REFRESHED capture now CARRIES flakeBudget (post-B3-3), so the happy path is non-null.
+    // (Pre-refresh this test read the capture's ACCIDENTAL absence as the null case — a staleness artifact,
+    // not a real API state. It now tests the null path against DELIBERATE nulls below.)
+    const base = await withRealResponse(raw, () => getTrustReport("30d"));
+    expect(base!.monitors[0]!.flake_budget, "present flakeBudget → non-null").not.toBeNull();
+    // (a) an explicit null on the wire → null.
     const withNull = { ...raw, monitors: [{ ...raw.monitors[0], checkId: 888888, flakeBudget: null }] };
     const nulled = await withRealResponse(withNull, () => getTrustReport("30d"));
-    expect(nulled!.monitors.find((x) => x.check_id === 888888)!.flake_budget).toBeNull();
+    expect(nulled!.monitors.find((x) => x.check_id === 888888)!.flake_budget, "explicit null → null").toBeNull();
+    // (b) the field OMITTED entirely (the API dropping it) → null, NOT a synthetic "ok". This is the exact
+    //     scenario the concern names: "if the API stops sending flakeBudget tomorrow, do we notice?" — YES.
+    const stripped: Record<string, unknown> = { ...raw.monitors[0], checkId: 777001 };
+    delete stripped.flakeBudget;
+    const omitted = await withRealResponse({ ...raw, monitors: [stripped] }, () => getTrustReport("30d"));
+    expect(omitted!.monitors.find((x) => x.check_id === 777001)!.flake_budget, "omitted → null").toBeNull();
   });
 
-  // A PRESENT flakeBudget maps its fields by the real camelCase names — pins state/consumed/directedTask so a
-  // rename drifts loudly here. (The capture predates B3-3; refresh with `pnpm capture:contracts` to anchor the
-  // live shape.)
-  test("a present flakeBudget maps its fields (state/consumed/directedTask) by camelCase name", async () => {
+  // A DEGRADED flakeBudget maps its fields by the real camelCase names — pins state/consumed/directedTask so a
+  // rename drifts loudly here. (Synthetic degraded row: the live capture's monitors are all healthy state:"ok".)
+  test("a degraded flakeBudget maps its fields (state/consumed/directedTask) by camelCase name", async () => {
     const raw = real("reports_trust");
     const withBudget = {
       ...raw,
@@ -129,5 +149,28 @@ test.describe("API contract — trust scorecard mappers vs the real responses", 
     expect(fb!.state).toBe("degraded-as-a-monitor");
     expect(fb!.consumed).toBe(5);
     expect(fb!.directed_task).toBe("stabilise the selector");
+  });
+
+  // ★ PART 2 MUST-GO-RED (same fake-quiet class): an ABSENT dimensions payload maps every axis to null
+  // (UNKNOWN), never "ok"; and an off-taxonomy state fail-safes to null, never "ok". A mapper that coalesces
+  // to "ok" paints four fake-clean axes — the chip does NOT mitigate (it only downgrades on no-green/no-runs).
+  test("teeth: absent/off-taxonomy dimension state maps to null (unknown), never 'ok'", async () => {
+    const raw = real("reports_trust");
+    // (a) the whole dimensions object OMITTED → every axis null.
+    const stripped: Record<string, unknown> = { ...raw.monitors[0], checkId: 777002 };
+    delete stripped.dimensions;
+    const rep = await withRealResponse({ ...raw, monitors: [stripped] }, () => getTrustReport("30d"));
+    const m = rep!.monitors.find((x) => x.check_id === 777002)!;
+    expect(m.dimensions.flap, "absent flap → null").toBeNull();
+    expect(m.dimensions.retry).toBeNull();
+    expect(m.dimensions.monitor_noise).toBeNull();
+    expect(m.dimensions.spurious_red).toBeNull();
+    // (b) an off-taxonomy state fail-safes to null; a VALID sibling still passes through.
+    const poisoned: Record<string, unknown> = { ...raw.monitors[0], checkId: 777003,
+      dimensions: { flap: { state: "totally-bogus" }, retry: { state: "flaky" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "ok" } } };
+    const rep2 = await withRealResponse({ ...raw, monitors: [poisoned] }, () => getTrustReport("30d"));
+    const m2 = rep2!.monitors.find((x) => x.check_id === 777003)!;
+    expect(m2.dimensions.flap, "off-taxonomy → null, never 'ok'").toBeNull();
+    expect(m2.dimensions.retry, "valid state still passes through").toBe("flaky");
   });
 });

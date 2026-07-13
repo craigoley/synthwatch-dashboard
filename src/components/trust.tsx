@@ -102,6 +102,23 @@ export function DimensionStrip({ row }: { row: TrustRow }) {
     <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="trust-dimensions">
       {DIMENSION_META.map((d) => {
         const state = row.dimensions[d.key];
+        // ★ Absent state (null) → EXPLICIT unknown ("— no data"), NEVER a clean "ok". The API returned no
+        // verdict for this axis; a data gap must read as unknown, not healthy. A hollow dot + em-dash reads
+        // distinctly from the filled faint dot of a genuine "ok".
+        if (state == null) {
+          return (
+            <span
+              key={d.key}
+              className="inline-flex items-center gap-1 text-[11px] text-[var(--color-ink-faint)]"
+              data-testid={`trust-dim-${d.key}`}
+              data-state="unknown"
+              title={`${d.label}: NO DATA — the API returned no state for this dimension. This is UNKNOWN, not "ok".`}
+            >
+              <span className="h-1.5 w-1.5 rounded-full border border-[var(--color-ink-faint)]" />
+              {d.label} <span className="font-medium">— no data</span>
+            </span>
+          );
+        }
         const tone = DIM_STATE_TONE[state];
         const dim = state === "ok"; // an ok dimension reads faint; elevated/flaky read amber (attention)
         return (
