@@ -50,6 +50,18 @@ test.describe("archived monitors — status grid", () => {
     await expect(page.locator('a[href="/checks/1"]')).toHaveCount(0);
   });
 
+  test("archived-then-REMOVED stays visible in 'All' (removed supersedes archived — the purge clock is a call to action)", async ({ page }) => {
+    const w = defaultWorld();
+    w.checks = [
+      listItem({ id: 1, name: "API health", currentStatus: "pass", severity: "warning" }),
+      archived({ removedAt: "2026-07-11T09:00:00Z", currentStatus: "removed" }),
+    ];
+    await mockApi(page, w);
+    await page.goto("/");
+    // the co-occurring timestamps must not hide the purge-clock state from the landing view
+    await expect(page.locator('a[href="/checks/2"]')).toBeVisible();
+  });
+
   test("★ an archived card reads RETIRED, not warming up: no sparkline/p50/p95, no '24h avail building…'", async ({ page }) => {
     const w = defaultWorld();
     w.checks = [archived()];

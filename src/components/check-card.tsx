@@ -43,10 +43,11 @@ export function CheckCard({
   const settled = lastSettledStatus(check);
   // ★ Archived = retired (0071). The card must read as RETIRED, not WARMING UP: no live sparkline, no
   // p50/p95 placeholders, no "24h avail building…" — those affordances promise future runs that will
-  // never come. (Archived cards render only under the opt-in Archived tab and anywhere else the fleet
-  // list is shown unfiltered.)
-  const isArchived = check.archived_at != null;
-  const isRunning = check.current_status === "running";
+  // never come. Removed supersedes archived (same precedence as the grid tabs): an archived-then-removed
+  // check keeps the removed presentation. And the running wash/dot are structurally off for a retired
+  // card, even if the 0071 projection ever leaks a raw current_status (drift guard, like the pulse's).
+  const isArchived = check.archived_at != null && check.removed_at == null;
+  const isRunning = !isArchived && check.current_status === "running";
   const meta = runStatusMeta(settled);
   // ★ Regional = some-but-not-all locations failing — a partial blip, visually
   // distinct (amber) from a full outage (red) or healthy (token color).
