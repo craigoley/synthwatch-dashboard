@@ -27,10 +27,17 @@ test.describe("trust scorecard — Reports 'Trust' tab", () => {
     await expect(table.getByTestId("trust-chip-flaky")).toBeVisible();
     await expect(table.getByTestId("trust-chip-unverified")).toBeVisible();
 
-    // ★ the legend is load-bearing: it must SPELL the named-constant rules verbatim
+    // ★ the legend is load-bearing: it must SPELL the per-dimension formulas + thresholds verbatim (B3-2), then
+    // the chip derivation over them.
     const legend = page.getByTestId("trust-legend");
-    await expect(legend).toContainText("retry < 10%");
-    await expect(legend).toContainText("retry ≥ 50%");
+    const dims = page.getByTestId("trust-legend-dimensions");
+    await expect(dims).toContainText("transient failures ÷ scheduled runs"); // flap formula
+    await expect(dims).toContainText("flaky ≥ 5%"); // flap flaky threshold (measured-distribution)
+    await expect(dims).toContainText("runs needing a real retry ÷ runs"); // retry formula
+    await expect(dims).toContainText("flaky ≥ 10%"); // retry flaky threshold
+    await expect(dims).toContainText("selector-drift incidents"); // monitor-noise formula
+    await expect(legend).toContainText("EVERY dimension ok"); // proven-live derivation
+    await expect(legend).toContainText("ANY dimension flaky"); // flaky derivation
     await expect(legend).toContainText("within 2 intervals");
     await expect(legend).toContainText("never green OR no runs");
   });
@@ -57,6 +64,27 @@ test.describe("trust scorecard — Reports 'Trust' tab", () => {
     await expect(flap).toContainText(/6 transient failures \/ 142 runs/i);
     await expect(flap).toContainText(/didn.t count/i);
     await expect(flap).toHaveAttribute("title", /confirmed not-real.*does NOT count|measured one that self-healed/i);
+  });
+
+  test("★ B3-2: distinct dimensions are surfaced per row — WHICH axis flags, not a collapsed verdict", async ({ page }) => {
+    await mockApi(page, defaultWorld());
+    await page.goto("/reports?tab=trust");
+    await expect(page.getByTestId("trust-table")).toBeVisible();
+
+    // the flaky monitor (checkId 2) names its bad axes: retry flaky + monitor-noise flaky, flap elevated.
+    const flaky = page.getByTestId("trust-row-2");
+    await expect(flaky.getByTestId("trust-dim-retry")).toHaveAttribute("data-state", "flaky");
+    await expect(flaky.getByTestId("trust-dim-monitor_noise")).toHaveAttribute("data-state", "flaky");
+    await expect(flaky.getByTestId("trust-dim-flap")).toHaveAttribute("data-state", "elevated");
+
+    // the nominal monitor (checkId 3) shows retry ELEVATED (blocks proven-live, not yet flaky).
+    await expect(page.getByTestId("trust-row-3").getByTestId("trust-dim-retry")).toHaveAttribute("data-state", "elevated");
+
+    // the proven-live monitor (checkId 1) reads clean on EVERY axis — that's what "proven live" means now.
+    const clean = page.getByTestId("trust-row-1");
+    for (const axis of ["flap", "retry", "monitor_noise"]) {
+      await expect(clean.getByTestId(`trust-dim-${axis}`)).toHaveAttribute("data-state", "ok");
+    }
   });
 
   test("★ redTest is rendered as an honest GAP — 'not captured', never a checkmark/pass", async ({ page }) => {

@@ -238,23 +238,34 @@ const DEFAULT_EGRESS: RawObj[] = [
 const trustInc = (o: Partial<Record<string, number>> = {}) => ({
   total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0, ...o,
 });
+// ★ B3-2: the API's per-dimension states (wire shape: { flap:{state}, retry:{state}, monitorNoise:{state} }).
+// Defaults all-ok; override per axis. Absent entirely → the tolerant mapper reads "ok" (pre-deploy-API safe).
+const trustDims = (o: { flap?: string; retry?: string; monitorNoise?: string } = {}) => ({
+  flap: { state: o.flap ?? "ok" }, retry: { state: o.retry ?? "ok" }, monitorNoise: { state: o.monitorNoise ?? "ok" },
+});
 const DEFAULT_TRUST: RawObj[] = [
   // ★ proven-live WITH retriedPasses > 0 — the coexistence case: a healthy chip + the degrading-but-green
   // annotation. (Other rows omit retriedPasses → the tolerant mapper reads 0 → annotation hidden, which also
   // exercises pre-deploy-API tolerance.)
   { checkId: 1, checkName: "API health", sensitive: false, lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
     runCount: 500, retryCount: 6, retryRate: 0.012, retriedPasses: 4, incidents: trustInc(), redTest: { captured: false },
-    specProvenance: { executedSha256: "abc123def456", specPath: "monitors/api/health.spec.ts" }, trust: "proven-live" },
+    specProvenance: { executedSha256: "abc123def456", specPath: "monitors/api/health.spec.ts" },
+    dimensions: trustDims(), trust: "proven-live" },
   { checkId: 2, checkName: "Homepage flow", sensitive: false, lastGreenAt: "2026-07-01T19:00:00Z", lastRunAt: "2026-07-01T20:00:00Z",
     runCount: 400, retryCount: 240, retryRate: 0.6, retriedPasses: 0, flapCount: 6, scheduledCount: 142, flapRate: 0.0423,
     incidents: trustInc({ total: 3, flakyTransient: 3 }), redTest: { captured: false },
-    specProvenance: { executedSha256: "beef0001", specPath: "monitors/home/flow.spec.ts" }, trust: "flaky" },
+    specProvenance: { executedSha256: "beef0001", specPath: "monitors/home/flow.spec.ts" },
+    // ★ B3-2: retry flaky (60%) AND monitor-noise flaky (3 flaky-transient), flap elevated (4.2%) — the chip
+    // names WHICH axes; the OR-collapse used to hide them behind one "flaky".
+    dimensions: trustDims({ flap: "elevated", retry: "flaky", monitorNoise: "flaky" }), trust: "flaky" },
   { checkId: 3, checkName: "Checkout (nominal + perf)", sensitive: false, lastGreenAt: "2026-07-01T18:00:00Z", lastRunAt: "2026-07-01T20:00:00Z",
-    runCount: 300, retryCount: 60, retryRate: 0.2, incidents: trustInc({ total: 3, realOutage: 1, perfRegression: 1, unclassified: 1 }),
-    redTest: { captured: false }, specProvenance: { executedSha256: "cafe0002", specPath: "monitors/shop/checkout.spec.ts" }, trust: "nominal" },
+    runCount: 300, retryCount: 9, retryRate: 0.03, incidents: trustInc({ total: 3, realOutage: 1, perfRegression: 1, unclassified: 1 }),
+    redTest: { captured: false }, specProvenance: { executedSha256: "cafe0002", specPath: "monitors/shop/checkout.spec.ts" },
+    // ★ B3-2: retry ELEVATED (3% — above the well-behaved band, blocks proven-live, not yet flaky) → nominal.
+    dimensions: trustDims({ retry: "elevated" }), trust: "nominal" },
   { checkId: 4, checkName: "New monitor (never run)", sensitive: false, lastGreenAt: null, lastRunAt: null,
     runCount: 0, retryCount: 0, retryRate: null, incidents: trustInc(), redTest: { captured: false },
-    specProvenance: { executedSha256: null, specPath: null }, trust: "unverified" },
+    specProvenance: { executedSha256: null, specPath: null }, dimensions: trustDims(), trust: "unverified" },
 ];
 // Detail retry series: 4 days, incl. a NULL day (no runs) → a gap in the sparkline, never a 0.
 const DEFAULT_TRUST_SERIES: RawObj[] = [

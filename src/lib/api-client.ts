@@ -73,6 +73,7 @@ import type {
   TrustDetail,
   TrustRow,
   TrustChip,
+  TrustDimensions,
   StatusPage,
   StatusProperty,
   MttrReport,
@@ -2210,6 +2211,10 @@ export async function getRegionHealth(): Promise<RegionHealthReport | null> {
 // series). ★ null-safe (mirrors getSloReport/getEgressReport): 404 → null → the page/card self-hides. Renders
 // the API's rule-derived `trust` chip verbatim (no client-side re-derivation); redTest is an explicit gap.
 const TRUST_CHIPS = ["proven-live", "flaky", "nominal", "unverified"] as const;
+const TRUST_DIM_STATES = ["ok", "elevated", "flaky"] as const;
+// Coerce one dimension state; unknown/absent (pre-deploy API) → "ok" so the strip reads clean, forward-compatible.
+const dimState = (v: unknown) =>
+  (TRUST_DIM_STATES as readonly string[]).includes(String(v)) ? (v as TrustDimensions["flap"]) : "ok";
 
 function mapTrustRow(r: Record<string, unknown>): TrustRow {
   const num = (v: unknown) => Number(v ?? 0);
@@ -2217,6 +2222,8 @@ function mapTrustRow(r: Record<string, unknown>): TrustRow {
   const inc = (r.incidents ?? {}) as Record<string, unknown>;
   const sp = (r.specProvenance ?? {}) as Record<string, unknown>;
   const rt = (r.redTest ?? {}) as Record<string, unknown>;
+  const dim = (r.dimensions ?? {}) as Record<string, unknown>;
+  const dimObj = (k: string) => ((dim[k] ?? {}) as Record<string, unknown>).state;
   return {
     check_id: num(r.checkId),
     check_name: String(r.checkName ?? ""),
@@ -2245,6 +2252,13 @@ function mapTrustRow(r: Record<string, unknown>): TrustRow {
     spec_provenance: {
       executed_sha256: sp.executedSha256 == null ? null : String(sp.executedSha256),
       spec_path: sp.specPath == null ? null : String(sp.specPath),
+    },
+    // ★ B3-2: the distinct per-dimension states. Absent (pre-deploy API) → each "ok" → the strip reads clean
+    // (forward-compatible); the chip itself still comes through verbatim below.
+    dimensions: {
+      flap: dimState(dimObj("flap")),
+      retry: dimState(dimObj("retry")),
+      monitor_noise: dimState(dimObj("monitorNoise")),
     },
     // Coerce to a known chip; an unknown/absent value → "unverified" (null-safe, never crashes the table).
     trust: (TRUST_CHIPS as readonly string[]).includes(String(r.trust)) ? (r.trust as TrustChip) : "unverified",

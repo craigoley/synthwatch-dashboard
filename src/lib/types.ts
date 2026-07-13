@@ -869,6 +869,15 @@ export interface RegionHealthReport {
 // artifact. NO composite score: measured facts + an auditable, rule-derived chip (the rule is a named constant,
 // rendered as a legend). redTest is an explicit "not captured" gap. ──────────────────────────────────────────
 export type TrustChip = "proven-live" | "flaky" | "nominal" | "unverified";
+// ★ B3-2: each trust DIMENSION's graded verdict. The chip is DERIVED over these — proven-live needs every
+// dimension "ok"; any "flaky" ⇒ the chip is flaky. "elevated" = above the fleet's well-behaved band (blocks
+// proven-live, not yet flaky). Absent (pre-deploy API) → treated as "ok" (forward-compatible).
+export type TrustDimensionState = "ok" | "elevated" | "flaky";
+export interface TrustDimensions {
+  flap: TrustDimensionState; // superseded transients ÷ scheduled runs (browser/multistep; 0 for http/dns/ssl)
+  retry: TrustDimensionState; // runs needing a real retry ÷ runs (all kinds)
+  monitor_noise: TrustDimensionState; // RCA flaky-transient + selector-drift "cry wolf" incidents (a count)
+}
 export interface TrustIncidents {
   total: number;
   real_outage: number;
@@ -906,6 +915,9 @@ export interface TrustRow {
   red_test_tested_at: string | null; // ISO when captured; null when not
   red_test_method: string | null; // 'executed-red-fixture' | 'attested-manual' | null — rendered distinctly
   spec_provenance: TrustSpecProvenance;
+  // ★ B3-2: the distinct per-dimension states — the SURFACED replacement for the OR-collapse. The chip is
+  // derived from these; the scorecard shows WHICH dimension flagged rather than a single collapsed verdict.
+  dimensions: TrustDimensions;
   trust: TrustChip; // API-derived from the named-constant rule (rendered verbatim in the legend)
 }
 export interface TrustReport {
