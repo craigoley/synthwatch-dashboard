@@ -13,6 +13,7 @@ import { formatDuration, formatLocalDateTime } from "@/lib/format";
 import { runsDebug } from "@/lib/debug";
 import { TraceViewer } from "@/components/trace-viewer";
 import { TraceSummary } from "@/components/trace-summary";
+import { RunNewFirstPartyErrors } from "@/components/error-diff";
 import { AiInsightsPanel } from "@/components/ai-insights";
 import { BaselineDiffPanel } from "@/components/baseline-diff";
 import type { Run, RunOutcome } from "@/lib/types";
@@ -88,10 +89,12 @@ function RunArtifacts({ run }: { run: Run }) {
 }
 
 function RunRow({
+  checkId,
   run,
   expanded,
   onToggle,
 }: {
+  checkId: number;
   run: Run;
   expanded: boolean;
   onToggle: () => void;
@@ -234,6 +237,11 @@ function RunRow({
               {run.error_message}
             </p>
           )}
+          {/* ★ The join (#245 follow-up): on a FAILED run, the run's NEW first-party errors are shown right
+              here — next to the failed step / error message — so the operator sees the failure AND the new
+              error signal without opening the monitor-level Error diff panel. CITES the captured errors; never
+              infers a cause. Self-hides on a non-browser / no-signal run (the read 404s → null). */}
+          {failed && <RunNewFirstPartyErrors checkId={checkId} runId={run.id} />}
           {/* Render for ANY run with an artifact (RunArtifacts self-hides when there's none). A sensitive
               monitor now stores a REDACTED trace on PASS runs too, so a green run can have a viewable
               trace_url — no longer failure-gated. The failure screenshot block inside still only appears
@@ -415,6 +423,7 @@ export function RunHistory({ checkId, live = false }: { checkId: number; live?: 
             {runs.map((run) => (
               <RunRow
                 key={run.id}
+                checkId={checkId}
                 run={run}
                 expanded={expanded === run.id}
                 onToggle={() => setExpanded((cur) => (cur === run.id ? null : run.id))}

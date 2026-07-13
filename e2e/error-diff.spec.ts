@@ -133,3 +133,101 @@ test.describe("monitor detail — error-diff panel", () => {
     await expect(page.getByTestId("error-diff")).toHaveCount(0);
   });
 });
+
+// ★ The JOIN: on a FAILED run, the run's NEW first-party errors render INLINE on the run row (next to the
+// failed step / error message) so the operator sees the failure AND the new error signal without opening the
+// monitor-level panel — run 955866: add-bread failed while a first-party `Failed to fetch` fired.
+test.describe("failed run — NEW first-party errors joined onto the run row", () => {
+  const FETCH_FAIL: RawObj = {
+    checkId: 1, runId: 955866, location: "eastus2", baselineRunIds: [1, 2, 3, 4],
+    new: [
+      item({ fingerprint: "ff", kind: "net-error", status: null, sourceHost: "api.digitaldevelopment.wegmans.cloud",
+        message: "Product API Error: Failed to fetch", count: 3, severity: 6, severityLabel: "first-party-5xx",
+        firstSeenAfterDeploy: { sha: "abc1234def", deployedAt: "2026-07-12T22:00:00Z", targetHost: "www.wegmans.com" } }),
+      item({ fingerprint: "t1", kind: "net-4xx", origin: "third-party", status: 403, sourceHost: "doubleclick.net", message: "blocked ad request", count: 5, severity: 1, severityLabel: "third-party" }),
+    ],
+    persistent: [], resolved: [],
+    counts: { newFirstParty: 1, newThirdParty: 1, persistentFirstParty: 0, persistentThirdParty: 0, resolvedFirstParty: 0, resolvedThirdParty: 0 },
+    truncated: false, baselineRunCount: 4,
+  };
+
+  function worldWithFailedRun(diff: RawObj | null) {
+    const w = defaultWorld();
+    const at = new Date(Date.now() - 60_000).toISOString(); // recent → inside the run-history (now-7d) window
+    w.details[1] = detail(
+      { id: 1, name: "Wegmans full shop flow", kind: "browser", flowName: "shop", currentStatus: "error" },
+      [run({ id: 955866, status: "error", failedStep: "add-bread", startedAt: at, errorMessage: "Add to Cart affordance not found — expected element visible within 20000ms" })],
+    );
+    if (diff) w.errorDiff = { 1: diff };
+    return w;
+  }
+
+  // The newest run auto-expands on load (run-history #126), so the failed run's body is open without a click.
+  async function openFailedRun(page: import("@playwright/test").Page) {
+    await expect(page.getByTestId("run-history")).toBeVisible();
+    await expect(page.locator("#run-955866")).toContainText("✕ add-bread"); // the failed STEP is on the row
+    await expect(page.getByText("Funnel · run #955866")).toBeVisible(); // body is expanded
+  }
+
+  test("★ 955866 replay: the add-bread failure and the NEW first-party 'Failed to fetch' are shown together, no second panel", async ({ page }) => {
+    await mockApi(page, worldWithFailedRun(FETCH_FAIL));
+    await page.goto("/checks/1");
+    await openFailedRun(page);
+
+    // ★ BOTH facts in the SAME expanded run body — no navigation to the monitor-level error-diff panel.
+    const join = page.getByTestId("run-new-errors");
+    await expect(join).toBeVisible();
+    const list = join.getByTestId("run-new-errors-list");
+    await expect(list).toContainText("Product API Error: Failed to fetch");
+    await expect(list).toContainText("api.digitaldevelopment.wegmans.cloud");
+    await expect(list).toContainText("×3"); // the captured count
+    // deploy correlation rides along (the existing badge, reused)
+    await expect(join.getByTestId("ediff-deploy")).toContainText(/first seen after/i);
+    await expect(join.getByTestId("ediff-deploy")).toContainText("abc1234");
+    // the failure message (the step's error) is right there in the same view — the whole point
+    await expect(page.getByText(/Add to Cart affordance not found/)).toBeVisible();
+
+    // ★ third-party tracker noise stays behind the counted toggle (first-party only by default)
+    await expect(join.getByText(/blocked ad request/)).toHaveCount(0);
+    await expect(join.getByTestId("ediff-thirdparty-toggle")).toContainText("1 third-party");
+    await join.getByTestId("ediff-thirdparty-toggle").click();
+    await expect(join.getByTestId("ediff-thirdparty-list")).toContainText("blocked ad request");
+
+    // ★ CITES, never GUESSES — no inferred-cause language; the disclaimer is explicit.
+    await expect(join).not.toContainText(/caused|probabl|likely|because of/i);
+    await expect(join).toContainText(/not inferred as its cause/i);
+  });
+
+  test("no new first-party errors (clean capture) → says so EXPLICITLY (itself diagnostic)", async ({ page }) => {
+    const clean: RawObj = { ...FETCH_FAIL, new: [], counts: { ...(FETCH_FAIL.counts as RawObj), newFirstParty: 0, newThirdParty: 0 }, truncated: false };
+    await mockApi(page, worldWithFailedRun(clean));
+    await page.goto("/checks/1");
+    await openFailedRun(page);
+
+    const none = page.getByTestId("run-new-errors").getByTestId("run-new-errors-none");
+    await expect(none).toContainText(/no new first-party errors this run/i);
+    await expect(none).toContainText(/not accompanied by a new error signal/i);
+    // it is NOT a truncated case → no "incomplete/truncated" caveat
+    await expect(page.getByTestId("run-new-errors").getByTestId("run-new-errors-truncated")).toHaveCount(0);
+  });
+
+  test("truncated capture → says capture was incomplete, never implies 'no errors'", async ({ page }) => {
+    const truncatedEmpty: RawObj = { ...FETCH_FAIL, new: [], counts: { ...(FETCH_FAIL.counts as RawObj), newFirstParty: 0, newThirdParty: 0 }, truncated: true };
+    await mockApi(page, worldWithFailedRun(truncatedEmpty));
+    await page.goto("/checks/1");
+    await openFailedRun(page);
+
+    const join = page.getByTestId("run-new-errors");
+    await expect(join.getByTestId("run-new-errors-truncated")).toContainText(/truncated/i);
+    await expect(join.getByTestId("run-new-errors-truncated")).toContainText(/incomplete|can’t be concluded/i);
+    // ★ never claims "no errors" when capture may have missed them
+    await expect(join.getByTestId("run-new-errors-none")).toHaveCount(0);
+  });
+
+  test("self-hides on a run with no captured error signal (endpoint 404s)", async ({ page }) => {
+    await mockApi(page, worldWithFailedRun(null)); // no world.errorDiff → the mock 404s
+    await page.goto("/checks/1");
+    await openFailedRun(page);
+    await expect(page.getByTestId("run-new-errors")).toHaveCount(0);
+  });
+});
