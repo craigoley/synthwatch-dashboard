@@ -73,7 +73,7 @@ import type {
   TrustDetail,
   TrustRow,
   TrustChip,
-  TrustDimensions,
+  TrustDimensionState,
   StatusPage,
   StatusProperty,
   MttrReport,
@@ -2212,9 +2212,12 @@ export async function getRegionHealth(): Promise<RegionHealthReport | null> {
 // the API's rule-derived `trust` chip verbatim (no client-side re-derivation); redTest is an explicit gap.
 const TRUST_CHIPS = ["proven-live", "flaky", "nominal", "unverified"] as const;
 const TRUST_DIM_STATES = ["ok", "elevated", "flaky"] as const;
-// Coerce one dimension state; unknown/absent (pre-deploy API) → "ok" so the strip reads clean, forward-compatible.
-const dimState = (v: unknown) =>
-  (TRUST_DIM_STATES as readonly string[]).includes(String(v)) ? (v as TrustDimensions["flap"]) : "ok";
+// ★ Coerce one dimension state. Absent / off-taxonomy → null (UNKNOWN), NEVER "ok": an absent per-dimension
+// state must not read as a clean axis. A monitor WITH runs + a green whose dimensions payload went missing
+// reads chip "nominal" (deriveChip only downgrades to "unverified" on no-green/no-runs) — so coalescing the
+// dimensions to "ok" would paint four clean axes with nothing mitigating it (the #177 fake-quiet class).
+const dimState = (v: unknown): TrustDimensionState | null =>
+  (TRUST_DIM_STATES as readonly string[]).includes(String(v)) ? (v as TrustDimensionState) : null;
 
 function mapTrustRow(r: Record<string, unknown>): TrustRow {
   const num = (v: unknown) => Number(v ?? 0);

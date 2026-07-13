@@ -5,12 +5,21 @@
       "checkId": 343,
       "checkName": "algolia-product-search-api",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:21:12.887919+00:00",
-      "lastRunAt": "2026-07-07T18:21:12.815417+00:00",
-      "runCount": 2374,
+      "lastGreenAt": "2026-07-13T18:26:14.336871+00:00",
+      "lastRunAt": "2026-07-13T18:26:14.295939+00:00",
+      "runCount": 7331,
       "retryCount": 3,
-      "retryRate": 0.0013,
+      "retryRate": 0.0004,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 7331,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -29,18 +38,56 @@
         "executedSha256": null,
         "specPath": null
       },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 7331,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 146.62,
+        "consumed": 0,
+        "remaining": 146.62,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
       "trust": "proven-live"
     },
     {
       "checkId": 192,
       "checkName": "Amore: menu page exposes a downloadable menu",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:16:18.250831+00:00",
-      "lastRunAt": "2026-07-07T18:16:18.218355+00:00",
-      "runCount": 1005,
+      "lastGreenAt": "2026-07-13T18:20:21.168427+00:00",
+      "lastRunAt": "2026-07-13T18:20:21.164117+00:00",
+      "runCount": 1449,
       "retryCount": 0,
       "retryRate": 0,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 1449,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -59,18 +106,56 @@
         "executedSha256": "4b8617894d255663026581f8831f955c8cbe73b67b30e29336ce55129e159484",
         "specPath": "monitors/amore/amore-menu.spec.ts"
       },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 1449,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 28.98,
+        "consumed": 0,
+        "remaining": 28.98,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
       "trust": "proven-live"
     },
     {
       "checkId": 193,
       "checkName": "Amore: reservations OpenTable widget loads",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:26:02.827657+00:00",
-      "lastRunAt": "2026-07-07T18:26:02.794089+00:00",
-      "runCount": 540,
+      "lastGreenAt": "2026-07-13T17:55:19.387489+00:00",
+      "lastRunAt": "2026-07-13T17:55:19.337859+00:00",
+      "runCount": 878,
       "retryCount": 2,
-      "retryRate": 0.0037,
+      "retryRate": 0.0023,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 878,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -86,8 +171,37 @@
         "method": null
       },
       "specProvenance": {
-        "executedSha256": "d2fcfd23a388f61c5108780f8d64072253300d40e6a59a887382a7f0bda00bd0",
+        "executedSha256": "f14f2e9ea644e7268c41aadcc081a49bb05a7dc5eef54f99b1a80b29351eaf0a",
         "specPath": "monitors/amore/amore-reservations.spec.ts"
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 878,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 17.56,
+        "consumed": 0,
+        "remaining": 17.56,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "proven-live"
     },
@@ -95,12 +209,21 @@
       "checkId": 33,
       "checkName": "API CORS preflight",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:21:15.584903+00:00",
-      "lastRunAt": "2026-07-07T18:21:15.515023+00:00",
-      "runCount": 5698,
-      "retryCount": 0,
-      "retryRate": 0,
-      "retriedPasses": 0,
+      "lastGreenAt": "2026-07-13T18:26:14.832786+00:00",
+      "lastRunAt": "2026-07-13T18:26:14.794224+00:00",
+      "runCount": 10655,
+      "retryCount": 1,
+      "retryRate": 0.0001,
+      "retriedPasses": 1,
+      "flapCount": 0,
+      "scheduledCount": 10655,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -118,6 +241,35 @@
       "specProvenance": {
         "executedSha256": null,
         "specPath": null
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 10655,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 213.1,
+        "consumed": 0,
+        "remaining": 213.1,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "proven-live"
     },
@@ -125,12 +277,21 @@
       "checkId": 342,
       "checkName": "kitting-catering-api",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:26:46.367858+00:00",
-      "lastRunAt": "2026-07-07T18:26:46.364295+00:00",
-      "runCount": 1648,
-      "retryCount": 270,
-      "retryRate": 0.1638,
-      "retriedPasses": 8,
+      "lastGreenAt": "2026-07-13T18:20:56.200629+00:00",
+      "lastRunAt": "2026-07-13T18:20:56.192302+00:00",
+      "runCount": 2797,
+      "retryCount": 310,
+      "retryRate": 0.1108,
+      "retriedPasses": 21,
+      "flapCount": 0,
+      "scheduledCount": 2797,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -149,18 +310,56 @@
         "executedSha256": null,
         "specPath": null
       },
-      "trust": "nominal"
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "flaky"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 2797,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 55.94,
+        "consumed": 0,
+        "remaining": 55.94,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
+      "trust": "flaky"
     },
     {
       "checkId": 341,
       "checkName": "kitting-takeout-api",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:16:29.639886+00:00",
-      "lastRunAt": "2026-07-07T18:16:29.607071+00:00",
-      "runCount": 1681,
-      "retryCount": 151,
-      "retryRate": 0.0898,
-      "retriedPasses": 12,
+      "lastGreenAt": "2026-07-13T18:21:33.766109+00:00",
+      "lastRunAt": "2026-07-13T18:21:33.762311+00:00",
+      "runCount": 2831,
+      "retryCount": 178,
+      "retryRate": 0.0629,
+      "retriedPasses": 20,
+      "flapCount": 0,
+      "scheduledCount": 2831,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -179,24 +378,62 @@
         "executedSha256": null,
         "specPath": null
       },
-      "trust": "proven-live"
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "elevated"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 2831,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 56.62,
+        "consumed": 0,
+        "remaining": 56.62,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
+      "trust": "nominal"
     },
     {
       "checkId": 352,
       "checkName": "Meals 2 Go: browse a catering menu (anon)",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:26:37.739272+00:00",
-      "lastRunAt": "2026-07-07T18:26:37.735692+00:00",
-      "runCount": 256,
-      "retryCount": 0,
-      "retryRate": 0,
+      "lastGreenAt": "2026-07-13T18:21:51.716249+00:00",
+      "lastRunAt": "2026-07-13T18:21:51.711177+00:00",
+      "runCount": 1828,
+      "retryCount": 2,
+      "retryRate": 0.0011,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 1828,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
-        "total": 0,
+        "total": 1,
         "realOutage": 0,
         "flakyTransient": 0,
         "selectorDrift": 0,
-        "environmentRegional": 0,
+        "environmentRegional": 1,
         "perfRegression": 0,
         "unclassified": 0
       },
@@ -206,8 +443,37 @@
         "method": null
       },
       "specProvenance": {
-        "executedSha256": "82ae9cf39f098a7913ff17698294086c7a2167b0fff9315e6d74c405a587e4e5",
+        "executedSha256": "6f11f0d3ac8ea49968d2329df67b66078723ecf6e69571adedcd40def3a77791",
         "specPath": "monitors/wegmans/meals2go-catering-browse.spec.ts"
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 1828,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 36.56,
+        "consumed": 0,
+        "remaining": 36.56,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "proven-live"
     },
@@ -215,20 +481,29 @@
       "checkId": 221,
       "checkName": "Meals 2 Go: browse a cuisine menu (anon)",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:26:48.092683+00:00",
-      "lastRunAt": "2026-07-07T18:26:48.021305+00:00",
-      "runCount": 776,
-      "retryCount": 2,
-      "retryRate": 0.0026,
+      "lastGreenAt": "2026-07-13T18:21:45.710301+00:00",
+      "lastRunAt": "2026-07-13T18:21:45.706176+00:00",
+      "runCount": 2349,
+      "retryCount": 5,
+      "retryRate": 0.0021,
       "retriedPasses": 1,
+      "flapCount": 0,
+      "scheduledCount": 2349,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
-        "total": 1,
+        "total": 2,
         "realOutage": 0,
         "flakyTransient": 1,
         "selectorDrift": 0,
         "environmentRegional": 0,
         "perfRegression": 0,
-        "unclassified": 0
+        "unclassified": 1
       },
       "redTest": {
         "captured": false,
@@ -236,8 +511,37 @@
         "method": null
       },
       "specProvenance": {
-        "executedSha256": "74de19d25f1e3826201b230318fb05865b0d26b1c9f4f622e4ea865400baf706",
+        "executedSha256": "be0365394015bf711393c6358b377fa1b0308d011af0223f6fd544b8e3dab363",
         "specPath": "monitors/wegmans/meals2go-browse-menu.spec.ts"
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "flaky"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 2349,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 46.98,
+        "consumed": 0,
+        "remaining": 46.98,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "flaky"
     },
@@ -245,12 +549,21 @@
       "checkId": 306,
       "checkName": "meals2go cert expiry",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T17:55:18.75039+00:00",
-      "lastRunAt": "2026-07-07T17:55:18.744715+00:00",
-      "runCount": 131,
+      "lastGreenAt": "2026-07-13T17:55:18.036705+00:00",
+      "lastRunAt": "2026-07-13T17:55:18.029545+00:00",
+      "runCount": 275,
       "retryCount": 0,
       "retryRate": 0,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 275,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -268,6 +581,35 @@
       "specProvenance": {
         "executedSha256": null,
         "specPath": null
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 275,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 5.5,
+        "consumed": 0,
+        "remaining": 5.5,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "proven-live"
     },
@@ -275,18 +617,27 @@
       "checkId": 80,
       "checkName": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:16:34.793626+00:00",
-      "lastRunAt": "2026-07-07T18:16:34.719161+00:00",
-      "runCount": 1741,
-      "retryCount": 4,
-      "retryRate": 0.0023,
-      "retriedPasses": 1,
+      "lastGreenAt": "2026-07-13T18:21:20.213637+00:00",
+      "lastRunAt": "2026-07-13T18:21:20.209234+00:00",
+      "runCount": 3187,
+      "retryCount": 8,
+      "retryRate": 0.0025,
+      "retriedPasses": 2,
+      "flapCount": 0,
+      "scheduledCount": 3187,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
-        "total": 2,
+        "total": 3,
         "realOutage": 0,
         "flakyTransient": 0,
         "selectorDrift": 2,
-        "environmentRegional": 0,
+        "environmentRegional": 1,
         "perfRegression": 0,
         "unclassified": 0
       },
@@ -296,8 +647,37 @@
         "method": null
       },
       "specProvenance": {
-        "executedSha256": "ec1fe9c3b9ab6f26293d32b8762b2dd8553a09113dd3040f5846defd40d695a1",
+        "executedSha256": "e7fe4a682cf9935267250b342f7ba39ce75364561b63303bdad103187d72cbf6",
         "specPath": "monitors/wegmans/meals2go-cheese-pizza-cart.spec.ts"
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "flaky"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 3187,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 63.74,
+        "consumed": 0,
+        "remaining": 63.74,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "flaky"
     },
@@ -305,12 +685,21 @@
       "checkId": 347,
       "checkName": "meals2go-dns",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:21:16.968832+00:00",
-      "lastRunAt": "2026-07-07T18:21:16.898712+00:00",
-      "runCount": 2421,
+      "lastGreenAt": "2026-07-13T18:26:15.824289+00:00",
+      "lastRunAt": "2026-07-13T18:26:15.785013+00:00",
+      "runCount": 7378,
       "retryCount": 0,
       "retryRate": 0,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 7378,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -329,26 +718,64 @@
         "executedSha256": null,
         "specPath": null
       },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 7378,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 147.56,
+        "consumed": 0,
+        "remaining": 147.56,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
       "trust": "proven-live"
     },
     {
       "checkId": 81,
       "checkName": "Meals 2 Go: homepage load",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:21:17.526133+00:00",
-      "lastRunAt": "2026-07-07T18:21:17.45671+00:00",
-      "runCount": 3949,
-      "retryCount": 3,
-      "retryRate": 0.0008,
+      "lastGreenAt": "2026-07-13T18:26:07.482118+00:00",
+      "lastRunAt": "2026-07-13T18:26:07.443949+00:00",
+      "runCount": 7287,
+      "retryCount": 11,
+      "retryRate": 0.0015,
       "retriedPasses": 1,
+      "flapCount": 0,
+      "scheduledCount": 7287,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
-        "total": 0,
+        "total": 1,
         "realOutage": 0,
         "flakyTransient": 0,
         "selectorDrift": 0,
         "environmentRegional": 0,
         "perfRegression": 0,
-        "unclassified": 0
+        "unclassified": 1
       },
       "redTest": {
         "captured": false,
@@ -356,8 +783,37 @@
         "method": null
       },
       "specProvenance": {
-        "executedSha256": "d4fd5873a3c9d065928d1e00d77c28c26adf5bcdcaaa8807692e78a7cb88d02b",
+        "executedSha256": "999d7fb9dc228d1da021e9ef9a1ba7af0a46ea6efbdbdd0612e45319fde75cc2",
         "specPath": "monitors/wegmans/meals2go-homepage.spec.ts"
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 7287,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 145.74,
+        "consumed": 0,
+        "remaining": 145.74,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "proven-live"
     },
@@ -365,12 +821,21 @@
       "checkId": 194,
       "checkName": "Next Door: homepage location picker",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:27:14.438266+00:00",
-      "lastRunAt": "2026-07-07T18:27:14.40768+00:00",
-      "runCount": 1373,
-      "retryCount": 2,
-      "retryRate": 0.0015,
+      "lastGreenAt": "2026-07-13T18:20:25.920634+00:00",
+      "lastRunAt": "2026-07-13T18:20:25.916341+00:00",
+      "runCount": 2155,
+      "retryCount": 3,
+      "retryRate": 0.0014,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 2155,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -389,18 +854,56 @@
         "executedSha256": "204eb6cb12211dc25574109954dbd024a583f310e282eefbf93e8b014d819a48",
         "specPath": "monitors/nextdoor/nextdoor-homepage.spec.ts"
       },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 2155,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 43.1,
+        "consumed": 0,
+        "remaining": 43.1,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
       "trust": "proven-live"
     },
     {
       "checkId": 195,
       "checkName": "Next Door: reservations OpenTable widget loads",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:27:17.075687+00:00",
-      "lastRunAt": "2026-07-07T18:27:17.071241+00:00",
-      "runCount": 988,
-      "retryCount": 4,
-      "retryRate": 0.004,
+      "lastGreenAt": "2026-07-13T18:20:24.964202+00:00",
+      "lastRunAt": "2026-07-13T18:20:24.919186+00:00",
+      "runCount": 1431,
+      "retryCount": 5,
+      "retryRate": 0.0035,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 1431,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -416,51 +919,59 @@
         "method": null
       },
       "specProvenance": {
-        "executedSha256": "a2aa049c288524e433c91bf6e0a3a36b10d678cfb08f8d55c9efd21fa613d48b",
+        "executedSha256": "2fac9a300caefc1d4d0871d0335347c51ca9e71a7fff11d1d821f4f1029813a8",
         "specPath": "monitors/nextdoor/nextdoor-reservations.spec.ts"
       },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 1431,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 28.62,
+        "consumed": 0,
+        "remaining": 28.62,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
       "trust": "proven-live"
-    },
-    {
-      "checkId": 59,
-      "checkName": "rca-demo",
-      "sensitive": false,
-      "lastGreenAt": null,
-      "lastRunAt": "2026-07-07T18:21:14.625952+00:00",
-      "runCount": 5621,
-      "retryCount": 0,
-      "retryRate": 0,
-      "retriedPasses": 0,
-      "incidents": {
-        "total": 11,
-        "realOutage": 6,
-        "flakyTransient": 0,
-        "selectorDrift": 0,
-        "environmentRegional": 0,
-        "perfRegression": 0,
-        "unclassified": 5
-      },
-      "redTest": {
-        "captured": false,
-        "testedAt": null,
-        "method": null
-      },
-      "specProvenance": {
-        "executedSha256": null,
-        "specPath": null
-      },
-      "trust": "unverified"
     },
     {
       "checkId": 4,
       "checkName": "SynthWatch API health",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:21:13.812668+00:00",
-      "lastRunAt": "2026-07-07T18:21:13.742867+00:00",
-      "runCount": 5937,
+      "lastGreenAt": "2026-07-13T18:21:45.466862+00:00",
+      "lastRunAt": "2026-07-13T18:21:45.462821+00:00",
+      "runCount": 8196,
       "retryCount": 0,
       "retryRate": 0,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 8196,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 2,
         "realOutage": 0,
@@ -479,18 +990,124 @@
         "executedSha256": null,
         "specPath": null
       },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 8196,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 163.92,
+        "consumed": 0,
+        "remaining": 163.92,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
       "trust": "proven-live"
+    },
+    {
+      "checkId": 395,
+      "checkName": "synthwatch-canary-confirmation-retry",
+      "sensitive": false,
+      "lastGreenAt": "2026-07-13T18:21:57.426505+00:00",
+      "lastRunAt": "2026-07-13T18:21:57.422814+00:00",
+      "runCount": 112,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "flapCount": 1,
+      "scheduledCount": 111,
+      "flapRate": 0.009,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
+      "incidents": {
+        "total": 1,
+        "realOutage": 0,
+        "flakyTransient": 1,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": null,
+        "specPath": null
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "flaky"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 109,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 2.18,
+        "consumed": 0,
+        "remaining": 2.18,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
+      "trust": "flaky"
     },
     {
       "checkId": 222,
       "checkName": "SynthWatch dashboard homepage",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:27:11.013672+00:00",
-      "lastRunAt": "2026-07-07T18:27:10.982369+00:00",
-      "runCount": 1973,
+      "lastGreenAt": "2026-07-13T18:25:22.243614+00:00",
+      "lastRunAt": "2026-07-13T18:25:22.170555+00:00",
+      "runCount": 3853,
       "retryCount": 1,
-      "retryRate": 0.0005,
+      "retryRate": 0.0003,
       "retriedPasses": 1,
+      "flapCount": 2,
+      "scheduledCount": 3853,
+      "flapRate": 0.0005,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -506,8 +1123,37 @@
         "method": null
       },
       "specProvenance": {
-        "executedSha256": "c3190c5c5c5f16aa1d5d792f204fc98390884681911d8eab102fffeffdcfb93b",
+        "executedSha256": "8becc720becc54ec8f55d749ecec30fca72a6b830b8deb38d634cada2b0ccb11",
         "specPath": "monitors/synthwatch/dashboard-homepage.spec.ts"
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 3850,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 77,
+        "consumed": 0,
+        "remaining": 77,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "proven-live"
     },
@@ -515,12 +1161,21 @@
       "checkId": 344,
       "checkName": "wegmansamore-cert",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T17:55:18.997404+00:00",
-      "lastRunAt": "2026-07-07T17:55:18.993328+00:00",
-      "runCount": 93,
+      "lastGreenAt": "2026-07-13T17:55:18.180522+00:00",
+      "lastRunAt": "2026-07-13T17:55:18.176984+00:00",
+      "runCount": 237,
       "retryCount": 0,
       "retryRate": 0,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 237,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -538,6 +1193,35 @@
       "specProvenance": {
         "executedSha256": null,
         "specPath": null
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 237,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 4.74,
+        "consumed": 0,
+        "remaining": 4.74,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "proven-live"
     },
@@ -545,12 +1229,21 @@
       "checkId": 348,
       "checkName": "wegmansamore-dns",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:21:11.825038+00:00",
-      "lastRunAt": "2026-07-07T18:21:11.754521+00:00",
-      "runCount": 2371,
+      "lastGreenAt": "2026-07-13T18:25:46.256315+00:00",
+      "lastRunAt": "2026-07-13T18:25:46.249509+00:00",
+      "runCount": 3925,
       "retryCount": 0,
       "retryRate": 0,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 3925,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -568,6 +1261,35 @@
       "specProvenance": {
         "executedSha256": null,
         "specPath": null
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 3925,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 78.5,
+        "consumed": 0,
+        "remaining": 78.5,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "proven-live"
     },
@@ -575,12 +1297,21 @@
       "checkId": 350,
       "checkName": "wegmans-cake-catering-handoff",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:27:19.851697+00:00",
-      "lastRunAt": "2026-07-07T18:27:19.84792+00:00",
-      "runCount": 1001,
+      "lastGreenAt": "2026-07-13T18:25:21.294802+00:00",
+      "lastRunAt": "2026-07-13T18:25:21.220289+00:00",
+      "runCount": 2726,
       "retryCount": 0,
       "retryRate": 0,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 2726,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -598,6 +1329,35 @@
       "specProvenance": {
         "executedSha256": null,
         "specPath": null
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 2726,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 54.52,
+        "consumed": 0,
+        "remaining": 54.52,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "proven-live"
     },
@@ -605,12 +1365,21 @@
       "checkId": 10,
       "checkName": "Wegmans.com cert",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T17:55:19.148557+00:00",
-      "lastRunAt": "2026-07-07T17:55:19.143736+00:00",
-      "runCount": 523,
+      "lastGreenAt": "2026-07-13T17:55:18.277289+00:00",
+      "lastRunAt": "2026-07-13T17:55:18.270947+00:00",
+      "runCount": 667,
       "retryCount": 0,
       "retryRate": 0,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 667,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -628,6 +1397,35 @@
       "specProvenance": {
         "executedSha256": null,
         "specPath": null
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 667,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 13.34,
+        "consumed": 0,
+        "remaining": 13.34,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "proven-live"
     },
@@ -635,12 +1433,21 @@
       "checkId": 351,
       "checkName": "wegmans-delivery-pickup-landing",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:27:13.836343+00:00",
-      "lastRunAt": "2026-07-07T18:27:13.805328+00:00",
-      "runCount": 1444,
+      "lastGreenAt": "2026-07-13T18:26:06.783602+00:00",
+      "lastRunAt": "2026-07-13T18:26:06.745004+00:00",
+      "runCount": 4022,
       "retryCount": 0,
       "retryRate": 0,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 4022,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -658,6 +1465,35 @@
       "specProvenance": {
         "executedSha256": null,
         "specPath": null
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 4022,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 80.44,
+        "consumed": 0,
+        "remaining": 80.44,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "proven-live"
     },
@@ -665,12 +1501,21 @@
       "checkId": 346,
       "checkName": "wegmans-dns",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:21:16.439261+00:00",
-      "lastRunAt": "2026-07-07T18:21:16.368799+00:00",
-      "runCount": 2406,
+      "lastGreenAt": "2026-07-13T18:26:15.386694+00:00",
+      "lastRunAt": "2026-07-13T18:26:15.348214+00:00",
+      "runCount": 7363,
       "retryCount": 0,
       "retryRate": 0,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 7363,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -689,18 +1534,124 @@
         "executedSha256": null,
         "specPath": null
       },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 7363,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 147.26,
+        "consumed": 0,
+        "remaining": 147.26,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
       "trust": "proven-live"
+    },
+    {
+      "checkId": 355,
+      "checkName": "Wegmans: full authenticated pickup shopping flow",
+      "sensitive": true,
+      "lastGreenAt": "2026-07-13T18:15:20.750324+00:00",
+      "lastRunAt": "2026-07-13T18:15:20.743969+00:00",
+      "runCount": 109,
+      "retryCount": 0,
+      "retryRate": 0,
+      "retriedPasses": 0,
+      "flapCount": 3,
+      "scheduledCount": 61,
+      "flapRate": 0.0492,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
+      "incidents": {
+        "total": 1,
+        "realOutage": 1,
+        "flakyTransient": 0,
+        "selectorDrift": 0,
+        "environmentRegional": 0,
+        "perfRegression": 0,
+        "unclassified": 0
+      },
+      "redTest": {
+        "captured": false,
+        "testedAt": null,
+        "method": null
+      },
+      "specProvenance": {
+        "executedSha256": "974a9c6ea2a7f3697ba0122dc813a221063ed0b056fc6bd98ea7be5f20a44b44",
+        "specPath": "monitors/wegmans/full-shop-flow.spec.ts"
+      },
+      "dimensions": {
+        "flap": {
+          "state": "elevated"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 57,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 1.14,
+        "consumed": 0,
+        "remaining": 1.14,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
+      "trust": "nominal"
     },
     {
       "checkId": 2,
       "checkName": "Wegmans homepage",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:26:09.703967+00:00",
-      "lastRunAt": "2026-07-07T18:26:09.672535+00:00",
-      "runCount": 1543,
-      "retryCount": 0,
-      "retryRate": 0,
+      "lastGreenAt": "2026-07-13T01:25:31.482591+00:00",
+      "lastRunAt": "2026-07-13T01:25:31.479025+00:00",
+      "runCount": 2303,
+      "retryCount": 2,
+      "retryRate": 0.0009,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 2303,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 2,
         "realOutage": 0,
@@ -719,18 +1670,56 @@
         "executedSha256": null,
         "specPath": null
       },
-      "trust": "proven-live"
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 2303,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 46.06,
+        "consumed": 0,
+        "remaining": 46.06,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
+      "trust": "nominal"
     },
     {
       "checkId": 223,
       "checkName": "Wegmans: homepage load",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:26:49.356945+00:00",
-      "lastRunAt": "2026-07-07T18:27:20.213148+00:00",
-      "runCount": 1374,
-      "retryCount": 1,
+      "lastGreenAt": "2026-07-13T18:20:56.758937+00:00",
+      "lastRunAt": "2026-07-13T18:20:56.755005+00:00",
+      "runCount": 2817,
+      "retryCount": 2,
       "retryRate": 0.0007,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 2817,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -746,8 +1735,37 @@
         "method": null
       },
       "specProvenance": {
-        "executedSha256": "45a0646acfd34a3af109d82ca5954e1440b741dadac162b0a1715cee1edcb8ab",
+        "executedSha256": "9de812d4205b93a6244376ca9d9f60b097204041f0441f255d1ffa0f19862271",
         "specPath": "monitors/wegmans/homepage-load.spec.ts"
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 2817,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 56.34,
+        "consumed": 0,
+        "remaining": 56.34,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "proven-live"
     },
@@ -755,12 +1773,21 @@
       "checkId": 345,
       "checkName": "wegmansnextdoor-cert",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T17:55:19.296859+00:00",
-      "lastRunAt": "2026-07-07T17:55:19.290751+00:00",
-      "runCount": 94,
+      "lastGreenAt": "2026-07-13T17:55:18.416334+00:00",
+      "lastRunAt": "2026-07-13T17:55:18.41115+00:00",
+      "runCount": 238,
       "retryCount": 0,
       "retryRate": 0,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 238,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -778,6 +1805,35 @@
       "specProvenance": {
         "executedSha256": null,
         "specPath": null
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 238,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 4.76,
+        "consumed": 0,
+        "remaining": 4.76,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "proven-live"
     },
@@ -785,12 +1841,21 @@
       "checkId": 349,
       "checkName": "wegmansnextdoor-dns",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:21:12.350498+00:00",
-      "lastRunAt": "2026-07-07T18:21:12.280503+00:00",
-      "runCount": 2404,
+      "lastGreenAt": "2026-07-13T18:25:46.319718+00:00",
+      "lastRunAt": "2026-07-13T18:25:46.314977+00:00",
+      "runCount": 3958,
       "retryCount": 0,
       "retryRate": 0,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 3958,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -809,18 +1874,56 @@
         "executedSha256": null,
         "specPath": null
       },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 3958,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 79.16,
+        "consumed": 0,
+        "remaining": 79.16,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
       "trust": "proven-live"
     },
     {
       "checkId": 77,
       "checkName": "Wegmans: recipe navigation",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:26:46.462925+00:00",
-      "lastRunAt": "2026-07-07T18:26:46.459502+00:00",
-      "runCount": 2149,
-      "retryCount": 1,
-      "retryRate": 0.0005,
-      "retriedPasses": 0,
+      "lastGreenAt": "2026-07-13T18:20:37.54813+00:00",
+      "lastRunAt": "2026-07-13T18:20:37.544066+00:00",
+      "runCount": 3783,
+      "retryCount": 21,
+      "retryRate": 0.0056,
+      "retriedPasses": 6,
+      "flapCount": 0,
+      "scheduledCount": 3783,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 1,
         "realOutage": 0,
@@ -839,18 +1942,56 @@
         "executedSha256": "6a4ac54807cfd411badb702223924ffe463c07f61b616e0737d3b6521f19bf8c",
         "specPath": "monitors/wegmans/recipe-nav.spec.ts"
       },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "flaky"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 3783,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 75.66,
+        "consumed": 0,
+        "remaining": 75.66,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
       "trust": "flaky"
     },
     {
       "checkId": 220,
       "checkName": "Wegmans: recipe search",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:26:14.348974+00:00",
-      "lastRunAt": "2026-07-07T18:26:14.277493+00:00",
-      "runCount": 763,
-      "retryCount": 2,
-      "retryRate": 0.0026,
-      "retriedPasses": 1,
+      "lastGreenAt": "2026-07-13T18:25:32.421799+00:00",
+      "lastRunAt": "2026-07-13T18:25:32.417222+00:00",
+      "runCount": 1626,
+      "retryCount": 9,
+      "retryRate": 0.0055,
+      "retriedPasses": 2,
+      "flapCount": 0,
+      "scheduledCount": 1626,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 1,
         "realOutage": 0,
@@ -869,18 +2010,56 @@
         "executedSha256": "273907a03105709cacbc5f6ad1a87ce57a0766ed59d07199ccb8d96c7075e6b0",
         "specPath": "monitors/wegmans/recipe-search.spec.ts"
       },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "flaky"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 1626,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 32.52,
+        "consumed": 0,
+        "remaining": 32.52,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
       "trust": "flaky"
     },
     {
       "checkId": 224,
       "checkName": "Wegmans: search autocomplete suggestions",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:25:49.970598+00:00",
-      "lastRunAt": "2026-07-07T18:25:49.900274+00:00",
-      "runCount": 753,
-      "retryCount": 38,
-      "retryRate": 0.0505,
-      "retriedPasses": 37,
+      "lastGreenAt": "2026-07-13T18:25:18.731952+00:00",
+      "lastRunAt": "2026-07-13T18:25:18.72417+00:00",
+      "runCount": 1616,
+      "retryCount": 62,
+      "retryRate": 0.0384,
+      "retriedPasses": 59,
+      "flapCount": 0,
+      "scheduledCount": 1616,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -896,21 +2075,59 @@
         "method": null
       },
       "specProvenance": {
-        "executedSha256": "b667b94bfe0f2e6ff51fcc5063e42ebe45386e9ae1fc9fa525d7214bdd1fe799",
+        "executedSha256": "8cf3d7e22d437af097db60f6fb5d30b6163e439ddb5ad356d7639cd9a6c249e3",
         "specPath": "monitors/wegmans/search-autocomplete.spec.ts"
       },
-      "trust": "proven-live"
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "elevated"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 1616,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 32.32,
+        "consumed": 0,
+        "remaining": 32.32,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
+      "trust": "nominal"
     },
     {
       "checkId": 74,
       "checkName": "Wegmans: search → product page",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:20:45.683297+00:00",
-      "lastRunAt": "2026-07-07T18:27:19.303517+00:00",
-      "runCount": 2738,
-      "retryCount": 3,
-      "retryRate": 0.0011,
+      "lastGreenAt": "2026-07-13T18:25:29.11276+00:00",
+      "lastRunAt": "2026-07-13T18:25:29.041677+00:00",
+      "runCount": 4615,
+      "retryCount": 4,
+      "retryRate": 0.0009,
       "retriedPasses": 1,
+      "flapCount": 0,
+      "scheduledCount": 4615,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 1,
         "realOutage": 0,
@@ -929,18 +2146,56 @@
         "executedSha256": "468aba87f9b18b65369f3e6319ccfaf08f2d5e095c8c27f981673192d7db689a",
         "specPath": "monitors/wegmans/search-product.spec.ts"
       },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 4615,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 92.3,
+        "consumed": 0,
+        "remaining": 92.3,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
       "trust": "proven-live"
     },
     {
       "checkId": 197,
       "checkName": "Wegmans: shop category browse",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:26:23.488493+00:00",
-      "lastRunAt": "2026-07-07T18:26:23.45654+00:00",
-      "runCount": 1507,
-      "retryCount": 1,
-      "retryRate": 0.0007,
-      "retriedPasses": 1,
+      "lastGreenAt": "2026-07-13T18:21:07.892261+00:00",
+      "lastRunAt": "2026-07-13T18:21:07.887134+00:00",
+      "runCount": 2952,
+      "retryCount": 3,
+      "retryRate": 0.001,
+      "retriedPasses": 2,
+      "flapCount": 0,
+      "scheduledCount": 2952,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -959,18 +2214,56 @@
         "executedSha256": "2acc7969dca43ab1044fdb49b0ffa800fcb0a751e37e2bc3775bc01d4ca2d149",
         "specPath": "monitors/wegmans/shop-category-browse.spec.ts"
       },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 2952,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 59.04,
+        "consumed": 0,
+        "remaining": 59.04,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
+      },
       "trust": "proven-live"
     },
     {
       "checkId": 196,
       "checkName": "Wegmans: store locator",
       "sensitive": false,
-      "lastGreenAt": "2026-07-07T18:20:43.970817+00:00",
-      "lastRunAt": "2026-07-07T18:20:43.953621+00:00",
-      "runCount": 2123,
-      "retryCount": 2,
-      "retryRate": 0.0009,
+      "lastGreenAt": "2026-07-13T18:25:55.133607+00:00",
+      "lastRunAt": "2026-07-13T18:25:55.091414+00:00",
+      "runCount": 3868,
+      "retryCount": 4,
+      "retryRate": 0.001,
       "retriedPasses": 0,
+      "flapCount": 0,
+      "scheduledCount": 3868,
+      "flapRate": 0,
+      "transients": {
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "spuriousRedRate": 0
+      },
       "incidents": {
         "total": 0,
         "realOutage": 0,
@@ -988,6 +2281,35 @@
       "specProvenance": {
         "executedSha256": "0aca91e722b4945571013df93778bb1a2d71c3099f55cc4f2a5d14fbf32fc398",
         "specPath": "monitors/wegmans/store-locator.spec.ts"
+      },
+      "dimensions": {
+        "flap": {
+          "state": "ok"
+        },
+        "retry": {
+          "state": "ok"
+        },
+        "monitorNoise": {
+          "state": "ok"
+        },
+        "spuriousRed": {
+          "state": "ok"
+        }
+      },
+      "flakeBudget": {
+        "target": 0.02,
+        "targetIsDefault": true,
+        "scheduledRuns": 3868,
+        "monitorSide": 0,
+        "serviceSide": 0,
+        "indeterminate": 0,
+        "budget": 77.36,
+        "consumed": 0,
+        "remaining": 77.36,
+        "remainingPct": 1,
+        "burnRate": 0,
+        "state": "ok",
+        "directedTask": null
       },
       "trust": "proven-live"
     }

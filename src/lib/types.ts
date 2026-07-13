@@ -873,13 +873,16 @@ export type TrustChip = "proven-live" | "flaky" | "nominal" | "unverified";
 // dimension "ok"; any "flaky" ⇒ the chip is flaky. "elevated" = above the fleet's well-behaved band (blocks
 // proven-live, not yet flaky). Absent (pre-deploy API) → treated as "ok" (forward-compatible).
 export type TrustDimensionState = "ok" | "elevated" | "flaky";
+// null = the API sent no state for this axis (dimensions payload absent / an off-taxonomy value). Absence is
+// UNKNOWN, never "ok" — an absent per-dimension state must NOT read as a clean axis (the #177 fake-quiet
+// class). DimensionStrip renders null as an explicit "— no data", distinct from the calm "ok".
 export interface TrustDimensions {
-  flap: TrustDimensionState; // superseded transients ÷ scheduled runs (browser/multistep; 0 for http/dns/ssl)
-  retry: TrustDimensionState; // runs needing a real retry ÷ runs (all kinds)
-  monitor_noise: TrustDimensionState; // RCA flaky-transient + selector-drift "cry wolf" incidents (a count)
+  flap: TrustDimensionState | null; // superseded transients ÷ scheduled runs (browser/multistep; 0 for http/dns/ssl)
+  retry: TrustDimensionState | null; // runs needing a real retry ÷ runs (all kinds)
+  monitor_noise: TrustDimensionState | null; // RCA flaky-transient + selector-drift "cry wolf" incidents (a count)
   // ★ B3-2 stage 2: MONITOR-SIDE transients ÷ scheduled (the "cried wolf on a monitor-side red" axis). ONLY
   // monitor-side counts — a service-side transient (a real brief outage the monitor caught) never flags this.
-  spurious_red: TrustDimensionState;
+  spurious_red: TrustDimensionState | null;
 }
 export interface TrustIncidents {
   total: number;

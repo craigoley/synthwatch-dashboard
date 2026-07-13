@@ -327,4 +327,47 @@ test.describe("trust card — monitor detail", () => {
     await expect(page.getByTestId("trust-flake-budget-absent").first()).toBeVisible();
     await expect(page.getByTestId("trust-flake-budget-absent").first()).toContainText(/no flake-budget data/i);
   });
+
+  // ★ PART 2 — the dimensions seam. An absent dimensions payload must render EXPLICIT unknown, NOT four clean
+  // "ok" dims. The chip does NOT mitigate: it downgrades to "unverified" only on no-green/no-runs, so a monitor
+  // WITH a green + runs whose dimensions went missing reads chip "nominal" beside four fake-clean axes.
+  test("★ absent dimensions payload renders UNKNOWN dims, not fake-clean 'ok' (the chip does not mitigate)", async ({ page }) => {
+    const w = defaultWorld();
+    w.trustMonitors = [
+      {
+        checkId: 1, checkName: "API health", sensitive: false,
+        lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z", // ★ WITH a green
+        runCount: 500, retryCount: 6, retryRate: 0.012, // ★ WITH runs → chip is NOT "unverified"
+        incidents: { total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0 },
+        redTest: { captured: false }, specProvenance: { executedSha256: "abc123def456", specPath: "monitors/api/health.spec.ts" },
+        trust: "nominal", // the API-computed chip — reads fine on its own
+        flakeBudget: { state: "ok", target: 0.02, targetIsDefault: true, scheduledRuns: 500, monitorSide: 0, serviceSide: 0, indeterminate: 0, budget: 10, consumed: 0, remaining: 10, remainingPct: 1, burnRate: 0, directedTask: null },
+        // dimensions + transients DELIBERATELY OMITTED — models the payload going missing.
+      },
+    ];
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+
+    const strip = page.getByTestId("trust-card-dimensions");
+    await expect(strip).toBeVisible();
+    // ★ every axis reads UNKNOWN, never "ok"
+    for (const k of ["flap", "retry", "monitor_noise", "spurious_red"]) {
+      await expect(strip.getByTestId(`trust-dim-${k}`)).toHaveAttribute("data-state", "unknown");
+    }
+    await expect(strip.getByTestId("trust-dim-flap")).toContainText(/no data/i);
+    await expect(strip.locator('[data-state="ok"]')).toHaveCount(0); // NOT one fake-clean axis
+    // ★ the chip beside it reads "nominal" — proof that nothing mitigates a fake-clean strip
+    await expect(page.getByTestId("trust-chip-nominal")).toBeVisible();
+  });
+
+  test("a present dimension state still renders normally (ok/elevated/flaky unchanged)", async ({ page }) => {
+    // regression guard: valid states are untouched — only ABSENT → unknown changed.
+    await mockApi(page, defaultWorld());
+    await page.goto("/reports?tab=trust");
+    // check 2 (Homepage flow): retry flaky, spurious-red flaky — present states render as before.
+    const row2 = page.getByTestId("trust-row-2");
+    await expect(row2.getByTestId("trust-dim-retry")).toHaveAttribute("data-state", "flaky");
+    await expect(row2.getByTestId("trust-dim-flap")).toHaveAttribute("data-state", "elevated");
+    await expect(row2.locator('[data-state="unknown"]')).toHaveCount(0); // present payload → no unknowns
+  });
 });

@@ -4,12 +4,21 @@
     "checkId": 343,
     "checkName": "algolia-product-search-api",
     "sensitive": false,
-    "lastGreenAt": "2026-07-07T18:21:12.887919+00:00",
-    "lastRunAt": "2026-07-07T18:21:12.815417+00:00",
-    "runCount": 2374,
+    "lastGreenAt": "2026-07-13T18:26:14.336871+00:00",
+    "lastRunAt": "2026-07-13T18:26:14.295939+00:00",
+    "runCount": 7331,
     "retryCount": 3,
-    "retryRate": 0.0013,
+    "retryRate": 0.0004,
     "retriedPasses": 0,
+    "flapCount": 0,
+    "scheduledCount": 7331,
+    "flapRate": 0,
+    "transients": {
+      "monitorSide": 0,
+      "serviceSide": 0,
+      "indeterminate": 0,
+      "spuriousRedRate": 0
+    },
     "incidents": {
       "total": 0,
       "realOutage": 0,
@@ -28,45 +37,38 @@
       "executedSha256": null,
       "specPath": null
     },
+    "dimensions": {
+      "flap": {
+        "state": "ok"
+      },
+      "retry": {
+        "state": "ok"
+      },
+      "monitorNoise": {
+        "state": "ok"
+      },
+      "spuriousRed": {
+        "state": "ok"
+      }
+    },
+    "flakeBudget": {
+      "target": 0.02,
+      "targetIsDefault": true,
+      "scheduledRuns": 7331,
+      "monitorSide": 0,
+      "serviceSide": 0,
+      "indeterminate": 0,
+      "budget": 146.62,
+      "consumed": 0,
+      "remaining": 146.62,
+      "remainingPct": 1,
+      "burnRate": 0,
+      "state": "ok",
+      "directedTask": null
+    },
     "trust": "proven-live"
   },
   "retrySeries": [
-    {
-      "day": "2026-06-08",
-      "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
-    },
-    {
-      "day": "2026-06-09",
-      "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
-    },
-    {
-      "day": "2026-06-10",
-      "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
-    },
-    {
-      "day": "2026-06-11",
-      "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
-    },
-    {
-      "day": "2026-06-12",
-      "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
-    },
-    {
-      "day": "2026-06-13",
-      "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
-    },
     {
       "day": "2026-06-14",
       "runCount": 0,
@@ -207,7 +209,43 @@
     },
     {
       "day": "2026-07-07",
-      "runCount": 604,
+      "runCount": 789,
+      "retryCount": 0,
+      "retryRate": 0
+    },
+    {
+      "day": "2026-07-08",
+      "runCount": 798,
+      "retryCount": 0,
+      "retryRate": 0
+    },
+    {
+      "day": "2026-07-09",
+      "runCount": 806,
+      "retryCount": 0,
+      "retryRate": 0
+    },
+    {
+      "day": "2026-07-10",
+      "runCount": 840,
+      "retryCount": 0,
+      "retryRate": 0
+    },
+    {
+      "day": "2026-07-11",
+      "runCount": 856,
+      "retryCount": 0,
+      "retryRate": 0
+    },
+    {
+      "day": "2026-07-12",
+      "runCount": 849,
+      "retryCount": 0,
+      "retryRate": 0
+    },
+    {
+      "day": "2026-07-13",
+      "runCount": 623,
       "retryCount": 0,
       "retryRate": 0
     }
