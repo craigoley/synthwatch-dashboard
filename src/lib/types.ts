@@ -954,7 +954,10 @@ export interface TrustRow {
   // derived from these; the scorecard shows WHICH dimension flagged rather than a single collapsed verdict.
   dimensions: TrustDimensions;
   // ★ B3-3: the MONITOR trust budget — "degraded as a monitor" + the directed fix task. Burns monitor-side ONLY.
-  flake_budget: TrustFlakeBudget;
+  // null = the API sent no flake-budget object (feature absent / older API). Absence is a STATE — NEVER
+  // synthesised into a healthy "ok" budget (that would read a data gap as fleet-wide monitor health, the
+  // #177 fake-quiet class). The renderer shows an explicit "no flake-budget data", not nothing.
+  flake_budget: TrustFlakeBudget | null;
   trust: TrustChip; // API-derived from the named-constant rule (rendered verbatim in the legend)
 }
 export interface TrustReport {

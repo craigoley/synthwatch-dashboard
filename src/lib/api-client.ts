@@ -2277,7 +2277,12 @@ function mapTrustRow(r: Record<string, unknown>): TrustRow {
 }
 
 function mapFlakeBudget(v: unknown): TrustRow["flake_budget"] {
-  const fb = (v ?? {}) as Record<string, unknown>;
+  // ★ Absent/null wire value is ABSENCE, not health. Return null (the renderer shows an explicit "no
+  // flake-budget data") — do NOT coalesce into a synthetic {} → state:"ok", which would make a monitor with
+  // no trust-budget data indistinguishable from a healthy one (the #177 nullish fake-quiet class). If the
+  // API stops sending flakeBudget, every card/row must SAY so, not read green.
+  if (v == null) return null;
+  const fb = v as Record<string, unknown>;
   const num = (x: unknown) => Number(x ?? 0);
   return {
     target: num(fb.target),

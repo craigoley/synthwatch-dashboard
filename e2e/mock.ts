@@ -249,6 +249,15 @@ const trustTransients = (o: { monitorSide?: number; serviceSide?: number; indete
   monitorSide: o.monitorSide ?? 0, serviceSide: o.serviceSide ?? 0, indeterminate: o.indeterminate ?? 0,
   spuriousRedRate: o.spuriousRedRate ?? null,
 });
+// ★ B3-3: a healthy monitor trust budget (state "ok"). The real API ALWAYS sends flakeBudget (non-null), so
+// the default fixtures carry it — a row that OMITS it models the API dropping the field entirely (→ the
+// dashboard's honest "no flake-budget data" absence render, never a synthetic "ok").
+const flakeOk = (o: { scheduledRuns?: number } = {}) => ({
+  state: "ok", target: 0.02, targetIsDefault: true, scheduledRuns: o.scheduledRuns ?? 100,
+  monitorSide: 0, serviceSide: 0, indeterminate: 0,
+  budget: (o.scheduledRuns ?? 100) * 0.02, consumed: 0, remaining: (o.scheduledRuns ?? 100) * 0.02,
+  remainingPct: 1, burnRate: 0, directedTask: null,
+});
 const DEFAULT_TRUST: RawObj[] = [
   // ★ proven-live WITH retriedPasses > 0 — the coexistence case: a healthy chip + the degrading-but-green
   // annotation. (Other rows omit retriedPasses → the tolerant mapper reads 0 → annotation hidden, which also
@@ -256,7 +265,7 @@ const DEFAULT_TRUST: RawObj[] = [
   { checkId: 1, checkName: "API health", sensitive: false, lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
     runCount: 500, retryCount: 6, retryRate: 0.012, retriedPasses: 4, incidents: trustInc(), redTest: { captured: false },
     specProvenance: { executedSha256: "abc123def456", specPath: "monitors/api/health.spec.ts" },
-    dimensions: trustDims(), trust: "proven-live" },
+    dimensions: trustDims(), flakeBudget: flakeOk({ scheduledRuns: 500 }), trust: "proven-live" },
   { checkId: 2, checkName: "Homepage flow", sensitive: false, lastGreenAt: "2026-07-01T19:00:00Z", lastRunAt: "2026-07-01T20:00:00Z",
     runCount: 400, retryCount: 240, retryRate: 0.6, retriedPasses: 0, flapCount: 6, scheduledCount: 142, flapRate: 0.0423,
     incidents: trustInc({ total: 3, flakyTransient: 3 }), redTest: { captured: false },
@@ -265,15 +274,15 @@ const DEFAULT_TRUST: RawObj[] = [
     // flaky (3 monitor-side transients / 142 = 2.1%). The chip names WHICH axes.
     dimensions: trustDims({ flap: "elevated", retry: "flaky", monitorNoise: "flaky", spuriousRed: "flaky" }),
     transients: trustTransients({ monitorSide: 3, serviceSide: 1, indeterminate: 2, spuriousRedRate: 0.0211 }),
-    trust: "flaky" },
+    flakeBudget: flakeOk({ scheduledRuns: 142 }), trust: "flaky" },
   { checkId: 3, checkName: "Checkout (nominal + perf)", sensitive: false, lastGreenAt: "2026-07-01T18:00:00Z", lastRunAt: "2026-07-01T20:00:00Z",
     runCount: 300, retryCount: 9, retryRate: 0.03, incidents: trustInc({ total: 3, realOutage: 1, perfRegression: 1, unclassified: 1 }),
     redTest: { captured: false }, specProvenance: { executedSha256: "cafe0002", specPath: "monitors/shop/checkout.spec.ts" },
     // ★ B3-2: retry ELEVATED (3% — above the well-behaved band, blocks proven-live, not yet flaky) → nominal.
-    dimensions: trustDims({ retry: "elevated" }), trust: "nominal" },
+    dimensions: trustDims({ retry: "elevated" }), flakeBudget: flakeOk({ scheduledRuns: 300 }), trust: "nominal" },
   { checkId: 4, checkName: "New monitor (never run)", sensitive: false, lastGreenAt: null, lastRunAt: null,
     runCount: 0, retryCount: 0, retryRate: null, incidents: trustInc(), redTest: { captured: false },
-    specProvenance: { executedSha256: null, specPath: null }, dimensions: trustDims(), transients: trustTransients(), trust: "unverified" },
+    specProvenance: { executedSha256: null, specPath: null }, dimensions: trustDims(), transients: trustTransients(), flakeBudget: flakeOk({ scheduledRuns: 0 }), trust: "unverified" },
   // ★★ B3-2 stage 2 SAFETY DEMO: a SERVICE-flaky monitor (Wegmans blips it caught). It flaps (flap flaky), but
   // its transients are SERVICE-side → spurious-red is OK: the monitor's TRUST is intact, never penalised for
   // the service being flaky. 3 service-side + 1 indeterminate, ZERO monitor-side → spurious-red rate 0%.
@@ -282,7 +291,7 @@ const DEFAULT_TRUST: RawObj[] = [
     incidents: trustInc(), redTest: { captured: false }, specProvenance: { executedSha256: "5ecc0005", specPath: "monitors/wegmans/shop.spec.ts" },
     dimensions: trustDims({ flap: "flaky", spuriousRed: "ok" }),
     transients: trustTransients({ monitorSide: 0, serviceSide: 3, indeterminate: 1, spuriousRedRate: 0 }),
-    trust: "flaky" },
+    flakeBudget: flakeOk({ scheduledRuns: 48 }), trust: "flaky" },
 ];
 // Detail retry series: 4 days, incl. a NULL day (no runs) → a gap in the sparkline, never a 0.
 const DEFAULT_TRUST_SERIES: RawObj[] = [
