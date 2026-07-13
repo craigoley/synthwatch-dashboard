@@ -134,6 +134,52 @@ test.describe("monitor detail — error-diff panel", () => {
   });
 });
 
+// ★ Class-aware truncation (synthwatch-api#229): stay LOUD only when first-party was dropped OR the drop class
+// is UNKNOWN; go calm only when we AFFIRMATIVELY know it was third-party (tracker) noise. FULL_DIFF carries NO
+// class fields, so it exercises the unknown → LOUD path.
+test.describe("monitor detail — error-diff truncation, by class", () => {
+  test("first-party dropped → stays LOUD (the diff may be incomplete)", async ({ page }) => {
+    const diff: RawObj = { ...FULL_DIFF, truncated: true, firstPartyTruncated: true, droppedThirdParty: 12 };
+    await mockApi(page, worldWithDiff(diff));
+    await page.goto("/checks/1");
+
+    const note = page.getByTestId("error-diff-truncated");
+    await expect(note).toContainText(/first-party errors were dropped/i);
+    await expect(note).toContainText(/incomplete/i);
+    await expect(page.getByTestId("error-diff-truncated-third-party")).toHaveCount(0);
+  });
+
+  test("only third-party dropped (known) → CALM: first-party capture is complete", async ({ page }) => {
+    const diff: RawObj = { ...FULL_DIFF, truncated: true, firstPartyTruncated: false, droppedThirdParty: 7 };
+    await mockApi(page, worldWithDiff(diff));
+    await page.goto("/checks/1");
+
+    const note = page.getByTestId("error-diff-truncated-third-party");
+    await expect(note).toContainText("7 third-party errors were dropped");
+    await expect(note).toContainText(/first-party capture is complete/i);
+    await expect(page.getByTestId("error-diff-truncated")).toHaveCount(0); // NOT the loud generic/first-party note
+  });
+
+  test("a single third-party drop reads 'error was', not 'errors were'", async ({ page }) => {
+    const diff: RawObj = { ...FULL_DIFF, truncated: true, firstPartyTruncated: false, droppedThirdParty: 1 };
+    await mockApi(page, worldWithDiff(diff));
+    await page.goto("/checks/1");
+
+    await expect(page.getByTestId("error-diff-truncated-third-party")).toContainText("1 third-party error was dropped");
+  });
+
+  test("★ honest-render: truncated but drop-class UNKNOWN (pre-#229 API) → LOUD generic, never 'complete'", async ({ page }) => {
+    // FULL_DIFF omits firstPartyTruncated/droppedThirdParty → both default false/0. We do NOT know first-party
+    // capture was complete, so it must stay LOUD — the calm "complete" copy would be a fake-healthy claim.
+    await mockApi(page, worldWithDiff({ ...FULL_DIFF, truncated: true }));
+    await page.goto("/checks/1");
+
+    await expect(page.getByTestId("error-diff-truncated")).toContainText(/some errors were dropped/i);
+    await expect(page.getByTestId("error-diff-truncated")).toContainText(/incomplete/i);
+    await expect(page.getByTestId("error-diff-truncated-third-party")).toHaveCount(0); // never implies completeness
+  });
+});
+
 // ★ The JOIN: on a FAILED run, the run's NEW first-party errors render INLINE on the run row (next to the
 // failed step / error message) so the operator sees the failure AND the new error signal without opening the
 // monitor-level panel — run 955866: add-bread failed while a first-party `Failed to fetch` fired.

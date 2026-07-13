@@ -790,6 +790,11 @@ export interface ErrorDiff {
   counts: ErrorDiffCounts;
   /** true when this run or any baseline run hit the console cap — the diff is INCOMPLETE above the cap. */
   truncated: boolean;
+  /** true when the cap dropped a FIRST-PARTY message (not just tracker noise) — the LOUD case. When `truncated`
+   *  but NOT this, only third-party was dropped and first-party capture is complete (calm copy). */
+  first_party_truncated: boolean;
+  /** the target run's count of third-party messages dropped by the cap — the "N" in the calm copy. */
+  dropped_third_party: number;
   baseline_run_count: number;
 }
 
@@ -858,6 +863,8 @@ export async function getErrorDiff(
         muted: Number(counts.muted ?? 0),
       },
       truncated: Boolean(raw?.truncated),
+      first_party_truncated: Boolean(raw?.firstPartyTruncated),
+      dropped_third_party: Number(raw?.droppedThirdParty ?? 0),
       baseline_run_count: Number(raw?.baselineRunCount ?? 0),
     };
   } catch (err) {

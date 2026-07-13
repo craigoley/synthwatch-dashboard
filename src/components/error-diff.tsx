@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { useErrorDiff, useErrorMutes } from "@/lib/client";
 import { muteError, unmuteError } from "@/lib/api-client";
-import type { ErrorItem } from "@/lib/api-client";
+import type { ErrorItem, ErrorDiff as ErrorDiffData } from "@/lib/api-client";
 import { useAuth } from "@/components/auth-provider";
 import { Spinner } from "@/components/states";
 import { TONE_VAR } from "@/components/status-badge";
@@ -346,6 +346,41 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * TRUNCATION, BY CLASS — honest AND informative. Stay LOUD (warn tone) when the cap dropped a FIRST-PARTY
+ * message (the diff may have lost real signal) OR when the drop CLASS is UNKNOWN — an older API / a dashboard
+ * deployed ahead of synthwatch-api#229 omits the class fields, and honest-render forbids rendering an unknown
+ * state as a healthy one ("first-party capture is complete" is a claim we can't prove there). Go CALM only when
+ * we AFFIRMATIVELY know the drop was third-party (tracker) noise only (`dropped_third_party > 0`).
+ */
+function TruncationNote({ diff }: { diff: ErrorDiffData }) {
+  if (!diff.truncated) return null;
+  // Affirmatively third-party-only → calm; first-party capture is genuinely complete.
+  if (!diff.first_party_truncated && diff.dropped_third_party > 0) {
+    return (
+      <p
+        className="mb-2 rounded border border-[var(--color-border)] px-2 py-1 text-[11px] text-[var(--color-ink-faint)]"
+        data-testid="error-diff-truncated-third-party"
+      >
+        {diff.dropped_third_party} third-party {diff.dropped_third_party === 1 ? "error was" : "errors were"} dropped
+        from capture — first-party capture is complete.
+      </p>
+    );
+  }
+  // First-party dropped, OR the class is unknown (old API) → LOUD; never imply a completeness we can't prove.
+  return (
+    <p
+      className="mb-2 rounded border border-[var(--color-warn)] px-2 py-1 text-[11px] text-[var(--color-ink-dim)]"
+      style={{ borderColor: `color-mix(in srgb, ${TONE_VAR.warn} 40%, transparent)`, background: `color-mix(in srgb, ${TONE_VAR.warn} 8%, transparent)` }}
+      data-testid="error-diff-truncated"
+    >
+      {diff.first_party_truncated
+        ? "First-party errors were dropped from capture (cap reached) — this diff may be incomplete."
+        : "Some errors were dropped from capture (cap reached) — this diff may be incomplete."}
+    </p>
+  );
+}
+
 export function ErrorDiff({ checkId, runId }: { checkId: number; runId?: number | null }) {
   const { data, error, isLoading, mutate } = useErrorDiff(checkId, runId);
   const { data: mutes, mutate: mutateMutes } = useErrorMutes(checkId);
@@ -385,15 +420,7 @@ export function ErrorDiff({ checkId, runId }: { checkId: number; runId?: number 
         {context}
       </p>
 
-      {data.truncated && (
-        <p
-          className="mb-2 rounded border border-[var(--color-warn)] px-2 py-1 text-[11px] text-[var(--color-ink-dim)]"
-          style={{ borderColor: `color-mix(in srgb, ${TONE_VAR.warn} 40%, transparent)`, background: `color-mix(in srgb, ${TONE_VAR.warn} 8%, transparent)` }}
-          data-testid="error-diff-truncated"
-        >
-          Some errors were dropped from capture (cap reached) — this diff may be incomplete.
-        </p>
-      )}
+      <TruncationNote diff={data} />
 
       {/* NEW — leads, always expanded (the regression signal). Each row can be muted (editor). */}
       <div data-testid="error-diff-new">
