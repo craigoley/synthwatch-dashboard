@@ -8,7 +8,7 @@ import { TONE_VAR } from "@/components/status-badge";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { StalenessStamp, useFetchedAt } from "@/components/staleness";
 import { formatRelative } from "@/lib/format";
-import type { ReportWindow, TrustChip, TrustDimensionState, TrustFlakeBudget, TrustIncidents, TrustRetryPoint, TrustRow } from "@/lib/types";
+import type { ReportWindow, TrustChip, TrustFlakeBudget, TrustIncidents, TrustRetryPoint, TrustRow } from "@/lib/types";
 
 /**
  * §D1 monitor-trust — the "every green shown with its proof" surface. NO composite score: the chip is
@@ -52,7 +52,9 @@ export const TRUST_META: Record<TrustChip, { label: string; tone: "pass" | "warn
 
 // ── ★ B3-2 the DISTINCT DIMENSIONS (the surfaced replacement for the OR-collapse) ──────────────────────────
 // tone by state: ok = calm/neutral, elevated = amber (watch), flaky = amber-loud (the axis that demotes the chip).
-const DIM_STATE_TONE: Record<TrustDimensionState, "pass" | "warn" | "idle"> = { ok: "idle", elevated: "warn", flaky: "warn" };
+// Only the GRADED states carry a tone — the applicability markers (not-applicable / no-data-yet) render in their
+// own neutral idiom (handled explicitly in DimensionStrip), never as a health tone.
+const DIM_STATE_TONE: Record<"ok" | "elevated" | "flaky", "pass" | "warn" | "idle"> = { ok: "idle", elevated: "warn", flaky: "warn" };
 
 type DimKey = "flap" | "retry" | "monitor_noise" | "spurious_red";
 // Each dimension: its label, the exact formula + threshold (rendered verbatim in the legend), and how to read
@@ -103,8 +105,9 @@ export function DimensionStrip({ row }: { row: TrustRow }) {
       {DIMENSION_META.map((d) => {
         const state = row.dimensions[d.key];
         // ★ Absent state (null) → EXPLICIT unknown ("— no data"), NEVER a clean "ok". The API returned no
-        // verdict for this axis; a data gap must read as unknown, not healthy. A hollow dot + em-dash reads
-        // distinctly from the filled faint dot of a genuine "ok".
+        // verdict for this axis (payload gap / off-taxonomy); it must read as unknown, not healthy. A solid-border
+        // hollow dot + em-dash. DISTINCT from "no-data-yet" below: null is a data GAP, no-data-yet is a graded
+        // "measurable but new" value the API chose to send.
         if (state == null) {
           return (
             <span
@@ -116,6 +119,41 @@ export function DimensionStrip({ row }: { row: TrustRow }) {
             >
               <span className="h-1.5 w-1.5 rounded-full border border-[var(--color-ink-faint)]" />
               {d.label} <span className="font-medium">— no data</span>
+            </span>
+          );
+        }
+        // ★ B — NOT-MEASURABLE. This axis is structurally dead for this monitor kind (http/dns/ssl/tcp/ping carry
+        // no trace_signals), so it can NEVER be graded and will NEVER fill in. The 2am read is "don't look here for
+        // this kind" — NOT "no data" (which would imply it's coming). A DASHED hollow ring (reads as "inert, by
+        // design") + the words "n/a · not measurable".
+        if (state === "not-applicable") {
+          return (
+            <span
+              key={d.key}
+              className="inline-flex items-center gap-1 text-[11px] text-[var(--color-ink-faint)]"
+              data-testid={`trust-dim-${d.key}`}
+              data-state="not-applicable"
+              title={`${d.label}: NOT MEASURABLE for this monitor type — it captures no trace_signals, so this axis can never be graded. This is NOT "no data yet": it will never fill in.`}
+            >
+              <span className="h-1.5 w-1.5 rounded-full border border-dashed border-[var(--color-ink-faint)]" />
+              {d.label} <span className="font-medium italic">n/a · not measurable</span>
+            </span>
+          );
+        }
+        // ★ C — NO-DATA-YET. The axis IS measurable for this monitor, but there isn't enough history to grade it.
+        // The 2am read is "ask me again later" — it WILL fill in (unlike not-measurable), and it is NOT "ok" (we
+        // haven't proven anything). A dotted hollow ring (reads as "pending, accumulating") + "no data yet".
+        if (state === "no-data-yet") {
+          return (
+            <span
+              key={d.key}
+              className="inline-flex items-center gap-1 text-[11px] text-[var(--color-ink-dim)]"
+              data-testid={`trust-dim-${d.key}`}
+              data-state="no-data-yet"
+              title={`${d.label}: NO DATA YET — measurable for this monitor, but too few runs to grade. Ask again later: this WILL fill in as runs accumulate (unlike "not measurable"). It is NOT "ok" — nothing is proven yet.`}
+            >
+              <span className="h-1.5 w-1.5 rounded-full border border-dotted border-[var(--color-ink-dim)]" />
+              {d.label} <span className="font-medium">no data yet</span>
             </span>
           );
         }

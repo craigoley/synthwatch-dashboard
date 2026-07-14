@@ -74,6 +74,7 @@ import type {
   TrustRow,
   TrustChip,
   TrustDimensionState,
+  TrustFlakeBudgetState,
   StatusPage,
   StatusProperty,
   MttrReport,
@@ -2222,11 +2223,16 @@ export async function getRegionHealth(): Promise<RegionHealthReport | null> {
 // series). ★ null-safe (mirrors getSloReport/getEgressReport): 404 → null → the page/card self-hides. Renders
 // the API's rule-derived `trust` chip verbatim (no client-side re-derivation); redTest is an explicit gap.
 const TRUST_CHIPS = ["proven-live", "flaky", "nominal", "unverified"] as const;
-const TRUST_DIM_STATES = ["ok", "elevated", "flaky"] as const;
-// ★ Coerce one dimension state. Absent / off-taxonomy → null (UNKNOWN), NEVER "ok": an absent per-dimension
-// state must not read as a clean axis. A monitor WITH runs + a green whose dimensions payload went missing
-// reads chip "nominal" (deriveChip only downgrades to "unverified" on no-green/no-runs) — so coalescing the
-// dimensions to "ok" would paint four clean axes with nothing mitigating it (the #177 fake-quiet class).
+// ★ THREE-STATE taxonomy (#246): the graded states PLUS the two applicability markers the API emits. All five are
+// FIRST-CLASS wire values that must pass through verbatim — "not-applicable" and "no-data-yet" are NOT the same as
+// absence and must NOT be nulled (that flattening is exactly what made B and C both render "— no data").
+const TRUST_DIM_STATES = ["ok", "elevated", "flaky", "not-applicable", "no-data-yet"] as const;
+const FLAKE_BUDGET_STATES: readonly TrustFlakeBudgetState[] = ["ok", "degraded-as-a-monitor", "not-applicable", "no-data-yet"];
+// ★ Coerce one dimension state. A recognised value passes through; anything else (absent / off-taxonomy) → null
+// (UNKNOWN), NEVER "ok": an absent per-dimension state must not read as a clean axis. A monitor WITH runs + a green
+// whose dimensions payload went missing reads chip "nominal" (deriveChip only downgrades to "unverified" on
+// no-green/no-runs) — so coalescing the dimensions to "ok" would paint clean axes with nothing mitigating it (the
+// #177 fake-quiet class). Note null (payload gap) stays DISTINCT from "no-data-yet" (a graded "measurable but new").
 const dimState = (v: unknown): TrustDimensionState | null =>
   (TRUST_DIM_STATES as readonly string[]).includes(String(v)) ? (v as TrustDimensionState) : null;
 
@@ -2321,8 +2327,12 @@ function mapFlakeBudget(v: unknown): TrustRow["flake_budget"] {
     remaining: num(fb.remaining),
     remaining_pct: fb.remainingPct == null ? null : Number(fb.remainingPct),
     burn_rate: num(fb.burnRate),
-    // Only the API's two states are valid; anything else (absent/unknown) → "ok" (never a false "degraded").
-    state: fb.state === "degraded-as-a-monitor" ? "degraded-as-a-monitor" : "ok",
+    // ★ Preserve ALL FOUR API states verbatim (#246): the two graded states + the two applicability markers.
+    // Do NOT collapse "not-applicable" / "no-data-yet" into "ok" — a budget that can never move (http) or hasn't
+    // run enough (new browser) is NOT a healthy 0%-consumed budget. Off-taxonomy → "ok" (never a false "degraded").
+    state: FLAKE_BUDGET_STATES.includes(String(fb.state) as TrustFlakeBudgetState)
+      ? (fb.state as TrustFlakeBudgetState)
+      : "ok",
     directed_task: fb.directedTask == null ? null : String(fb.directedTask),
   };
 }
