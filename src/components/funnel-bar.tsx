@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRunSteps } from "@/lib/client";
 import { TONE_VAR } from "@/components/status-badge";
 import { stepStatusToken } from "@/lib/status";
@@ -48,7 +49,9 @@ export function FunnelBarStatic({ steps }: { steps: RunStep[] }) {
           to a colourblind operator without hover. */}
       {failed && (
         <p className="sw-mono text-[12px] font-semibold" style={{ color: TONE_VAR.fail }} data-testid="funnel-failed-step">
-          <span aria-hidden>✕ </span>Failed at step {failed.step_index + 1} · {failed.name}
+          <span aria-hidden>✕ </span>Failed at step {failed.step_index + 1} · {failed.name}{" "}
+          {/* "funnel / stage-bar" is jargon — link the glossary where a failure confronts the reader */}
+          <Link href="/glossary" className="text-[11px] font-normal text-[var(--color-brand)] hover:underline" data-testid="funnel-glossary-link" title="What is the funnel / stage-bar?">ⓘ</Link>
         </p>
       )}
       <div className="flex h-7 w-full gap-[2px] overflow-hidden rounded-md">

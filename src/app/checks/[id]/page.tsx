@@ -243,6 +243,13 @@ function StepChainPanel({ steps, latest }: { steps: ChainStep[]; latest: Run | n
  * aggregated verdict. Single-location checks (only "default") render nothing —
  * no clutter, no regression for the common case.
  */
+// ★ TODO (T6.7, cross-repo BLOCKED — promoted from docs/recon/2026-07-07-dashboard.md so it survives that
+//   file's deletion): this panel derives per-location health from the `runs` PROP (recent_runs) — a recent-N
+//   SAMPLE, not the authoritative per-(check,location) rollup. PARTIAL unblock: RawCheckDetail/CheckDetail now
+//   carry `locations` (api-client.ts), but `mapCheck` STILL DROPS it (only mapCheckWithStatus maps it) — so
+//   this panel can't consume it yet. To close: (a) the API detail endpoint includes the locations rollup,
+//   (b) map it through `mapCheck` + the type, (c) feed THAT here instead of `runs`. Until then this is a
+//   runs-sampled approximation. Live TODO, not shipped.
 function PerLocationPanel({ runs }: { runs: Run[] }) {
   // Latest run per location.
   const byLoc = new Map<string, Run>();
