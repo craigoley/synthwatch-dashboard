@@ -411,3 +411,83 @@ test.describe("trust card — monitor detail", () => {
     await expect(page.getByTestId("trust-incidents-nodata")).toHaveCount(0); // present-zero ≠ absent
   });
 });
+
+// ★★ #246 — THREE STATES, THREE DISTINCT RENDERINGS. The spurious-red axis has three genuinely different truths
+// that the dashboard used to collapse into two (both a faint "— no data"): MEASURED-AND-FINE ("ok"), NOT-MEASURABLE
+// ("not-applicable" — http/dns/ssl carry no trace_signals, never fills in), and NO-DATA-YET ("no-data-yet" — a new
+// browser check, WILL fill in). The 2am test for the WORDS: "ok" = "I checked, it's fine"; "n/a · not measurable" =
+// "don't look here for this kind"; "no data yet" = "ask me again later". They must NOT read the same.
+test.describe("trust dimensions — three applicability states render distinctly (#246)", () => {
+  const trustInc = () => ({ total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0 });
+  const dims = (spuriousRed: string) => ({ flap: { state: "ok" }, retry: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: spuriousRed } });
+  const budget = (state: string, scheduledRuns: number) => ({
+    state, target: 0.02, targetIsDefault: true, scheduledRuns, monitorSide: 0, serviceSide: 0, indeterminate: 0,
+    budget: scheduledRuns * 0.02, consumed: 0, remaining: scheduledRuns * 0.02, remainingPct: 1, burnRate: 0, directedTask: null,
+  });
+  const base = {
+    sensitive: false, lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
+    retryCount: 0, retryRate: 0, incidents: trustInc(), redTest: { captured: false },
+    specProvenance: { executedSha256: "abc", specPath: "monitors/x.spec.ts" }, trust: "proven-live" as const,
+  };
+  // A. a MATURE browser check → measured-and-fine. B. an http check → not-measurable. C. a NEW browser check → no-data-yet.
+  const world = () => {
+    const w = defaultWorld();
+    w.trustMonitors = [
+      { ...base, checkId: 301, checkName: "A — mature browser", runCount: 500,
+        dimensions: dims("ok"), transients: { monitorSide: 0, serviceSide: 0, indeterminate: 0, spuriousRedRate: 0 }, flakeBudget: budget("ok", 500) },
+      { ...base, checkId: 302, checkName: "B — http monitor", runCount: 500,
+        dimensions: dims("not-applicable"), transients: { monitorSide: 0, serviceSide: 0, indeterminate: 0, spuriousRedRate: null }, flakeBudget: budget("not-applicable", 500) },
+      { ...base, checkId: 303, checkName: "C — new browser", runCount: 8,
+        dimensions: dims("no-data-yet"), transients: { monitorSide: 0, serviceSide: 0, indeterminate: 0, spuriousRedRate: null }, flakeBudget: budget("no-data-yet", 8) },
+    ];
+    return w;
+  };
+
+  test("★ A/B/C carry three DISTINCT data-state values (the wire distinction survives to the DOM)", async ({ page }) => {
+    await mockApi(page, world());
+    await page.goto("/reports?tab=trust");
+    await expect(page.getByTestId("trust-table")).toBeVisible();
+
+    const spur = (id: number) => page.getByTestId(`trust-row-${id}`).getByTestId("trust-dim-spurious_red");
+    await expect(spur(301)).toHaveAttribute("data-state", "ok");             // A — measured-and-fine
+    await expect(spur(302)).toHaveAttribute("data-state", "not-applicable"); // B — structurally dead
+    await expect(spur(303)).toHaveAttribute("data-state", "no-data-yet");    // C — too new
+
+    // ★ THREE genuinely different values — not two. (If the client re-flattened B or C to null/"ok", this fails.)
+    const states = await Promise.all([spur(301), spur(302), spur(303)].map((l) => l.getAttribute("data-state")));
+    expect(new Set(states).size).toBe(3);
+  });
+
+  test("★ the 2am test for the WORDS: 'ok' ≠ 'not measurable' ≠ 'no data yet' (the copy is the point)", async ({ page }) => {
+    await mockApi(page, world());
+    await page.goto("/reports?tab=trust");
+    const spur = (id: number) => page.getByTestId(`trust-row-${id}`).getByTestId("trust-dim-spurious_red");
+
+    // B — NOT-MEASURABLE: "don't look here for this kind". Says "not measurable", NEVER "no data" (which implies
+    // it's coming). This is the lie-of-omission the whole PR kills — assert the exact wrong word is ABSENT.
+    await expect(spur(302)).toContainText(/not measurable/i);
+    await expect(spur(302)).not.toContainText(/no data/i); // ★ NEVER "no data" for a never-fills-in axis
+    await expect(spur(302)).not.toContainText(/ok/i);
+
+    // C — NO-DATA-YET: "ask me again later". Says "no data yet" (it WILL fill in), and is NOT "not measurable".
+    await expect(spur(303)).toContainText(/no data yet/i);
+    await expect(spur(303)).not.toContainText(/not measurable/i);
+
+    // A — MEASURED-AND-FINE: "I checked, it's fine". Reads the value, carries NEITHER marker's words.
+    await expect(spur(301)).not.toContainText(/not measurable/i);
+    await expect(spur(301)).not.toContainText(/no data yet/i);
+  });
+
+  test("★ prove-can-fail: the three renderings are visually distinct (dot treatment differs per state)", async ({ page }) => {
+    await mockApi(page, world());
+    await page.goto("/reports?tab=trust");
+    const dot = (id: number) => page.getByTestId(`trust-row-${id}`).getByTestId("trust-dim-spurious_red").locator("span").first();
+    // The marker dots use DISTINCT border styles (dashed = never, dotted = pending) vs the graded filled dot — so
+    // even colour-blind / glanced-not-read, B and C don't look identical. borderStyle is the machine-checkable proxy.
+    await expect(dot(302)).toHaveCSS("border-style", "dashed"); // B — not-measurable ring
+    await expect(dot(303)).toHaveCSS("border-style", "dotted"); // C — no-data-yet ring
+    const styleA = await dot(301).evaluate((el) => getComputedStyle(el).borderStyle);
+    expect(styleA).not.toBe("dashed");
+    expect(styleA).not.toBe("dotted"); // A — the graded dot is filled/solid, not a marker ring
+  });
+});

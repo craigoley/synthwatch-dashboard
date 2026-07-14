@@ -872,10 +872,18 @@ export type TrustChip = "proven-live" | "flaky" | "nominal" | "unverified";
 // ★ B3-2: each trust DIMENSION's graded verdict. The chip is DERIVED over these — proven-live needs every
 // dimension "ok"; any "flaky" ⇒ the chip is flaky. "elevated" = above the fleet's well-behaved band (blocks
 // proven-live, not yet flaky). Absent (pre-deploy API) → treated as "ok" (forward-compatible).
-export type TrustDimensionState = "ok" | "elevated" | "flaky";
+// ★ THREE STATES, THREE VALUES — a measured axis ("ok"/"elevated"/"flaky") plus two APPLICABILITY markers the
+// API emits (not health verdicts) that MUST render distinctly, never collapsed together or into a bare "ok":
+//   • "not-applicable" — structurally dead for this monitor kind (http/dns/ssl/tcp/ping carry no trace_signals):
+//                        the axis can NEVER be graded and NEVER fills in. Reads "n/a — not measurable", NOT "no data".
+//   • "no-data-yet"    — measurable, but too little history to grade: it WILL fill in ("ask again later"). NOT "ok".
+// These are genuinely different truths (see #246): "ok" lies about a barely-run monitor; "not-applicable" implies a
+// dead-end; "no-data-yet" promises data later. Rendering B and C the same (the old "— no data") is the bug this fixes.
+export type TrustDimensionState = "ok" | "elevated" | "flaky" | "not-applicable" | "no-data-yet";
 // null = the API sent no state for this axis (dimensions payload absent / an off-taxonomy value). Absence is
 // UNKNOWN, never "ok" — an absent per-dimension state must NOT read as a clean axis (the #177 fake-quiet
-// class). DimensionStrip renders null as an explicit "— no data", distinct from the calm "ok".
+// class). DimensionStrip renders null as an explicit "— no data" (data-state "unknown"), distinct from BOTH the
+// calm "ok" AND the two applicability markers above (which are first-class API values, not a payload gap).
 export interface TrustDimensions {
   flap: TrustDimensionState | null; // superseded transients ÷ scheduled runs (browser/multistep; 0 for http/dns/ssl)
   retry: TrustDimensionState | null; // runs needing a real retry ÷ runs (all kinds)
@@ -909,7 +917,10 @@ export interface TrustSpecProvenance {
 // service_side + indeterminate are surfaced, never consumed. state = "degraded-as-a-monitor" is DISTINCT from a
 // service outage ("my monitor is unreliable" ≠ "Wegmans is down"). directed_task (non-null only when degraded)
 // is a FIX task, never a mute. target_is_default = the fleet default (2%) is in force.
-export type TrustFlakeBudgetState = "ok" | "degraded-as-a-monitor";
+// Same taxonomy as a dimension: a graded budget ("ok"/"degraded-as-a-monitor") plus the two applicability markers
+// ("not-applicable" = the meter can never move for this kind; "no-data-yet" = too few scheduled runs to be a
+// verdict). The markers must never collapse to "ok" (a vacuous-perfect budget is a lie — see #246).
+export type TrustFlakeBudgetState = "ok" | "degraded-as-a-monitor" | "not-applicable" | "no-data-yet";
 export interface TrustFlakeBudget {
   target: number;
   target_is_default: boolean;
