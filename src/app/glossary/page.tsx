@@ -30,7 +30,7 @@ const TERMS: Term[] = [
         <ul className="mt-2 space-y-1">
           <li><strong>Proven live</strong> — green recently, and clean on every axis. You can rely on it.</li>
           <li><strong>Nominal</strong> — green is going stale, or one axis is elevated. Worth a glance, not yet a problem.</li>
-          <li><strong>Flaky</strong> — one axis crossed the line; the chip names which (flap / retry / monitor-noise / spurious-red). The monitor’s signal is noisy.</li>
+          <li><strong>Flaky</strong> — one axis crossed the line; the chip names which (flap / recheck / monitor-noise / spurious-red). The monitor’s signal is noisy.</li>
           <li><strong>Unverified</strong> — never been green, or hasn’t run yet. Unproven — <em>not</em> broken.</li>
         </ul>
       </>
@@ -51,14 +51,15 @@ const TERMS: Term[] = [
     ),
   },
   {
-    id: "retry",
-    term: "Retry (degrading-but-green)",
-    short: "Passed, but only after more than one attempt.",
+    id: "recheck",
+    term: "Recheck (degrading-but-green)",
+    short: "Passed, but only after a confirmation re-check.",
     body: (
       <p>
-        A run that needed <strong>more than one try</strong> to pass. The monitor is still green, but a rising
-        retry rate is an <strong>early warning</strong> — “degrading but green.” It never demotes the trust chip
-        on its own; it’s a heads-up that something is getting slower or flakier before it actually breaks.
+        A run that settled green only after a <strong>confirmation re-check</strong>. The monitor is still green,
+        but a rising <strong>recheck rate</strong> (confirmation re-checks ÷ runs) is an <strong>early warning</strong> —
+        “degrading but green.” It never demotes the trust chip on its own; it’s a heads-up that something is
+        getting slower or flakier before it actually breaks.
       </p>
     ),
   },

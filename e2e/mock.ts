@@ -111,7 +111,7 @@ export interface World {
   /** §D1 trust rows (GET /reports/trust, raw camelCase). Unset → DEFAULT_TRUST (covers every chip + honest
    *  states). Detail (/reports/trust/{id}) resolves the row by id + serves trustSeries. */
   trustMonitors?: RawObj[];
-  /** Daily retry series for the trust detail card (raw camelCase). Unset → DEFAULT_TRUST_SERIES (incl. a null day). */
+  /** Daily recheck series for the trust detail card (raw camelCase). Unset → DEFAULT_TRUST_SERIES (incl. a null day). */
   trustSeries?: RawObj[];
   /** Status summary (§A3) served? false → GET /status 404 (the By-property section hides). Default true. */
   statusServed?: boolean;
@@ -233,15 +233,15 @@ const DEFAULT_EGRESS: RawObj[] = [
 ];
 
 // §D1 trust rows (raw camelCase DTO). Covers every honest-render state: proven-live, flaky, never-green +
-// null-retryRate unverified, and a nominal row with a perfRegression incident (to prove it's NOT folded into
+// null-recheckRate unverified, and a nominal row with a perfRegression incident (to prove it's NOT folded into
 // real-outage). redTest.captured is always false (v1) → "not captured", never a pass.
 const trustInc = (o: Partial<Record<string, number>> = {}) => ({
   total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0, ...o,
 });
-// ★ B3-2: the API's per-dimension states (wire shape: { flap:{state}, retry:{state}, monitorNoise:{state} }).
+// ★ B3-2: the API's per-dimension states (wire shape: { flap:{state}, recheck:{state}, monitorNoise:{state} }).
 // Defaults all-ok; override per axis. Absent entirely → the tolerant mapper reads "ok" (pre-deploy-API safe).
-const trustDims = (o: { flap?: string; retry?: string; monitorNoise?: string; spuriousRed?: string } = {}) => ({
-  flap: { state: o.flap ?? "ok" }, retry: { state: o.retry ?? "ok" }, monitorNoise: { state: o.monitorNoise ?? "ok" },
+const trustDims = (o: { flap?: string; recheck?: string; monitorNoise?: string; spuriousRed?: string } = {}) => ({
+  flap: { state: o.flap ?? "ok" }, recheck: { state: o.recheck ?? "ok" }, monitorNoise: { state: o.monitorNoise ?? "ok" },
   spuriousRed: { state: o.spuriousRed ?? "ok" }, // ★ B3-2 stage 2
 });
 // ★ B3-2 stage 2: the transient split. Absent (pre-deploy API) → the tolerant mapper reads 0/null.
@@ -259,46 +259,46 @@ const flakeOk = (o: { scheduledRuns?: number } = {}) => ({
   remainingPct: 1, burnRate: 0, directedTask: null,
 });
 const DEFAULT_TRUST: RawObj[] = [
-  // ★ proven-live WITH retriedPasses > 0 — the coexistence case: a healthy chip + the degrading-but-green
-  // annotation. (Other rows omit retriedPasses → the tolerant mapper reads 0 → annotation hidden, which also
+  // ★ proven-live WITH recheckedPasses > 0 — the coexistence case: a healthy chip + the degrading-but-green
+  // annotation. (Other rows omit recheckedPasses → the tolerant mapper reads 0 → annotation hidden, which also
   // exercises pre-deploy-API tolerance.)
   { checkId: 1, checkName: "API health", sensitive: false, lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
-    runCount: 500, retryCount: 6, retryRate: 0.012, retriedPasses: 4, incidents: trustInc(), redTest: { captured: false },
+    runCount: 500, recheckCount: 6, recheckRate: 0.012, recheckedPasses: 4, incidents: trustInc(), redTest: { captured: false },
     specProvenance: { executedSha256: "abc123def456", specPath: "monitors/api/health.spec.ts" },
     dimensions: trustDims(), flakeBudget: flakeOk({ scheduledRuns: 500 }), trust: "proven-live" },
   { checkId: 2, checkName: "Homepage flow", sensitive: false, lastGreenAt: "2026-07-01T19:00:00Z", lastRunAt: "2026-07-01T20:00:00Z",
-    runCount: 400, retryCount: 240, retryRate: 0.6, retriedPasses: 0, flapCount: 6, scheduledCount: 142, flapRate: 0.0423,
+    runCount: 400, recheckCount: 240, recheckRate: 0.6, recheckedPasses: 0, flapCount: 6, scheduledCount: 142, flapRate: 0.0423,
     incidents: trustInc({ total: 3, flakyTransient: 3 }), redTest: { captured: false },
     specProvenance: { executedSha256: "beef0001", specPath: "monitors/home/flow.spec.ts" },
-    // ★ B3-2: retry flaky (60%) AND monitor-noise flaky (3 flaky-transient), flap elevated (4.2%), spurious-red
+    // ★ B3-2: recheck flaky (60%) AND monitor-noise flaky (3 flaky-transient), flap elevated (4.2%), spurious-red
     // flaky (3 monitor-side transients / 142 = 2.1%). The chip names WHICH axes.
-    dimensions: trustDims({ flap: "elevated", retry: "flaky", monitorNoise: "flaky", spuriousRed: "flaky" }),
+    dimensions: trustDims({ flap: "elevated", recheck: "flaky", monitorNoise: "flaky", spuriousRed: "flaky" }),
     transients: trustTransients({ monitorSide: 3, serviceSide: 1, indeterminate: 2, spuriousRedRate: 0.0211 }),
     flakeBudget: flakeOk({ scheduledRuns: 142 }), trust: "flaky" },
   { checkId: 3, checkName: "Checkout (nominal + perf)", sensitive: false, lastGreenAt: "2026-07-01T18:00:00Z", lastRunAt: "2026-07-01T20:00:00Z",
-    runCount: 300, retryCount: 9, retryRate: 0.03, incidents: trustInc({ total: 3, realOutage: 1, perfRegression: 1, unclassified: 1 }),
+    runCount: 300, recheckCount: 9, recheckRate: 0.03, incidents: trustInc({ total: 3, realOutage: 1, perfRegression: 1, unclassified: 1 }),
     redTest: { captured: false }, specProvenance: { executedSha256: "cafe0002", specPath: "monitors/shop/checkout.spec.ts" },
-    // ★ B3-2: retry ELEVATED (3% — above the well-behaved band, blocks proven-live, not yet flaky) → nominal.
-    dimensions: trustDims({ retry: "elevated" }), flakeBudget: flakeOk({ scheduledRuns: 300 }), trust: "nominal" },
+    // ★ B3-2: recheck ELEVATED (3% — above the well-behaved band, blocks proven-live, not yet flaky) → nominal.
+    dimensions: trustDims({ recheck: "elevated" }), flakeBudget: flakeOk({ scheduledRuns: 300 }), trust: "nominal" },
   { checkId: 4, checkName: "New monitor (never run)", sensitive: false, lastGreenAt: null, lastRunAt: null,
-    runCount: 0, retryCount: 0, retryRate: null, incidents: trustInc(), redTest: { captured: false },
+    runCount: 0, recheckCount: 0, recheckRate: null, incidents: trustInc(), redTest: { captured: false },
     specProvenance: { executedSha256: null, specPath: null }, dimensions: trustDims(), transients: trustTransients(), flakeBudget: flakeOk({ scheduledRuns: 0 }), trust: "unverified" },
   // ★★ B3-2 stage 2 SAFETY DEMO: a SERVICE-flaky monitor (Wegmans blips it caught). It flaps (flap flaky), but
   // its transients are SERVICE-side → spurious-red is OK: the monitor's TRUST is intact, never penalised for
   // the service being flaky. 3 service-side + 1 indeterminate, ZERO monitor-side → spurious-red rate 0%.
   { checkId: 5, checkName: "Wegmans shop (service-flaky)", sensitive: false, lastGreenAt: "2026-07-01T19:55:00Z", lastRunAt: "2026-07-01T20:00:00Z",
-    runCount: 50, retryCount: 0, retryRate: 0, flapCount: 4, scheduledCount: 48, flapRate: 0.0833,
+    runCount: 50, recheckCount: 0, recheckRate: 0, flapCount: 4, scheduledCount: 48, flapRate: 0.0833,
     incidents: trustInc(), redTest: { captured: false }, specProvenance: { executedSha256: "5ecc0005", specPath: "monitors/wegmans/shop.spec.ts" },
     dimensions: trustDims({ flap: "flaky", spuriousRed: "ok" }),
     transients: trustTransients({ monitorSide: 0, serviceSide: 3, indeterminate: 1, spuriousRedRate: 0 }),
     flakeBudget: flakeOk({ scheduledRuns: 48 }), trust: "flaky" },
 ];
-// Detail retry series: 4 days, incl. a NULL day (no runs) → a gap in the sparkline, never a 0.
+// Detail recheck series: 4 days, incl. a NULL day (no runs) → a gap in the sparkline, never a 0.
 const DEFAULT_TRUST_SERIES: RawObj[] = [
-  { day: "2026-06-28", runCount: 0, retryCount: 0, retryRate: null },
-  { day: "2026-06-29", runCount: 100, retryCount: 2, retryRate: 0.02 },
-  { day: "2026-06-30", runCount: 100, retryCount: 5, retryRate: 0.05 },
-  { day: "2026-07-01", runCount: 100, retryCount: 60, retryRate: 0.6 },
+  { day: "2026-06-28", runCount: 0, recheckCount: 0, recheckRate: null },
+  { day: "2026-06-29", runCount: 100, recheckCount: 2, recheckRate: 0.02 },
+  { day: "2026-06-30", runCount: 100, recheckCount: 5, recheckRate: 0.05 },
+  { day: "2026-07-01", runCount: 100, recheckCount: 60, recheckRate: 0.6 },
 ];
 
 /**
@@ -831,7 +831,7 @@ export async function mockApi(
       return json(route, { regions: world.regionHealth });
     }
 
-    // §D1 trust — fleet scorecard + per-check detail (with daily retry series).
+    // §D1 trust — fleet scorecard + per-check detail (with daily recheck series).
     if (path === "/api/reports/trust" && method === "GET") {
       if (world.reports500) return json(route, { error: "boom" }, 500); // real error → LOUD, not a silent hide
       if (world.reportsServed === false) return json(route, { error: "not_found" }, 404); // self-hides the page table
@@ -843,7 +843,7 @@ export async function mockApi(
       const id = Number(trustDetail[1]);
       const monitor = (world.trustMonitors ?? DEFAULT_TRUST).find((m) => Number(m.id ?? (m as RawObj).checkId) === id);
       if (!monitor) return json(route, { error: "not_found" }, 404);
-      return json(route, { window: url.searchParams.get("window") ?? "30d", monitor, retrySeries: world.trustSeries ?? DEFAULT_TRUST_SERIES });
+      return json(route, { window: url.searchParams.get("window") ?? "30d", monitor, recheckSeries: world.trustSeries ?? DEFAULT_TRUST_SERIES });
     }
 
     // Estimated monthly ACA compute cost (synthwatch-api #198). Unset → 404 (the cost UI self-hides).

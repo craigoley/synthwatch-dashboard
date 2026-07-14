@@ -34,7 +34,7 @@ test.describe("API contract — trust scorecard mappers vs the real responses", 
     expect(raw.monitors.length, "capture has ≥1 monitor").toBeGreaterThan(0);
 
     const r0 = raw.monitors[0];
-    for (const f of ["checkId", "checkName", "lastGreenAt", "runCount", "retryCount", "retryRate", "incidents", "redTest", "specProvenance", "trust"]) {
+    for (const f of ["checkId", "checkName", "lastGreenAt", "runCount", "recheckCount", "recheckRate", "incidents", "redTest", "specProvenance", "trust"]) {
       expect(r0, `monitor has ${f}`).toHaveProperty(f);
     }
     // nested field names the mapper reads
@@ -51,7 +51,7 @@ test.describe("API contract — trust scorecard mappers vs the real responses", 
     for (const f of ["state", "consumed", "budget", "burnRate", "directedTask", "targetIsDefault"]) {
       expect(r0.flakeBudget, `flakeBudget has ${f}`).toHaveProperty(f);
     }
-    for (const f of ["flap", "retry", "monitorNoise", "spuriousRed"]) {
+    for (const f of ["flap", "recheck", "monitorNoise", "spuriousRed"]) {
       expect(r0.dimensions[f], `dimensions.${f} has state`).toHaveProperty("state");
     }
     for (const f of ["monitorSide", "serviceSide", "indeterminate", "spuriousRedRate"]) {
@@ -67,8 +67,8 @@ test.describe("API contract — trust scorecard mappers vs the real responses", 
       expect(m, `monitor for check ${rm.checkId}`).toBeTruthy();
       expect(m!.check_name).toBe(rm.checkName ?? "");
       expect(m!.last_green_at).toBe(rm.lastGreenAt == null ? null : String(rm.lastGreenAt)); // ★ null-safe: never-green preserved
-      expect(m!.retry_rate).toBe(rm.retryRate == null ? null : Number(rm.retryRate)); // ★ null preserved → "—"
-      expect(m!.retried_passes).toBe(Number(rm.retriedPasses ?? 0));
+      expect(m!.recheck_rate).toBe(rm.recheckRate == null ? null : Number(rm.recheckRate)); // ★ null preserved → "—"
+      expect(m!.rechecked_passes).toBe(Number(rm.recheckedPasses ?? 0));
       // nested incidents mapped (camelCase → snake_case), NOT folded. The real capture always carries the
       // incidents object → non-null here (the absent→null path is the teeth test below).
       expect(m!.incidents!.real_outage).toBe(Number(rm.incidents.realOutage ?? 0));
@@ -79,24 +79,24 @@ test.describe("API contract — trust scorecard mappers vs the real responses", 
     }
   });
 
-  test("GET /reports/trust/{id}: monitor + retrySeries[] mapped by real field names (retryRate null-safe)", async () => {
+  test("GET /reports/trust/{id}: monitor + recheckSeries[] mapped by real field names (recheckRate null-safe)", async () => {
     const raw = real("reports_trust_detail");
     expect(raw.monitor, "detail has a monitor").toBeTruthy();
-    expect(Array.isArray(raw.retrySeries), "retrySeries is an array").toBe(true);
+    expect(Array.isArray(raw.recheckSeries), "recheckSeries is an array").toBe(true);
 
     const detail = await withRealResponse(raw, () => getTrustDetail(Number(raw.monitor.checkId), "30d"));
     expect(detail, "getTrustDetail returns a detail (not null)").toBeTruthy();
     expect(detail!.monitor.check_id).toBe(Number(raw.monitor.checkId));
-    expect(detail!.retry_series.length).toBe(raw.retrySeries.length);
+    expect(detail!.recheck_series.length).toBe(raw.recheckSeries.length);
 
-    const p0 = raw.retrySeries[0];
+    const p0 = raw.recheckSeries[0];
     if (p0) {
-      for (const f of ["day", "runCount", "retryCount", "retryRate"]) expect(p0, `retry point has ${f}`).toHaveProperty(f);
-      const m = detail!.retry_series[0]!;
+      for (const f of ["day", "runCount", "recheckCount", "recheckRate"]) expect(p0, `recheck point has ${f}`).toHaveProperty(f);
+      const m = detail!.recheck_series[0]!;
       expect(m.day).toBe(String(p0.day ?? ""));
       expect(m.run_count).toBe(Number(p0.runCount ?? 0));
-      expect(m.retry_count).toBe(Number(p0.retryCount ?? 0));
-      expect(m.retry_rate).toBe(p0.retryRate == null ? null : Number(p0.retryRate)); // null → gap, never 0
+      expect(m.recheck_count).toBe(Number(p0.recheckCount ?? 0));
+      expect(m.recheck_rate).toBe(p0.recheckRate == null ? null : Number(p0.recheckRate)); // null → gap, never 0
     }
   });
 
@@ -163,16 +163,16 @@ test.describe("API contract — trust scorecard mappers vs the real responses", 
     const rep = await withRealResponse({ ...raw, monitors: [stripped] }, () => getTrustReport("30d"));
     const m = rep!.monitors.find((x) => x.check_id === 777002)!;
     expect(m.dimensions.flap, "absent flap → null").toBeNull();
-    expect(m.dimensions.retry).toBeNull();
+    expect(m.dimensions.recheck).toBeNull();
     expect(m.dimensions.monitor_noise).toBeNull();
     expect(m.dimensions.spurious_red).toBeNull();
     // (b) an off-taxonomy state fail-safes to null; a VALID sibling still passes through.
     const poisoned: Record<string, unknown> = { ...raw.monitors[0], checkId: 777003,
-      dimensions: { flap: { state: "totally-bogus" }, retry: { state: "flaky" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "ok" } } };
+      dimensions: { flap: { state: "totally-bogus" }, recheck: { state: "flaky" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "ok" } } };
     const rep2 = await withRealResponse({ ...raw, monitors: [poisoned] }, () => getTrustReport("30d"));
     const m2 = rep2!.monitors.find((x) => x.check_id === 777003)!;
     expect(m2.dimensions.flap, "off-taxonomy → null, never 'ok'").toBeNull();
-    expect(m2.dimensions.retry, "valid state still passes through").toBe("flaky");
+    expect(m2.dimensions.recheck, "valid state still passes through").toBe("flaky");
   });
 
   // ★ THE FOURTH INSTANCE (this PR): an ABSENT incidents object maps to null (UNKNOWN), never a synthetic

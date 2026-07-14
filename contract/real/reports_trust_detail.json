@@ -7,9 +7,9 @@
     "lastGreenAt": "2026-07-13T18:26:14.336871+00:00",
     "lastRunAt": "2026-07-13T18:26:14.295939+00:00",
     "runCount": 7331,
-    "retryCount": 3,
-    "retryRate": 0.0004,
-    "retriedPasses": 0,
+    "recheckCount": 3,
+    "recheckRate": 0.0004,
+    "recheckedPasses": 0,
     "flapCount": 0,
     "scheduledCount": 7331,
     "flapRate": 0,
@@ -41,7 +41,7 @@
       "flap": {
         "state": "ok"
       },
-      "retry": {
+      "recheck": {
         "state": "ok"
       },
       "monitorNoise": {
@@ -68,186 +68,186 @@
     },
     "trust": "proven-live"
   },
-  "retrySeries": [
+  "recheckSeries": [
     {
       "day": "2026-06-14",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-15",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-16",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-17",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-18",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-19",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-20",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-21",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-22",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-23",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-24",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-25",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-26",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-27",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-28",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-29",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-06-30",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-07-01",
       "runCount": 0,
-      "retryCount": 0,
-      "retryRate": null
+      "recheckCount": 0,
+      "recheckRate": null
     },
     {
       "day": "2026-07-02",
       "runCount": 115,
-      "retryCount": 3,
-      "retryRate": 0.0261
+      "recheckCount": 3,
+      "recheckRate": 0.0261
     },
     {
       "day": "2026-07-03",
       "runCount": 434,
-      "retryCount": 0,
-      "retryRate": 0
+      "recheckCount": 0,
+      "recheckRate": 0
     },
     {
       "day": "2026-07-04",
       "runCount": 457,
-      "retryCount": 0,
-      "retryRate": 0
+      "recheckCount": 0,
+      "recheckRate": 0
     },
     {
       "day": "2026-07-05",
       "runCount": 407,
-      "retryCount": 0,
-      "retryRate": 0
+      "recheckCount": 0,
+      "recheckRate": 0
     },
     {
       "day": "2026-07-06",
       "runCount": 357,
-      "retryCount": 0,
-      "retryRate": 0
+      "recheckCount": 0,
+      "recheckRate": 0
     },
     {
       "day": "2026-07-07",
       "runCount": 789,
-      "retryCount": 0,
-      "retryRate": 0
+      "recheckCount": 0,
+      "recheckRate": 0
     },
     {
       "day": "2026-07-08",
       "runCount": 798,
-      "retryCount": 0,
-      "retryRate": 0
+      "recheckCount": 0,
+      "recheckRate": 0
     },
     {
       "day": "2026-07-09",
       "runCount": 806,
-      "retryCount": 0,
-      "retryRate": 0
+      "recheckCount": 0,
+      "recheckRate": 0
     },
     {
       "day": "2026-07-10",
       "runCount": 840,
-      "retryCount": 0,
-      "retryRate": 0
+      "recheckCount": 0,
+      "recheckRate": 0
     },
     {
       "day": "2026-07-11",
       "runCount": 856,
-      "retryCount": 0,
-      "retryRate": 0
+      "recheckCount": 0,
+      "recheckRate": 0
     },
     {
       "day": "2026-07-12",
       "runCount": 849,
-      "retryCount": 0,
-      "retryRate": 0
+      "recheckCount": 0,
+      "recheckRate": 0
     },
     {
       "day": "2026-07-13",
       "runCount": 623,
-      "retryCount": 0,
-      "retryRate": 0
+      "recheckCount": 0,
+      "recheckRate": 0
     }
   ]
 }

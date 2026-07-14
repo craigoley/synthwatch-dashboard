@@ -716,7 +716,7 @@ export default function CheckDetailPage() {
           Self-hides (null) until GET /reports/cost is reachable / the monitor has runs. */}
       <MonitorCostPanel checkId={check.id} />
 
-      {/* §D1 Trust drill-down — chip + honest red-test gap, retry sparkline, incident breakdown, spec
+      {/* §D1 Trust drill-down — chip + honest red-test gap, recheck sparkline, incident breakdown, spec
           integrity hash. Self-hides (404 → null) until GET /reports/trust/{id} is reachable. */}
       <TrustCard checkId={check.id} />
 

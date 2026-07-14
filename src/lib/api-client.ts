@@ -2219,7 +2219,7 @@ export async function getRegionHealth(): Promise<RegionHealthReport | null> {
   return { regions };
 }
 
-// GET /api/reports/trust?window= (§D1 fleet scorecard) + /reports/trust/{id}?window= (detail + daily retry
+// GET /api/reports/trust?window= (§D1 fleet scorecard) + /reports/trust/{id}?window= (detail + daily recheck
 // series). ★ null-safe (mirrors getSloReport/getEgressReport): 404 → null → the page/card self-hides. Renders
 // the API's rule-derived `trust` chip verbatim (no client-side re-derivation); redTest is an explicit gap.
 const TRUST_CHIPS = ["proven-live", "flaky", "nominal", "unverified"] as const;
@@ -2260,9 +2260,9 @@ function mapTrustRow(r: Record<string, unknown>): TrustRow {
     last_green_at: r.lastGreenAt == null ? null : String(r.lastGreenAt),
     last_run_at: r.lastRunAt == null ? null : String(r.lastRunAt),
     run_count: num(r.runCount),
-    retry_count: num(r.retryCount),
-    retry_rate: nul(r.retryRate), // null preserved → "—", never a fake 0%
-    retried_passes: num(r.retriedPasses), // absent (pre-deploy API) → 0 → annotation hidden; forward-compatible
+    recheck_count: num(r.recheckCount),
+    recheck_rate: nul(r.recheckRate), // null preserved → "—", never a fake 0%
+    rechecked_passes: num(r.recheckedPasses), // absent (pre-deploy API) → 0 → annotation hidden; forward-compatible
     flap_count: num(r.flapCount), // confirmation-retry P2: transient failures; absent (pre-deploy) → 0 → hidden
     scheduled_count: num(r.scheduledCount),
     flap_rate: nul(r.flapRate), // null preserved → "—", never a fake 0%
@@ -2289,7 +2289,7 @@ function mapTrustRow(r: Record<string, unknown>): TrustRow {
     // (forward-compatible); the chip itself still comes through verbatim below.
     dimensions: {
       flap: dimState(dimObj("flap")),
-      retry: dimState(dimObj("retry")),
+      recheck: dimState(dimObj("recheck")),
       monitor_noise: dimState(dimObj("monitorNoise")),
       spurious_red: dimState(dimObj("spuriousRed")), // ★ B3-2 stage 2; absent (pre-deploy) → "ok"
     },
@@ -2360,13 +2360,13 @@ export async function getTrustDetail(checkId: number, window: ReportWindow = "30
   const m = raw?.monitor as Record<string, unknown> | null | undefined;
   if (!m) return null;
   const nul = (v: unknown) => (v == null ? null : Number(v));
-  const retry_series = ((raw?.retrySeries as Record<string, unknown>[]) ?? []).map((p) => ({
+  const recheck_series = ((raw?.recheckSeries as Record<string, unknown>[]) ?? []).map((p) => ({
     day: String(p.day ?? ""),
     run_count: Number(p.runCount ?? 0),
-    retry_count: Number(p.retryCount ?? 0),
-    retry_rate: nul(p.retryRate), // null when run_count 0 → a gap, never 0
+    recheck_count: Number(p.recheckCount ?? 0),
+    recheck_rate: nul(p.recheckRate), // null when run_count 0 → a gap, never 0
   }));
-  return { window: String(raw?.window ?? window), monitor: mapTrustRow(m), retry_series };
+  return { window: String(raw?.window ?? window), monitor: mapTrustRow(m), recheck_series };
 }
 
 // GET /api/status (§A3) — the internal/stakeholder status page: per-PROPERTY current state + uptime + recent

@@ -114,7 +114,7 @@ test.describe("trust — glance summary + one disclosure, exceptions never colla
     w.trustMonitors = [
       {
         checkId: 3, checkName: "Checkout flow", lastGreenAt: "2026-07-11T12:00:00Z",
-        runCount: 300, retryCount: 60, retryRate: 0.2, incidents: {
+        runCount: 300, recheckCount: 60, recheckRate: 0.2, incidents: {
           total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0,
         },
         redTest: { captured: false },

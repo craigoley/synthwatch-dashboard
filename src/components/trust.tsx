@@ -8,7 +8,7 @@ import { TONE_VAR } from "@/components/status-badge";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { StalenessStamp, useFetchedAt } from "@/components/staleness";
 import { formatRelative } from "@/lib/format";
-import type { ReportWindow, TrustChip, TrustFlakeBudget, TrustIncidents, TrustRetryPoint, TrustRow } from "@/lib/types";
+import type { ReportWindow, TrustChip, TrustFlakeBudget, TrustIncidents, TrustRecheckPoint, TrustRow } from "@/lib/types";
 
 /**
  * §D1 monitor-trust — the "every green shown with its proof" surface. NO composite score: the chip is
@@ -25,8 +25,8 @@ export const TRUST_RULES = {
   FLAP_ELEVATED_MIN: 0.01, // flap dimension elevated at ≥ 1% …
   FLAP_FLAKY_MIN: 0.05, // … flaky at ≥ 5% …
   FLAP_MIN_COUNT: 2, // … both gated on ≥ 2 transient failures (one flap is noise; a pattern repeats)
-  RETRY_ELEVATED_MIN: 0.02, // retry dimension elevated at ≥ 2% …
-  RETRY_FLAKY_MIN: 0.1, // … flaky at ≥ 10% (matches the old proven-live boundary; the dead 50% floor is gone)
+  RECHECK_ELEVATED_MIN: 0.02, // recheck dimension elevated at ≥ 2% …
+  RECHECK_FLAKY_MIN: 0.1, // … flaky at ≥ 10% (matches the old proven-live boundary; the dead 50% floor is gone)
   SPURIOUS_ELEVATED_MIN: 0.01, // ★ B3-2 stage 2: spurious-red (monitor-side transients ÷ scheduled) elevated ≥ 1% …
   SPURIOUS_FLAKY_MIN: 0.05, // … flaky at ≥ 5% …
   SPURIOUS_MIN_COUNT: 2, // … with ≥ 2 monitor-side transients (one is noise)
@@ -45,7 +45,7 @@ export const TRUST_META: Record<TrustChip, { label: string; tone: "pass" | "warn
   flaky: {
     label: "Flaky",
     tone: "warn",
-    blurb: "ANY dimension flaky — the chip names which (flap / retry / monitor-noise)",
+    blurb: "ANY dimension flaky — the chip names which (flap / recheck / monitor-noise)",
   },
   unverified: { label: "Unverified", tone: "idle", blurb: "never green OR no runs — unproven, not broken" },
 };
@@ -56,7 +56,7 @@ export const TRUST_META: Record<TrustChip, { label: string; tone: "pass" | "warn
 // own neutral idiom (handled explicitly in DimensionStrip), never as a health tone.
 const DIM_STATE_TONE: Record<"ok" | "elevated" | "flaky", "pass" | "warn" | "idle"> = { ok: "idle", elevated: "warn", flaky: "warn" };
 
-type DimKey = "flap" | "retry" | "monitor_noise" | "spurious_red";
+type DimKey = "flap" | "recheck" | "monitor_noise" | "spurious_red";
 // Each dimension: its label, the exact formula + threshold (rendered verbatim in the legend), and how to read
 // its current value off a row. monitor-noise is a COUNT (selector-drift + flaky-transient), not a rate.
 const DIMENSION_META: {
@@ -72,10 +72,10 @@ const DIMENSION_META: {
     value: (row) => flapRateText(row),
   },
   {
-    key: "retry",
-    label: "Retry",
-    rule: `runs needing a real retry ÷ runs — elevated ≥ ${TRUST_RULES.RETRY_ELEVATED_MIN * 100}%, flaky ≥ ${TRUST_RULES.RETRY_FLAKY_MIN * 100}%`,
-    value: (row) => retryRateText(row),
+    key: "recheck",
+    label: "Recheck",
+    rule: `confirmation re-checks ÷ runs — elevated ≥ ${TRUST_RULES.RECHECK_ELEVATED_MIN * 100}%, flaky ≥ ${TRUST_RULES.RECHECK_FLAKY_MIN * 100}%`,
+    value: (row) => recheckRateText(row),
   },
   {
     key: "monitor_noise",
@@ -94,7 +94,7 @@ const DIMENSION_META: {
 ];
 
 /**
- * ★ B3-2 — the distinct dimensions rendered as a compact strip: one labelled state dot per axis (flap / retry /
+ * ★ B3-2 — the distinct dimensions rendered as a compact strip: one labelled state dot per axis (flap / recheck /
  * monitor-noise), tinted by its state, each carrying its current value + formula in the title. This is the
  * SURFACED replacement for the OR-collapse — you see WHICH axis flags, not a single verdict. Always shown (a
  * clean monitor reads three faint "ok" dots), so "proven live" is legible as "clean on every axis".
@@ -196,27 +196,27 @@ export function TrustChipBadge({ chip }: { chip: TrustChip }) {
   );
 }
 
-// ★ "Degrading-but-green" early warning. The ONLY threshold is > 0 (any passing run that needed a real retry
+// ★ "Degrading-but-green" early warning. The ONLY threshold is > 0 (any passing run that needed a re-check
 // is worth surfacing) — named, not magic. Deliberately SEPARATE from TRUST_RULES: this is NOT a chip rule.
-export const RETRIED_PASSES_MIN_TO_WARN = 1;
+export const RECHECKED_PASSES_MIN_TO_WARN = 1;
 
 /**
- * An ANNOTATION on a healthy monitor — NEVER a chip demotion. The API carries `retried_passes` (PASS/WARN runs
- * that still needed a real retry) as a DISPLAY-ONLY fact that never feeds the trust chip: a proven-live monitor
+ * An ANNOTATION on a healthy monitor — NEVER a chip demotion. The API carries `rechecked_passes` (PASS/WARN runs
+ * that still needed a re-check) as a DISPLAY-ONLY fact that never feeds the trust chip: a proven-live monitor
  * with retried passes STAYS proven-live. Rendered warn-toned but visually DISTINCT from TrustChipBadge — plain
  * caption text with a small dot, no pill — so it reads as "watch this", not "downgraded". Hidden when 0.
  */
-export function RetriedPassesNote({ retriedPasses, window }: { retriedPasses: number; window: string }) {
-  if (retriedPasses < RETRIED_PASSES_MIN_TO_WARN) return null;
+export function RecheckedPassesNote({ recheckedPasses, window }: { recheckedPasses: number; window: string }) {
+  if (recheckedPasses < RECHECKED_PASSES_MIN_TO_WARN) return null;
   return (
     <span
       className="mt-0.5 inline-flex items-center gap-1 text-[11px]"
       style={{ color: TONE_VAR.warn }}
-      data-testid="trust-retried-passes"
-      title={`${retriedPasses} passing run(s) needed a real retry in the last ${window} — degrading, but still green. This does NOT change the trust chip.`}
+      data-testid="trust-rechecked-passes"
+      title={`${recheckedPasses} passing run(s) needed a re-check in the last ${window} — degrading, but still green. This does NOT change the trust chip.`}
     >
       <span className="h-1 w-1 rounded-full" style={{ background: TONE_VAR.warn }} />
-      {retriedPasses} {retriedPasses === 1 ? "pass" : "passes"} needed retries · {window}
+      {recheckedPasses} {recheckedPasses === 1 ? "pass" : "passes"} needed re-checks · {window}
     </span>
   );
 }
@@ -226,7 +226,7 @@ export function RetriedPassesNote({ retriedPasses, window }: { retriedPasses: nu
  * PASSED, so it was confirmed NOT-real and excluded from availability/the SLO — it DID happen (the check
  * flapped), it just did not count. Surfaced so a check flapping N×/window TELLS you rather than silently
  * self-healing. The copy is explicit that the platform MEASURED a self-healed failure, never HID one. Hidden
- * when 0. (Unlike RetriedPassesNote, a REPEATED flap also feeds the chip server-side — this note explains it.)
+ * when 0. (Unlike RecheckedPassesNote, a REPEATED flap also feeds the chip server-side — this note explains it.)
  */
 export function FlapNote({ flapCount, scheduledCount, window }: { flapCount: number; scheduledCount: number; window: string }) {
   if (flapCount <= 0) return null;
@@ -393,9 +393,9 @@ export function RedTestStatus({
 }
 
 // ── formatting helpers (honest-empty) ────────────────────────────────────────────────────────────────────
-export function retryRateText(row: Pick<TrustRow, "retry_rate" | "retry_count" | "run_count">): string {
-  if (row.retry_rate == null) return "—"; // no runs → em-dash, NEVER 0%
-  return `${Math.round(row.retry_rate * 100)}% (${row.retry_count}/${row.run_count})`;
+export function recheckRateText(row: Pick<TrustRow, "recheck_rate" | "recheck_count" | "run_count">): string {
+  if (row.recheck_rate == null) return "—"; // no runs → em-dash, NEVER 0%
+  return `${Math.round(row.recheck_rate * 100)}% (${row.recheck_count}/${row.run_count})`;
 }
 // Confirmation-retry P2: "4.2% (6/142)" — transient failures ÷ scheduled runs. Null denominator → "—", never 0%.
 export function flapRateText(row: Pick<TrustRow, "flap_rate" | "flap_count" | "scheduled_count">): string {
@@ -448,25 +448,25 @@ function IncidentBreakdown({ incidents }: { incidents: TrustIncidents | null }) 
   );
 }
 
-function RetrySparkline({ series }: { series: TrustRetryPoint[] }) {
-  const present = series.filter((p) => p.retry_rate != null);
+function RecheckSparkline({ series }: { series: TrustRecheckPoint[] }) {
+  const present = series.filter((p) => p.recheck_rate != null);
   if (present.length < 2) return null; // needs ≥2 real days to read a trend
-  const first = series.find((p) => p.retry_rate != null);
-  const last = [...series].reverse().find((p) => p.retry_rate != null);
+  const first = series.find((p) => p.recheck_rate != null);
+  const last = [...series].reverse().find((p) => p.recheck_rate != null);
   return (
-    <div data-testid="trust-retry-sparkline">
-      <h4 className="mb-2 text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">Retry rate · daily</h4>
+    <div data-testid="trust-recheck-sparkline">
+      <h4 className="mb-2 text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">Recheck rate · daily</h4>
       <div className="flex items-end gap-0.5" style={{ height: 44 }}>
         {series.map((p) =>
-          p.retry_rate == null ? (
+          p.recheck_rate == null ? (
             // a GAP (no runs) — a faint baseline tick, never a 0%-height bar (gaps-not-zeros)
             <span key={p.day} title={`${p.day} · no runs`} className="flex-1 self-end" style={{ height: 2, background: "var(--color-border)" }} />
           ) : (
             <span
               key={p.day}
-              title={`${p.day} · ${Math.round(p.retry_rate * 100)}% retry · ${p.run_count} runs`}
+              title={`${p.day} · ${Math.round(p.recheck_rate * 100)}% recheck · ${p.run_count} runs`}
               className="flex-1 rounded-t"
-              style={{ height: `${Math.max(3, p.retry_rate * 100)}%`, background: "var(--color-warn)" }}
+              style={{ height: `${Math.max(3, p.recheck_rate * 100)}%`, background: "var(--color-warn)" }}
             />
           ),
         )}
@@ -483,11 +483,11 @@ function RetrySparkline({ series }: { series: TrustRetryPoint[] }) {
  * Per-check Trust card for the monitor detail page. Self-fetching + null-safe: 404 / no trust data → renders
  * nothing (mirrors the SLO/deploys self-hide). Split into a GLANCE layer + ONE disclosure:
  *
- *   always visible — the chip, the honest red-test slot, LAST GREEN, RETRY RATE, RUNS, the degrading-but-green
+ *   always visible — the chip, the honest red-test slot, LAST GREEN, RECHECK RATE, RUNS, the degrading-but-green
  *   annotation, and (only when non-zero) an INCIDENTS count. Collapse the boring; NEVER collapse the alarming:
  *   every bad state (not-captured, flaky/unverified chip, incidents > 0, retried passes) stays in the summary.
  *
- *   deferred behind one "Details" disclosure (the Metrics-section mechanism) — the daily retry SPARKLINE (flat
+ *   deferred behind one "Details" disclosure (the Metrics-section mechanism) — the daily recheck SPARKLINE (flat
  *   0% on most monitors; drill-down value only), the INCIDENTS-BY-CAUSE breakdown (its count is already in the
  *   summary when non-zero), and the FULL spec-integrity sha256 + path (forensic — nobody reads a 64-char hash
  *   at a glance; the summary carries the short form + a copy affordance instead of a two-line wrap on mobile).
@@ -532,12 +532,12 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
       </div>
 
       {/* degrading-but-green early warning + transient-flap note — distinct annotations, NOT a chip demotion.
-          Each self-hides (RetriedPassesNote when < MIN, FlapNote when 0), so gate on EITHER having something to
+          Each self-hides (RecheckedPassesNote when < MIN, FlapNote when 0), so gate on EITHER having something to
           say — otherwise a check that flaps but has no retried passes would silently drop the flap note here
           while the fleet scorecard still shows it. */}
-      {(m.retried_passes >= RETRIED_PASSES_MIN_TO_WARN || m.flap_count > 0) && (
+      {(m.rechecked_passes >= RECHECKED_PASSES_MIN_TO_WARN || m.flap_count > 0) && (
         <div className="mb-3">
-          <RetriedPassesNote retriedPasses={m.retried_passes} window={window} />
+          <RecheckedPassesNote recheckedPasses={m.rechecked_passes} window={window} />
           <FlapNote flapCount={m.flap_count} scheduledCount={m.scheduled_count} window={window} />
         </div>
       )}
@@ -565,8 +565,8 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
           </div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Retry rate</div>
-          <div className="sw-mono text-[13px] text-[var(--color-ink)]" data-testid="trust-retry-rate">{retryRateText(m)}</div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Recheck rate</div>
+          <div className="sw-mono text-[13px] text-[var(--color-ink)]" data-testid="trust-recheck-rate">{recheckRateText(m)}</div>
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">Flap rate</div>
@@ -663,12 +663,12 @@ export function TrustCard({ checkId, window = "30d" }: { checkId: number; window
           </svg>
           Details
           <span className="ml-0.5 text-[10px] font-normal uppercase tracking-wider text-[var(--color-ink-faint)]">
-            retry trend · incidents by cause · spec integrity
+            recheck trend · incidents by cause · spec integrity
           </span>
         </button>
         {detailsOpen && (
           <div id="trust-details-body" data-testid="trust-details-body" className="mt-3 space-y-4">
-            <RetrySparkline series={data.retry_series} />
+            <RecheckSparkline series={data.recheck_series} />
 
             <div>
               <h4 className="mb-2 text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">Incidents by cause</h4>
@@ -748,7 +748,7 @@ export function TrustScorecard({ window }: { window: ReportWindow }) {
           <div className="hidden grid-cols-[1fr_110px_130px_90px_110px_120px] gap-3 border-b border-[var(--color-border)] px-4 py-2.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)] sm:grid">
             <span>Monitor</span>
             <span>Last green</span>
-            <span>Retry rate</span>
+            <span>Recheck rate</span>
             <span className="text-right">Reds r/n</span>
             <span>Red-tested</span>
             <span>Trust</span>
@@ -776,7 +776,7 @@ export function TrustScorecard({ window }: { window: ReportWindow }) {
                       <DimensionStrip row={row} />
                     </div>
                     {/* degrading-but-green + transient-flap annotations — distinct from the chip + the dimensions */}
-                    <RetriedPassesNote retriedPasses={row.retried_passes} window={window} />
+                    <RecheckedPassesNote recheckedPasses={row.rechecked_passes} window={window} />
                     <FlapNote flapCount={row.flap_count} scheduledCount={row.scheduled_count} window={window} />
                     {/* ★ B3-3: the MONITOR trust budget — "degraded as a monitor" + the directed fix task (distinct
                         from a service alert), and the honest indeterminate caveat. */}
@@ -788,8 +788,8 @@ export function TrustScorecard({ window }: { window: ReportWindow }) {
                   >
                     {lastGreenText(row.last_green_at)}
                   </span>
-                  <span className="sw-mono text-[12px] text-[var(--color-ink-dim)]" data-testid={`trust-retry-${row.check_id}`}>
-                    {retryRateText(row)}
+                  <span className="sw-mono text-[12px] text-[var(--color-ink-dim)]" data-testid={`trust-recheck-${row.check_id}`}>
+                    {recheckRateText(row)}
                   </span>
                   <span
                     className="sw-mono text-right text-[12px] text-[var(--color-ink-dim)]"

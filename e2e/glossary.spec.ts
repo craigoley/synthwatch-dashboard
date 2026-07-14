@@ -11,7 +11,7 @@ test.describe("glossary — the 2am reference", () => {
 
     await expect(page.getByTestId("glossary")).toBeVisible();
     // ★ the words an on-call engineer actually hits, each defined
-    for (const id of ["trust-chip", "flap", "retry", "transient", "spurious-red", "flake-budget", "error-diff"]) {
+    for (const id of ["trust-chip", "flap", "recheck", "transient", "spurious-red", "flake-budget", "error-diff"]) {
       await expect(page.getByTestId(`glossary-term-${id}`)).toBeVisible();
     }
     // ★ operator language, not the schema's — "flap" is "recovered on recheck", not "superseded_by_run_id"
