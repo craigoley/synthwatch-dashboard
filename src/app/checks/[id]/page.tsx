@@ -36,7 +36,7 @@ import { MonitorForm } from "@/components/monitor-form";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { runStatusMeta, daysUntilPurge, PURGE_WINDOW_DAYS } from "@/lib/status";
 import { usePersistedBoolean } from "@/lib/use-persisted-boolean";
-import { formatCertExpiry, formatDuration, formatRelative, isWithinHours, secondsToMinutesLabel } from "@/lib/format";
+import { formatCertExpiry, formatDuration, formatRelative, parseDate, secondsToMinutesLabel } from "@/lib/format";
 import type { ChainStep, Check, Run } from "@/lib/types";
 
 /**
@@ -83,9 +83,16 @@ function ConfigChip({ label, value, note }: { label: string; value: string; note
  */
 function MonitorIncidentLink({ checkId }: { checkId: number }) {
   const { incidents } = useIncidentHistory({ checkId }, {});
+  // ★ No recency cliff here. This is a "what happened to THIS check" surface, not a "needs me NOW" one, so link
+  // to the check's MOST RECENT incident regardless of age and SHOW the age ("resolved 3d ago") — the operator
+  // judges relevance, not a magic constant. (A 24h literal here silently dropped 26 resolved incidents whose RCA
+  // still lives on /incidents.) The only bound is the history query's own newest-first page window — a data
+  // bound, not a UI cliff. Prefer an open incident; else the resolved one with the latest resolved_at.
   const open = incidents.find((i) => i.status === "open");
-  const recentResolved = incidents.find((i) => i.status === "resolved" && isWithinHours(i.resolved_at, 24));
-  const inc = open ?? recentResolved;
+  const mostRecentResolved = incidents
+    .filter((i) => i.status === "resolved")
+    .sort((a, b) => (parseDate(b.resolved_at)?.getTime() ?? 0) - (parseDate(a.resolved_at)?.getTime() ?? 0))[0];
+  const inc = open ?? mostRecentResolved;
   if (!inc) return null;
   const isOpen = inc.status === "open";
   const when = isOpen ? `opened ${formatRelative(inc.opened_at)}` : `resolved ${formatRelative(inc.resolved_at ?? inc.opened_at)}`;
@@ -102,7 +109,7 @@ function MonitorIncidentLink({ checkId }: { checkId: number }) {
     >
       <span aria-hidden style={{ color: tone }}>⚠</span>
       <span className="font-medium" style={{ color: tone }}>
-        {isOpen ? "Open incident" : "Recent incident"} #{inc.id}
+        {isOpen ? "Open incident" : "Last incident"} #{inc.id}
       </span>
       <span className="text-[var(--color-ink-dim)]">
         · {inc.severity} · {when}
