@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
-import { useCheck, useMetrics, updateCheck, revalidateChecks, runCheckNow, revalidateRunHistory, useSpecCache } from "@/lib/client";
+import { useCheck, useMetrics, updateCheck, revalidateChecks, runCheckNow, revalidateRunHistory, useSpecCache, useIncidentHistory } from "@/lib/client";
 import { useAuth } from "@/components/auth-provider";
 import { AvailabilityChart, LatencyChart, MetricsCharts } from "@/components/charts";
 import { CheckSlaPanel, SloPanel } from "@/components/sla";
@@ -36,7 +36,7 @@ import { MonitorForm } from "@/components/monitor-form";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { runStatusMeta, daysUntilPurge, PURGE_WINDOW_DAYS } from "@/lib/status";
 import { usePersistedBoolean } from "@/lib/use-persisted-boolean";
-import { formatCertExpiry, formatDuration, formatRelative, secondsToMinutesLabel } from "@/lib/format";
+import { formatCertExpiry, formatDuration, formatRelative, isWithinHours, secondsToMinutesLabel } from "@/lib/format";
 import type { ChainStep, Check, Run } from "@/lib/types";
 
 /**
@@ -72,6 +72,43 @@ function ConfigChip({ label, value, note }: { label: string; value: string; note
       <span className="sw-mono text-[12px] text-[var(--color-ink)]">{value}</span>
       {note && <span aria-hidden className="text-[10px] text-[var(--color-ink-faint)]">ⓘ</span>}
     </span>
+  );
+}
+
+/**
+ * ★ The 2am routing link: if this monitor has an OPEN incident (or one resolved in the last 24h), point at
+ * it — the Incidents page carries the monitor-vs-service root cause, and nothing else on this page routes
+ * you there. Link ONLY — we do NOT surface the RCA verdict here (the classifier is under repair; a signal
+ * must not be made more prominent until the number behind it is trustworthy). #299 / inversion follow-on.
+ */
+function MonitorIncidentLink({ checkId }: { checkId: number }) {
+  const { incidents } = useIncidentHistory({ checkId }, {});
+  const open = incidents.find((i) => i.status === "open");
+  const recentResolved = incidents.find((i) => i.status === "resolved" && isWithinHours(i.resolved_at, 24));
+  const inc = open ?? recentResolved;
+  if (!inc) return null;
+  const isOpen = inc.status === "open";
+  const when = isOpen ? `opened ${formatRelative(inc.opened_at)}` : `resolved ${formatRelative(inc.resolved_at ?? inc.opened_at)}`;
+  const tone = isOpen ? "var(--color-fail)" : "var(--color-ink-dim)";
+  return (
+    <Link
+      href={`/incidents/${inc.id}`}
+      data-testid="monitor-incident-link"
+      className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border px-4 py-2.5 text-sm transition hover:bg-[var(--color-panel-2)]"
+      style={{
+        borderColor: isOpen ? "color-mix(in srgb, var(--color-fail) 34%, transparent)" : "var(--color-border)",
+        background: isOpen ? "color-mix(in srgb, var(--color-fail) 8%, transparent)" : undefined,
+      }}
+    >
+      <span aria-hidden style={{ color: tone }}>⚠</span>
+      <span className="font-medium" style={{ color: tone }}>
+        {isOpen ? "Open incident" : "Recent incident"} #{inc.id}
+      </span>
+      <span className="text-[var(--color-ink-dim)]">
+        · {inc.severity} · {when}
+      </span>
+      <span className="ml-auto text-[var(--color-brand)]">view root cause →</span>
+    </Link>
   );
 }
 
@@ -545,6 +582,10 @@ export default function CheckDetailPage() {
           )}
         </div>
       </header>
+
+      {/* ★ Route to the incident (open, or resolved in the last 24h) — the Incidents page has the root cause;
+          nothing else on this page pointed there. Link only, no verdict. */}
+      <MonitorIncidentLink checkId={check.id} />
 
       {/* Git-removal (0072): this monitor's manifest entry was deleted from synthwatch-monitors. It stopped
           running and is on the 90-day purge clock. Read-only from here — re-add it in git to cancel the purge

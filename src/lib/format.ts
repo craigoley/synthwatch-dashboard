@@ -36,6 +36,13 @@ export function formatLocalDateTime(iso: string | null | undefined): string {
   });
 }
 
+/** True when `iso` is a timestamp within the last `hours`. `now` defaults to call-time (same pattern as
+ *  formatRelative) so callers in render bodies don't trip the no-impure-call-in-render lint. */
+export function isWithinHours(iso: string | null | undefined, hours: number, now = Date.now()): boolean {
+  const d = parseDate(iso);
+  return d != null && now - d.getTime() < hours * 3_600_000;
+}
+
 /** Compact relative time, e.g. "12s ago", "4m ago", "3h ago", "2d ago". */
 export function formatRelative(iso: string | null | undefined, now = Date.now()): string {
   const d = parseDate(iso);
