@@ -21,6 +21,14 @@ function budgetTone(remaining: number, budget: number, insufficient: boolean): T
   if (remaining < 0) return "fail";
   return remaining / budget <= 0.2 ? "warn" : "pass";
 }
+// ★ Minimum-sample gate (data-DERIVED, three-state discipline like the trust dims). `budget` = allowed
+// down-runs = (1−target)×completed_runs. When it's < 1, the window permits LESS THAN ONE failure, so a single
+// down-run flips "healthy" → "Budget blown" — the confidently-wrong verdict the confirmation-retry canary read.
+// 1 is not invented: it's the smallest meaningful budget (you can't spend a fraction of a failure). Below it,
+// show the sample, not a verdict — distinct from `insufficient_data` (the API's coarse too-few-runs gate).
+function budgetTooThin(budget: number, insufficient: boolean): boolean {
+  return !insufficient && budget < 1;
+}
 /** remaining/budget as a fraction (null while building / no budget), like SloPanel's remainingFraction. */
 function remainingFraction(r: { remaining: number; budget: number; insufficient_data: boolean }): number | null {
   return r.insufficient_data || r.budget <= 0 ? null : r.remaining / r.budget;
@@ -50,6 +58,11 @@ function FleetRollup({ fleet }: { fleet: SloReportFleet }) {
       {fleet.insufficient_data ? (
         <p className="text-[13px] text-[var(--color-ink-dim)]" data-testid="fleet-slo-building">
           Building baseline — not enough completed runs in the window yet.
+        </p>
+      ) : budgetTooThin(fleet.budget, fleet.insufficient_data) ? (
+        <p className="text-[13px] text-[var(--color-ink-dim)]" data-testid="fleet-slo-thin">
+          Not enough data to grade — the budget is {fleet.budget.toFixed(1)} of a single down-run. A verdict
+          needs at least one whole permitted failure; one down-run would flip it.
         </p>
       ) : (
         <>
@@ -87,6 +100,10 @@ function SloRow({ row }: { row: SloReportRow }) {
       {row.insufficient_data ? (
         <span className="text-[12px] text-[var(--color-ink-faint)]" data-testid="slo-building">
           building baseline
+        </span>
+      ) : budgetTooThin(row.budget, row.insufficient_data) ? (
+        <span className="text-[12px] text-[var(--color-ink-faint)]" data-testid="slo-thin" title="Budget is under one whole permitted failure — too thin to grade; one down-run would flip the verdict.">
+          not enough data
         </span>
       ) : (
         <div className="flex items-center gap-2">

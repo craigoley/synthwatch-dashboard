@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
 import { useAuth } from "@/components/auth-provider";
-import { useChecks } from "@/lib/client";
+import { useChecks, setEnvironmentOverride } from "@/lib/client";
 import {
   getEnvDomainMap,
   createEnvDomainRule,
@@ -227,27 +227,65 @@ function RuleRow({
   );
 }
 
-/** The checks that carry a manual override — so a wrong override is discoverable (and fixable on its page). */
+/** The checks that carry a manual override — so a wrong override is discoverable AND clearable here (reverts to
+ *  the derived env). The clear button previews what the monitor becomes ("→ prod (derived)") before committing. */
 function OverriddenChecks() {
   const { data: checks } = useChecks();
+  const { canWrite, promptLogin } = useAuth();
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [err, setErr] = useState<string | null>(null);
   const overridden = (checks ?? []).filter((c) => c.environment_override != null);
   if (overridden.length === 0) return null;
+
+  const clear = async (id: number) => {
+    if (!canWrite) return promptLogin();
+    setErr(null);
+    setBusyId(id);
+    try {
+      // null → the API clears environment_override and the effective env reverts to the derived value; the
+      // client wrapper revalidates useChecks, so this row drops out once the override is gone. (round-trips: #4)
+      await setEnvironmentOverride(id, null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn’t clear the override.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <section className="mt-8">
       <div className="mb-2 sw-eyebrow">Monitors with a manual override ({overridden.length})</div>
+      {err && <p className="mb-2 text-xs text-[var(--color-fail)]" data-testid="override-clear-error">{err}</p>}
       <div className="overflow-hidden rounded-lg border border-[var(--color-border)]">
-        {overridden.map((c) => (
-          <Link
-            key={c.id}
-            href={`/checks/${c.id}`}
-            className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-2 last:border-b-0 hover:bg-[var(--color-panel-2)]"
-          >
-            <span className="truncate text-sm text-[var(--color-ink)]">{c.name}</span>
-            <span className="sw-mono shrink-0 text-[12px] text-[var(--color-ink-dim)]">
-              {envOf(c)} <span className="text-[var(--color-ink-faint)]">(override; derived {c.environment})</span>
-            </span>
-          </Link>
-        ))}
+        {overridden.map((c) => {
+          const derived = c.environment ?? "prod";
+          return (
+            <div
+              key={c.id}
+              data-testid={`override-row-${c.id}`}
+              className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-2 last:border-b-0"
+            >
+              <Link href={`/checks/${c.id}`} className="min-w-0 flex-1 truncate text-sm text-[var(--color-ink)] hover:text-[var(--color-brand)]">
+                {c.name}
+              </Link>
+              <span className="sw-mono shrink-0 text-[12px] text-[var(--color-ink-dim)]">
+                {envOf(c)} <span className="text-[var(--color-ink-faint)]">(override; derived {derived})</span>
+              </span>
+              {canWrite && (
+                <button
+                  type="button"
+                  onClick={() => clear(c.id)}
+                  disabled={busyId === c.id}
+                  data-testid={`override-clear-${c.id}`}
+                  className="sw-btn sw-btn-ghost sw-btn-sm shrink-0 disabled:opacity-60"
+                  title={`Clear the manual override — reverts to the derived environment (${derived})`}
+                >
+                  {busyId === c.id ? "Clearing…" : `Clear → ${derived} (derived)`}
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );

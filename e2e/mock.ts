@@ -117,6 +117,12 @@ export interface World {
   statusServed?: boolean;
   /** Chat-to-prefill: set false to make /checks/parse-intent report unconfigured (the input hides). */
   parseIntentConfigured?: boolean;
+  /** Verbatim GET /reports/incident-breakdown payload (raw). When set, bypasses the deterministic builder —
+   *  used to drive the min-sample gate exactly (e.g. realOutages:1 / classified:4 → the fragile "25%"). */
+  incidentBreakdown?: RawObj;
+  /** Verbatim GET /reports/slo payload (raw {items,fleet}). When set, bypasses the deterministic builder —
+   *  used to drive the thin-budget gate exactly (fleet.budget < 1 → "not enough data", never "Budget blown"). */
+  sloReport?: RawObj;
   /** Fleet SLO report: which check ids have an SLO target (default [1,3]); which are "building baseline". */
   sloCheckIds?: number[];
   sloBuildingIds?: number[];
@@ -493,6 +499,17 @@ export async function mockApi(
       world.checkTags = { ...(world.checkTags ?? {}), [id]: tags };
       return json(route, tags);
     }
+    // PUT a check's env override (stateful) — body { environmentOverride: "prod"|"staging"|"dev"|null }. null
+    // CLEARS the override (revert to the derived env), mirroring the API (ChecksFunctions.cs:332). Mutates
+    // world.checks in place so a re-GET /checks reflects it — the round-trip the Environments clear button uses.
+    if ((m = path.match(/^\/api\/checks\/(\d+)\/environment$/)) && method === "PUT") {
+      const id = Number(m[1]);
+      const body = JSON.parse(req.postData() || "{}") as { environmentOverride?: string | null };
+      const check = (world.checks ?? []).find((c) => Number(c.id) === id);
+      if (!check) return json(route, { error: "not_found" }, 404);
+      check.environmentOverride = body.environmentOverride ?? null; // null → cleared → reverts to derived `environment`
+      return json(route, check);
+    }
     // PUT credentials (model B, stateful) — body { secretHeaders?, loginCredentials? } with PLAINTEXT values.
     // Mirrors the real API: each provided map REPLACES that column, each slot MASKED to "set" on store/echo
     // (never the value); an omitted map is unchanged; an empty map clears. The masked slots persist into the
@@ -771,6 +788,7 @@ export async function mockApi(
     // ?tag= filter observably shifts total/precision; no matching checks → total 0 / precision null (no fake 0%).
     if (path === "/api/reports/incident-breakdown" && method === "GET") {
       if (world.reportsServed === false) return json(route, { error: "not_found" }, 404);
+      if (world.incidentBreakdown) return json(route, world.incidentBreakdown); // verbatim → drives the gate exactly
       const win = url.searchParams.get("window") ?? "30d";
       const tagFilter = url.searchParams.getAll("tag");
       const matches = (c: RawObj) =>
@@ -790,6 +808,10 @@ export async function mockApi(
         ],
       });
     }
+    // env PR-3 domain→env inference rules (Environments page). Empty by default; the "manual override" list
+    // below the rules is driven by world.checks' environmentOverride, independent of these rules.
+    if (path === "/api/env-domain-map" && method === "GET") return json(route, { rules: [] });
+
     // Internal/stakeholder status summary (§A3) — property rollup. A DOWN property, an up one with a real %,
     // and a building-baseline property (state up NOW but null uptime — the state≠uptime honesty).
     if (path === "/api/status" && method === "GET") {
@@ -855,6 +877,7 @@ export async function mockApi(
     if (path === "/api/reports/slo" && method === "GET") {
       if (world.reports500) return json(route, { error: "boom" }, 500); // real error → LOUD, not a silent hide
       if (world.reportsServed === false) return json(route, { error: "not_found" }, 404);
+      if (world.sloReport) return json(route, world.sloReport); // verbatim → drives the thin-budget gate exactly
       const win = url.searchParams.get("window") ?? "30d";
       const tagFilter = url.searchParams.getAll("tag");
       const matches = (c: RawObj) =>
