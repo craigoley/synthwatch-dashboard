@@ -37,6 +37,7 @@ test.describe("check detail", () => {
   test("availability: over-time chart renders with a null gap (not a 0 dip)", async ({ page }) => {
     await mockApi(page); // default world serves a series with a dip + a null bucket
     await page.goto("/checks/1");
+    await page.getByTestId("metrics-toggle").click(); // Metrics is collapsed by default now — expand to reach the charts/SLO
 
     const card = page.locator(".sw-panel", { hasText: "Availability over time" });
     await expect(card.getByRole("heading", { name: "Availability over time" })).toBeVisible();
@@ -55,6 +56,7 @@ test.describe("check detail", () => {
   test("availability: its own window toggle switches and re-renders", async ({ page }) => {
     await mockApi(page);
     await page.goto("/checks/1");
+    await page.getByTestId("metrics-toggle").click(); // Metrics is collapsed by default now — expand to reach the charts/SLO
     const card = page.locator(".sw-panel", { hasText: "Availability over time" });
     await card.getByRole("button", { name: "90d", exact: true }).click();
     await page.waitForTimeout(400);
@@ -68,6 +70,7 @@ test.describe("check detail", () => {
     world.availability = null; // no series
     await mockApi(page, world);
     await page.goto("/checks/1");
+    await page.getByTestId("metrics-toggle").click(); // Metrics is collapsed by default now — expand to reach the charts/SLO
 
     const card = page.locator(".sw-panel", { hasText: "Availability over time" });
     await expect(card.getByText(/no availability data/i)).toBeVisible();
@@ -313,6 +316,7 @@ test.describe("check detail", () => {
   test("SLO: shows the error-budget + burn state when an SLO is set", async ({ page }) => {
     await mockApi(page);
     await page.goto("/checks/12");
+    await page.getByTestId("metrics-toggle").click(); // Metrics is collapsed by default now — expand to reach the charts/SLO
 
     await expect(page.getByRole("heading", { name: "Error budget (SLO)" })).toBeVisible();
     await expect(page.getByText(/99\.90% target/)).toBeVisible();
@@ -325,6 +329,7 @@ test.describe("check detail", () => {
   test("SLO: an exhausted budget reads as blown", async ({ page }) => {
     await mockApi(page);
     await page.goto("/checks/13");
+    await page.getByTestId("metrics-toggle").click(); // Metrics is collapsed by default now — expand to reach the charts/SLO
 
     await expect(page.getByText("Budget blown")).toBeVisible();
     await expect(page.getByText(/over budget/i)).toBeVisible();
@@ -450,41 +455,37 @@ test.describe("check detail", () => {
 
   // ★ The metrics ("Telemetry") section is collapsible, and the preference persists APP-WIDE — collapse it on
   // one monitor and every monitor opens collapsed, surviving reloads (check-id-agnostic localStorage key).
-  test("metrics section: collapse persists across monitors AND reloads (app-wide), default expanded", async ({ page }) => {
+  test("metrics section: collapse persists across monitors AND reloads (app-wide), default COLLAPSED", async ({ page }) => {
     await mockApi(page);
     await page.goto("/checks/1");
 
-    // default: EXPANDED (nothing stored yet — don't surprise existing users)
-    await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByTestId("metrics-body")).toBeVisible();
+    // ★ default: COLLAPSED (Pass-2 audit — the tall chart stack is weekly-review, not 2am; closed by default
+    //   pulls RunHistory up). The header/toggle is still present.
+    await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByTestId("metrics-body")).toHaveCount(0);
 
-    // ★ the disclosure wraps the WHOLE chart stack — Availability + Latency + Telemetry all inside it
+    // expand on check 1 → the disclosure wraps the WHOLE chart stack (Availability + Latency + Telemetry)
+    await page.getByTestId("metrics-toggle").click();
+    await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "true");
     const body = page.getByTestId("metrics-body");
     await expect(body.getByText("Availability over time")).toBeVisible();
     await expect(body.getByText("Latency over time")).toBeVisible();
     await expect(body.getByRole("heading", { name: "Telemetry" })).toBeVisible();
 
-    // collapse on check 1 → the ENTIRE stack collapses (not just Telemetry); the header stays
-    await page.getByTestId("metrics-toggle").click();
-    await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByTestId("metrics-body")).toHaveCount(0);
-    await expect(page.getByText("Availability over time")).toHaveCount(0); // the big charts collapsed too
-    await expect(page.getByText("Latency over time")).toHaveCount(0);
-
-    // ★ a DIFFERENT monitor opens collapsed too (the key is not per-check)
+    // ★ a DIFFERENT monitor opens EXPANDED too (the preference is app-wide, not per-check)
     await page.goto("/checks/2");
-    await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByTestId("metrics-body")).toHaveCount(0);
+    await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByTestId("metrics-body")).toBeVisible();
 
     // ★ persists across a reload
     await page.reload();
-    await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "false");
-
-    // re-expand → the preference flips back app-wide
-    await page.getByTestId("metrics-toggle").click();
-    await expect(page.getByTestId("metrics-body")).toBeVisible();
-    await page.goto("/checks/1");
     await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "true");
+
+    // re-collapse → the preference flips back app-wide
+    await page.getByTestId("metrics-toggle").click();
+    await expect(page.getByTestId("metrics-body")).toHaveCount(0);
+    await page.goto("/checks/1");
+    await expect(page.getByTestId("metrics-toggle")).toHaveAttribute("aria-expanded", "false");
   });
 
   // ★ Run-history "updating…" affordance: while a run is in-flight the list is fast-polling — show it so the

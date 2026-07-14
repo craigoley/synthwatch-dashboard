@@ -8,10 +8,9 @@ import { useCheck, useMetrics, updateCheck, revalidateChecks, runCheckNow, reval
 import { useAuth } from "@/components/auth-provider";
 import { AvailabilityChart, LatencyChart, MetricsCharts } from "@/components/charts";
 import { CheckSlaPanel, SloPanel } from "@/components/sla";
-import { MonitorCostPanel } from "@/components/cost";
 import { CredentialsPanel } from "@/components/credentials-panel";
-import { ErrorDiff } from "@/components/error-diff";
 import { TrustCard } from "@/components/trust";
+import { ErrorDiff } from "@/components/error-diff";
 import { RunHistory } from "@/components/run-history";
 import { LiveStepsChecklist } from "@/components/live-steps";
 import { TraceViewer } from "@/components/trace-viewer";
@@ -260,6 +259,9 @@ function PerLocationPanel({ runs }: { runs: Run[] }) {
   // warn = up-but-degraded; counted only when nothing is hard-down (failures take
   // precedence in the headline).
   const degraded = entries.filter(([, r]) => r.status === "warn").length;
+  // ★ Collapse the no-decision case (Pass-2 audit): "Healthy in all locations" drives no 2am decision —
+  // hide it so the panel only appears when a location is actually down/degraded (then it surfaces loudly).
+  if (down === 0 && degraded === 0) return null;
   // ★ 3-state summary, consistent with the per-location badges: down (regional vs
   // global outage) → degraded (warn, NOT "healthy") → healthy.
   const verdict =
@@ -351,7 +353,10 @@ export default function CheckDetailPage() {
   const [expectRun, setExpectRun] = useState(false);
   // App-wide (check-id-agnostic) collapse preference for the tall metrics section — set it on one monitor
   // page and every monitor page opens collapsed. Defaults to EXPANDED when unset. SSR-safe.
-  const [metricsCollapsed, setMetricsCollapsed] = usePersistedBoolean("synthwatch:metrics-section-collapsed", false);
+  // ★ Collapsed by DEFAULT (Pass-2 audit): the chart stack (availability + latency + web vitals) is the
+  // tallest thing on the page and is weekly-review, not 2am — closed by default pulls RunHistory up. The
+  // preference still persists per the app-wide key, so anyone who opens it keeps it open.
+  const [metricsCollapsed, setMetricsCollapsed] = usePersistedBoolean("synthwatch:metrics-section-collapsed", true);
   const { canWrite } = useAuth(); // editor/admin — gates the "Run now" affordance (it spends compute)
 
   const { data, error, isLoading } = useCheck(valid ? id : null, { expectRun });
@@ -699,9 +704,17 @@ export default function CheckDetailPage() {
       )}
 
       {/* Error diff (P3) — "what's newly broken since the last runs?" Browser/multistep only (trace-derived
-          error signals); self-hides (404) until a run has signals. Defaults to the latest settled run. */}
+          error signals); self-hides (404) until a run has signals.
+          ★ Pass-2 fix: scope to the most recent FAILED run, not the latest run. The latest run is usually
+          PASSING, so this panel used to diff a passing run and sit under a green PASS badge — "right
+          evidence, wrong event", actively misleading. Now it shows the FAILURE's new errors (falling back to
+          the latest run only when nothing recent failed). Chosen over deleting the panel, which would drop
+          the mute + persistent/resolved review it also carries. */}
       {(check.kind === "browser" || check.kind === "multistep") && (
-        <ErrorDiff checkId={check.id} runId={recent_runs[0]?.id ?? null} />
+        <ErrorDiff
+          checkId={check.id}
+          runId={(recent_runs.find((r) => r.status === "fail" || r.status === "error") ?? recent_runs[0])?.id ?? null}
+        />
       )}
 
       {/* Model-B credential editor (Step C). Editor-only (canWrite); the API also nulls the masked slots for
@@ -712,9 +725,10 @@ export default function CheckDetailPage() {
 
       <CheckSlaPanel checkId={check.id} />
 
-      {/* Estimated monthly compute cost — projected + inspectable breakdown + measured + divergence flag.
-          Self-hides (null) until GET /reports/cost is reachable / the monitor has runs. */}
-      <MonitorCostPanel checkId={check.id} />
+      {/* ★ Removed from the incident view: the monthly compute-COST panel ($/mo) drives no 2am decision and
+          is DUPLICATED on Reports → Cost. At 2am you were scrolling past a billing figure to reach the
+          outage (Pass-2 audit). Cost lives on the Reports Cost tab; it does not belong on the page you open
+          when something is on fire. */}
 
       {/* §D1 Trust drill-down — chip + honest red-test gap, recheck sparkline, incident breakdown, spec
           integrity hash. Self-hides (404 → null) until GET /reports/trust/{id} is reachable. */}
