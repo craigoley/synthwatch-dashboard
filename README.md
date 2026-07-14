@@ -4,11 +4,29 @@ Operator console for the self-hosted **SynthWatch** synthetic monitoring system.
 A Next.js (App Router, TypeScript) app deployed on Vercel that reads from — and
 does CRUD against — the standalone **SynthWatch C# API** on Azure.
 
-> _Verified 2026-07-14 — prose with **no automated check**. Route counts, file paths, and behaviour here can drift; if the code disagrees, the code is authoritative._
+> **How to read this doc.** Each section is stamped: **🔒 gated** = enforced by a test (trust it); **prose** =
+> human-maintained, no automated check, can drift — if the code disagrees, the code wins. The one trap that
+> silently bites is boxed at the top of [Architecture](#architecture--a-thin-client-over-the-c-api).
 
 ---
 
 ## Architecture — a thin client over the C# API
+
+> ## ★ THE WIRE ADAPTER IS THE DAY-ONE TRAP
+> `api-client.ts` maps the API's camelCase wire → the snake_case shapes components read. That adapter is a
+> *virtue* for isolation — and the **#1 way a new engineer ships a silent bug.** (Symbols, not line numbers,
+> are the durable anchors — line numbers as of this writing.)
+> - **Add a field to `types.ts` but forget the matching `mapCheck` / `mapRun` line** (`api-client.ts:510` / `:583`)
+>   → the field is silently `undefined` at runtime. No error, no build failure.
+> - **Fat-finger a wire key** → the `?? false` / `?? "prod"` defaults (`:526`, `:599`, `:671`) **SWALLOW it**: an
+>   absent value renders as *healthy* (prod, not-sandbox, sufficient-data). **Absent reads green — the fake-quiet class.**
+> - **Only the trust seam throws** on a missing field (`mapTrustRow` → `trustRowSchema.parse`, `:2366`). Every
+>   other mapper coalesces — so a wire break surfaces loud on the trust scorecard and **silently nowhere else.**
+>
+> **Rules:** when you touch `types.ts`, touch its mapper in the *same commit*; before renaming a wire key, grep
+> `api-client.ts` for the old camelCase key. See the non-atomic-deploy warning under [Rollback](#rollback).
+
+> _Prose — describes the seam's intent; `src/lib/api-client.ts` is authoritative._
 
 The dashboard has **no backend of its own**. Every read/write goes through one
 typed transport layer, `src/lib/api-client.ts`, to the C# API:
@@ -34,14 +52,19 @@ typed transport layer, `src/lib/api-client.ts`, to the C# API:
 
 ### Endpoints (served by the C# API)
 
-`GET /checks` · `POST /checks` · `GET|PATCH|DELETE /checks/{id}` (`?hard=true`
-for a real delete) · `GET /checks/{id}/runs` · `GET /checks/{id}/metrics` ·
-`GET /runs/{id}/steps` · `GET /incidents` · `GET /flows` ·
-`GET /sla?window=24h|7d|30d` — all under `NEXT_PUBLIC_API_BASE_URL`.
+> _Pointer — the authoritative list lives with the code that serves it, not here._
+
+The dashboard consumes **60+** endpoints; hand-listing them here drifts (this section once showed nine). Two
+authoritative sources, neither hand-maintained in this README:
+
+- **The full server-side list** — the C# API's [`docs/auth-gates.md`](https://github.com/craigoley/synthwatch-api/blob/main/docs/auth-gates.md), "the complete endpoint table" (which gate protects each, and the auth mechanism).
+- **What this app actually calls** — whatever `src/lib/api-client.ts` builds; that file is the dashboard-side source of truth. All requests go under `NEXT_PUBLIC_API_BASE_URL`.
 
 ---
 
 ## Environment
+
+> _Prose — verify against `.env.example` and the Vercel project settings._
 
 | Variable | Required | Notes |
 | --- | --- | --- |
@@ -56,12 +79,17 @@ the browser calls from (the Vercel origin in prod; a local browser on
 
 ## Operations
 
+> _Pointer — see the linked runbook (itself prose; it cites file:line that can drift)._
+
 Accounts, OTP sign-in, adding/removing editors and admins, and the API-side
-auth-enforcement flag: **[docs/operations.md](docs/operations.md)**.
+auth-enforcement flag: **[docs/operations.md](docs/operations.md)**. For deploying and reverting a build,
+see [Rollback](#rollback) below.
 
 ---
 
 ## Local development
+
+> _Commands are real (they map to `package.json` scripts); the surrounding notes are prose._
 
 ```bash
 corepack enable               # use the pinned pnpm
@@ -84,23 +112,39 @@ Vercel installs with a matching pnpm and a frozen lockfile.
 
 ---
 
+## Rollback
+
+> ⚠️ **DRAFT · UNREHEARSED · NEVER EXECUTED.** This is written from how the pieces work, not from a drill. Do
+> not trust it under fire without validating each step — an untested rollback is not a rollback.
+
+- **Reverting a bad build = Vercel Instant Rollback**, full stop. In the Vercel dashboard, promote the previous
+  Production deployment. There is no other revert path — the app has no server/config to flip.
+- **★ The env var will NOT save you.** `NEXT_PUBLIC_API_BASE_URL` is **baked into the client bundle at BUILD
+  time** (`api-client.ts:177` reads `process.env.NEXT_PUBLIC_*`, which Next inlines). Changing it in Vercel
+  settings does **nothing** to an already-built deployment — it requires a **rebuild + redeploy**, not a rollback.
+  So a bad base URL is fixed by rolling back to a build that had the right one, or rebuilding — never by editing the setting alone.
+- **⚠️ Dashboard ↔ API deploys are NOT atomic.** They ship from separate repos on separate pipelines. A wire-key
+  rename on the API breaks the dashboard **mostly SILENTLY** — the `?? false` / `?? "prod"` mapper defaults
+  swallow the now-absent field and render *healthy* (see the [Architecture trap](#architecture--a-thin-client-over-the-c-api)); only the trust seam goes loud. **Therefore:** a rollback on
+  EITHER side must be checked against the OTHER side's *live* contract (the API's deployed shape vs the
+  dashboard's `contract/real/*.json` fixtures), or you can roll one half into a silent mismatch.
+
+---
+
 ## Design
 
-A "control room" instrument-panel aesthetic: deep instrument-dark surfaces, a
-faint technical grid, a phosphor-teal brand accent, and IBM Plex Sans / Plex Mono.
-The status color law is absolute throughout: **pass = green, warn = amber,
-fail/error = red**. Dense but legible, one screenful on mobile, dark-native. All
-state is server state + URL params — **no browser storage APIs**.
+> _Pointer — the visual/UX design language lives in [docs/design.md](docs/design.md)._
 
-### Pages
+A "control room" instrument-panel aesthetic; **pass = green, warn = amber, fail/error = red** is the absolute
+status-color law. Full rationale and conventions: **[docs/design.md](docs/design.md)**.
 
-The list between the `ROUTES:START`/`ROUTES:END` markers below is the **presence contract**:
-`contract/readme-routes.contract.ts` asserts it matches `src/app/**/{page,route}.tsx` exactly, so a route
-added or removed without updating this list fails CI.
+---
 
-> ★ **What the gate checks — and what it does NOT.** The gate checks route **PRESENCE ONLY** (this list vs the
-> filesystem). It does **not** verify that the descriptions below are accurate — that prose is human-maintained
-> and unverified, and can drift. Trust the marked list for *which routes exist*; treat the descriptions as a guide.
+## Pages
+
+> 🔒 **Gated (presence).** The `ROUTES:START`/`ROUTES:END` list below is enforced by
+> `contract/readme-routes.contract.ts` to match `src/app/**/{page,route}.tsx` exactly — add/remove a route
+> without updating it and CI fails. ★ Presence ONLY: the gate does **not** check that any description is correct.
 
 <!-- ROUTES:START — presence-gated by contract/readme-routes.contract.ts (add/remove drift only, NOT descriptions). Keep sorted. -->
 Page routes:
@@ -126,22 +170,16 @@ Route handlers:
 - `/screenshot-proxy/[runId]`
 <!-- ROUTES:END -->
 
-**Descriptions** (human-maintained — *not* verified by the route gate; may drift):
-
-- **`/`** — status grid: a card per check with current state, last run, 24h
-  p50/p95 and a sparkline. Sorted open-incident → enabled → disabled. Filter by
-  status/kind/search (URL params).
-- **`/checks/[id]`** — run-history table with the funnel stage-bar (`run_steps`),
-  latency-over-time chart, tier-1 telemetry charts (`run_metrics`, rendering only
-  series with data), and inline failure-artifact screenshots.
-- **`/incidents`** — open + resolved incidents with severity, duration, summary.
-- **`/monitors`** — CRUD: create/edit/pause/delete via the API, with a soft-delete
-  default and an explicit hard-delete confirm.
-- **`/throw-test`** is a dev-only error-boundary probe.
+**What each route does:** read the page component under `src/app/**` — the code is the description, and it can't
+drift from itself. The high-traffic ones: `/` (status grid), `/checks/[id]` (run history + funnel + telemetry),
+`/incidents` (open/resolved), `/monitors` (CRUD, soft-delete default). `/throw-test` is a dev-only
+error-boundary probe.
 
 ---
 
 ## Project structure
+
+> _Prose — a hand-drawn sketch that can drift; the filesystem and the gated route list above are authoritative._
 
 ```
 src/
@@ -164,6 +202,8 @@ src/
 ```
 
 ## Stack
+
+> _Prose — verify against `package.json`._
 
 Next.js (App Router) · TypeScript (strict) · Tailwind CSS v4 · recharts · SWR ·
 zod · pnpm. No server-side DB driver — the C# API owns data access.
