@@ -35,7 +35,9 @@ export function ToneBadge({
 
 export function StatusDot({ status }: { status: RunStatus | null }) {
   const meta = runStatusMeta(status);
-  return <span className={`sw-dot ${meta.dotClass}`} title={meta.label} />;
+  // ★ a11y: a bare colour dot conveys nothing to a screen reader (or a colourblind eye) — give it a
+  // role + label so the status is announced, not just hover-titled.
+  return <span role="img" aria-label={meta.label} className={`sw-dot ${meta.dotClass}`} title={meta.label} />;
 }
 
 export { TONE_VAR };

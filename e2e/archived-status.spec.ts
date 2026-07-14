@@ -94,9 +94,10 @@ test.describe("archived monitors — status grid", () => {
 
     const pulse = page.locator('[aria-label="fleet status summary"]');
     await expect(pulse).toBeVisible();
-    // buckets: fail 0 (the archived drift is NOT counted) · warn 0 · pass 1
+    // buckets: fail 0 (the archived drift is NOT counted) · warn 0 · pass 1. Each count carries an a11y glyph
+    // (✕/⚠/✓) so severity isn't conveyed by colour alone.
     const counts = await pulse.locator("span.sw-mono").allTextContents();
-    expect(counts).toEqual(["0", "0", "1"]);
+    expect(counts.map((c) => c.trim())).toEqual(["✕ 0", "⚠ 0", "✓ 1"]);
   });
 });
 
