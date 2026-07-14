@@ -94,7 +94,39 @@ state is server state + URL params — **no browser storage APIs**.
 
 ### Pages
 
-There are **14 page routes** (`src/app/**/page.tsx`) plus 2 route handlers — not 4. The primary four:
+The list between the `ROUTES:START`/`ROUTES:END` markers below is the **presence contract**:
+`contract/readme-routes.contract.ts` asserts it matches `src/app/**/{page,route}.tsx` exactly, so a route
+added or removed without updating this list fails CI.
+
+> ★ **What the gate checks — and what it does NOT.** The gate checks route **PRESENCE ONLY** (this list vs the
+> filesystem). It does **not** verify that the descriptions below are accurate — that prose is human-maintained
+> and unverified, and can drift. Trust the marked list for *which routes exist*; treat the descriptions as a guide.
+
+<!-- ROUTES:START — presence-gated by contract/readme-routes.contract.ts (add/remove drift only, NOT descriptions). Keep sorted. -->
+Page routes:
+
+- `/`
+- `/checks/[id]`
+- `/glossary`
+- `/incidents`
+- `/incidents/[id]`
+- `/monitors`
+- `/notifications`
+- `/reports`
+- `/settings/environments`
+- `/specs`
+- `/status`
+- `/throw-test`
+- `/trust`
+- `/users`
+
+Route handlers:
+
+- `/api/probe-echo`
+- `/screenshot-proxy/[runId]`
+<!-- ROUTES:END -->
+
+**Descriptions** (human-maintained — *not* verified by the route gate; may drift):
 
 - **`/`** — status grid: a card per check with current state, last run, 24h
   p50/p95 and a sparkline. Sorted open-incident → enabled → disabled. Filter by
@@ -105,10 +137,7 @@ There are **14 page routes** (`src/app/**/page.tsx`) plus 2 route handlers — n
 - **`/incidents`** — open + resolved incidents with severity, duration, summary.
 - **`/monitors`** — CRUD: create/edit/pause/delete via the API, with a soft-delete
   default and an explicit hard-delete confirm.
-
-The rest: `/incidents/[id]`, `/reports`, `/settings/environments`, `/specs`, `/status`,
-`/users`, `/glossary`, `/trust`, `/notifications`, and `/throw-test` (dev/error-boundary
-test). Route handlers: `/screenshot-proxy/[runId]` and `/api/probe-echo`.
+- **`/throw-test`** is a dev-only error-boundary probe.
 
 ---
 
