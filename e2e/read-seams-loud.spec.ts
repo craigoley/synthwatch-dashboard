@@ -47,6 +47,20 @@ test.describe("read seams — loud on error, hidden only on 404", () => {
     await expect(page.getByTestId("trust-table")).toHaveCount(0);
   });
 
+  test("★ Trust scorecard — a 200 with a row MISSING a required field decodes LOUD, not a fake-green row (zod spike)", async ({ page }) => {
+    const w = defaultWorld();
+    // 200 OK but structurally corrupt: the row has no checkId. The boundary decoder (zod) THROWS on the missing
+    // required field → the SAME loud path as a 500 → the scorecard shows trust-error, NOT a fabricated row. This is
+    // the whole point of the decoder: for a required field, "absent reads healthy" is UNREPRESENTABLE — there is no
+    // `?? 0` to typo. (Before the decoder, `num(r.checkId)` silently produced check_id: 0 and rendered a green row.)
+    w.trustMonitors = [{ checkName: "corrupt row (no checkId)", trust: "proven-live", runCount: 100 }];
+    await mockApi(page, w);
+    await page.goto("/reports?tab=trust");
+    await expect(page.getByTestId("trust-error")).toBeVisible();
+    await expect(page.getByTestId("trust-legend")).toBeVisible(); // static legend still renders
+    await expect(page.getByTestId("trust-table")).toHaveCount(0); // no fabricated table
+  });
+
   test("Trust scorecard — 404 shows the honest 'unavailable' empty (NOT the error state)", async ({ page }) => {
     const w = defaultWorld();
     w.reportsServed = false; // /reports/trust 404s (absent)

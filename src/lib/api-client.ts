@@ -72,9 +72,13 @@ import type {
   TrustReport,
   TrustDetail,
   TrustRow,
-  TrustChip,
   TrustDimensionState,
   TrustFlakeBudgetState,
+  TrustIncidents,
+  TrustTransients,
+  TrustFlakeBudget,
+  TrustDimensions,
+  TrustSpecProvenance,
   StatusPage,
   StatusProperty,
   MttrReport,
@@ -105,6 +109,7 @@ import type {
   SlaWindow,
   SparkPoint,
 } from "@/lib/types";
+import { z } from "zod";
 import type { CreateCheckInput, UpdateCheckInput } from "@/lib/schemas";
 import { getToken, clearSession, emitAuthEvent, type Role } from "@/lib/auth";
 import { isDebugOn, runsDebug } from "@/lib/debug";
@@ -2233,108 +2238,133 @@ const FLAKE_BUDGET_STATES: readonly TrustFlakeBudgetState[] = ["ok", "degraded-a
 // whose dimensions payload went missing reads chip "nominal" (deriveChip only downgrades to "unverified" on
 // no-green/no-runs) — so coalescing the dimensions to "ok" would paint clean axes with nothing mitigating it (the
 // #177 fake-quiet class). Note null (payload gap) stays DISTINCT from "no-data-yet" (a graded "measurable but new").
-const dimState = (v: unknown): TrustDimensionState | null =>
+// ── Trust seam: a boundary DECODER (spike). #276's lint stops the bleeding; a decoder closes the wound. ──────────
+// The whole trust wire payload is ONE schema instead of ~40 scattered inline coercions. Three guarantees the
+// hand-mapper only held by convention become STRUCTURAL:
+//   • A missing REQUIRED field (checkId / checkName) makes `.parse` THROW → getTrustReport rethrows (it is not a
+//     404) → the scorecard renders a LOUD trust-error, never a synthetic green row. For a required field there is
+//     no `??` to write — "absent reads healthy" is UNREPRESENTABLE.
+//   • A nullable field decodes to an EXPLICIT null (→ "—"), never a fabricated 0 (the recheck_rate / flap_rate class).
+//   • A FORWARD-COMPAT count (recheckedPasses / flapCount / transients … absent on a pre-deploy API) uses a declared
+//     default — the healthy default is now a greppable schema decision, not an inline coalesce a typo reintroduces.
+// The single `.transform` also carries the camelCase→snake_case remap (the old per-field hand-copy).
+
+/** present number | null | absent → the number, else 0. The old `num(v ?? 0)`, now explicit and local to a field. */
+const zCount = z.number().nullish().transform((v) => v ?? 0);
+/** honest-nullable number: absent/null → null (the old `nul()`); null renders "—", NEVER a fake 0. */
+const zNullNum = z.number().nullish().transform((v) => v ?? null);
+/** honest-nullable string: absent/null → null. */
+const zNullStr = z.string().nullish().transform((v) => v ?? null);
+/** coerce to a known enum value; off-taxonomy / absent → the fallback (dimension / chip / budget-state semantics). */
+const zEnumOr = <T extends string>(vals: readonly T[], fallback: T) =>
+  z.unknown().transform((v) => ((vals as readonly string[]).includes(String(v)) ? (v as T) : fallback));
+/** one per-dimension state: recognised value passes; absent / off-taxonomy → null (UNKNOWN → "— no data"), NEVER
+ *  "ok" (#177/#268) — and null stays DISTINCT from the graded "no-data-yet". */
+const coerceDim = (v: unknown): TrustDimensionState | null =>
   (TRUST_DIM_STATES as readonly string[]).includes(String(v)) ? (v as TrustDimensionState) : null;
 
-function mapTrustRow(r: Record<string, unknown>): TrustRow {
-  const num = (v: unknown) => Number(v ?? 0);
-  const nul = (v: unknown) => (v == null ? null : Number(v));
-  // ★ The FOURTH fake-quiet instance (post-#267/#268): an absent incidents object had coalesced to `{}` →
-  // every bucket num()→0 → the row read "No incidents in this window" (green). Absence is UNKNOWN, not zero —
-  // preserve it as null and let IncidentBreakdown render "no incident data".
-  const incRaw = r.incidents == null ? null : (r.incidents as Record<string, unknown>);
-  // eslint-disable-next-line no-restricted-syntax -- benign: specProvenance's own fields are honest on absence — executedSha256/specPath map to null (no fake data), so `{}` only avoids a deref, never a healthy read.
-  const sp = (r.specProvenance ?? {}) as Record<string, unknown>;
-  // eslint-disable-next-line no-restricted-syntax -- benign: redTest.captured → Boolean(undefined)=false renders the HONEST first-class "not captured" state (never a pass); absence≡{} is the intended not-captured.
-  const rt = (r.redTest ?? {}) as Record<string, unknown>;
-  // eslint-disable-next-line no-restricted-syntax -- benign: dimState() (below) maps each extracted value to null on absence (#268) → "— no data"; this `{}` only prevents a deref before dimState runs, it does not create a healthy read.
-  const dim = (r.dimensions ?? {}) as Record<string, unknown>;
-  // eslint-disable-next-line no-restricted-syntax -- benign: same as `dim` — the extracted .state feeds dimState() which nulls the absence; `{}` is a deref guard only.
-  const dimObj = (k: string) => ((dim[k] ?? {}) as Record<string, unknown>).state;
-  // eslint-disable-next-line no-restricted-syntax -- benign: transients counts use num()→0 (a truthful "0 of this class") and spuriousRedRate uses nul()→null→"—"; no field reads healthy on absence.
-  const tr = (r.transients ?? {}) as Record<string, unknown>;
-  return {
-    check_id: num(r.checkId),
-    check_name: String(r.checkName ?? ""),
-    sensitive: Boolean(r.sensitive),
-    last_green_at: r.lastGreenAt == null ? null : String(r.lastGreenAt),
-    last_run_at: r.lastRunAt == null ? null : String(r.lastRunAt),
-    run_count: num(r.runCount),
-    recheck_count: num(r.recheckCount),
-    recheck_rate: nul(r.recheckRate), // null preserved → "—", never a fake 0%
-    rechecked_passes: num(r.recheckedPasses), // absent (pre-deploy API) → 0 → annotation hidden; forward-compatible
-    flap_count: num(r.flapCount), // confirmation-retry P2: transient failures; absent (pre-deploy) → 0 → hidden
-    scheduled_count: num(r.scheduledCount),
-    flap_rate: nul(r.flapRate), // null preserved → "—", never a fake 0%
-    incidents:
-      incRaw == null
-        ? null
-        : {
-            total: num(incRaw.total),
-            real_outage: num(incRaw.realOutage),
-            flaky_transient: num(incRaw.flakyTransient),
-            selector_drift: num(incRaw.selectorDrift),
-            environment_regional: num(incRaw.environmentRegional),
-            perf_regression: num(incRaw.perfRegression),
-            unclassified: num(incRaw.unclassified),
-          },
-    red_test_captured: Boolean(rt.captured), // true only when a harness-confirmed red_tests row exists
-    red_test_tested_at: rt.testedAt == null ? null : String(rt.testedAt),
-    red_test_method: rt.method == null ? null : String(rt.method),
-    spec_provenance: {
-      executed_sha256: sp.executedSha256 == null ? null : String(sp.executedSha256),
-      spec_path: sp.specPath == null ? null : String(sp.specPath),
-    },
-    // ★ B3-2: the distinct per-dimension states. Absent (pre-deploy API) → each "ok" → the strip reads clean
-    // (forward-compatible); the chip itself still comes through verbatim below.
-    dimensions: {
-      flap: dimState(dimObj("flap")),
-      recheck: dimState(dimObj("recheck")),
-      monitor_noise: dimState(dimObj("monitorNoise")),
-      spurious_red: dimState(dimObj("spuriousRed")), // ★ B3-2 stage 2; absent (pre-deploy) → "ok"
-    },
-    // ★ B3-2 stage 2: the transient split. Absent (pre-deploy API) → all 0 / null → the row reads clean.
-    transients: {
-      monitor_side: num(tr.monitorSide),
-      service_side: num(tr.serviceSide),
-      indeterminate: num(tr.indeterminate),
-      spurious_red_rate: nul(tr.spuriousRedRate),
-    },
-    // ★ B3-3: the MONITOR trust budget. Absent (pre-deploy API) → a safe "ok" default (never a false "degraded").
-    flake_budget: mapFlakeBudget(r.flakeBudget),
-    // Coerce to a known chip; an unknown/absent value → "unverified" (null-safe, never crashes the table).
-    trust: (TRUST_CHIPS as readonly string[]).includes(String(r.trust)) ? (r.trust as TrustChip) : "unverified",
-  };
-}
+// null/absent incidents rollup stays null (UNKNOWN) — never a synthetic all-zero object that reads "no incidents"
+// (the #267/#268 fake-quiet). A present-but-malformed object now THROWS (loud) instead of silently zeroing.
+const trustIncidentsSchema = z
+  .object({
+    total: zCount, realOutage: zCount, flakyTransient: zCount, selectorDrift: zCount,
+    environmentRegional: zCount, perfRegression: zCount, unclassified: zCount,
+  })
+  .nullish()
+  .transform((i): TrustIncidents | null =>
+    i == null ? null : {
+      total: i.total, real_outage: i.realOutage, flaky_transient: i.flakyTransient,
+      selector_drift: i.selectorDrift, environment_regional: i.environmentRegional,
+      perf_regression: i.perfRegression, unclassified: i.unclassified,
+    });
 
-function mapFlakeBudget(v: unknown): TrustRow["flake_budget"] {
-  // ★ Absent/null wire value is ABSENCE, not health. Return null (the renderer shows an explicit "no
-  // flake-budget data") — do NOT coalesce into a synthetic {} → state:"ok", which would make a monitor with
-  // no trust-budget data indistinguishable from a healthy one (the #177 nullish fake-quiet class). If the
-  // API stops sending flakeBudget, every card/row must SAY so, not read green.
-  if (v == null) return null;
-  const fb = v as Record<string, unknown>;
-  const num = (x: unknown) => Number(x ?? 0);
-  return {
-    target: num(fb.target),
-    target_is_default: Boolean(fb.targetIsDefault ?? true), // absent → assume the fleet default
-    scheduled_runs: num(fb.scheduledRuns),
-    monitor_side: num(fb.monitorSide),
-    service_side: num(fb.serviceSide),
-    indeterminate: num(fb.indeterminate),
-    budget: num(fb.budget),
-    consumed: num(fb.consumed),
-    remaining: num(fb.remaining),
-    remaining_pct: fb.remainingPct == null ? null : Number(fb.remainingPct),
-    burn_rate: num(fb.burnRate),
-    // ★ Preserve ALL FOUR API states verbatim (#246): the two graded states + the two applicability markers.
-    // Do NOT collapse "not-applicable" / "no-data-yet" into "ok" — a budget that can never move (http) or hasn't
-    // run enough (new browser) is NOT a healthy 0%-consumed budget. Off-taxonomy → "ok" (never a false "degraded").
-    state: FLAKE_BUDGET_STATES.includes(String(fb.state) as TrustFlakeBudgetState)
-      ? (fb.state as TrustFlakeBudgetState)
-      : "ok",
-    directed_task: fb.directedTask == null ? null : String(fb.directedTask),
-  };
+// Absent transients (pre-deploy) → all 0 / null (a truthful "0 of this class"), matching the old `?? {}` deref-guard.
+const trustTransientsSchema = z
+  .object({ monitorSide: zCount, serviceSide: zCount, indeterminate: zCount, spuriousRedRate: zNullNum })
+  .nullish()
+  .transform((t): TrustTransients => ({
+    monitor_side: t?.monitorSide ?? 0, service_side: t?.serviceSide ?? 0,
+    indeterminate: t?.indeterminate ?? 0, spurious_red_rate: t?.spuriousRedRate ?? null,
+  }));
+
+// specProvenance's own fields are honest on absence — both map to null (no fake data), never a healthy read.
+const trustSpecProvenanceSchema = z
+  .object({ executedSha256: zNullStr, specPath: zNullStr })
+  .nullish()
+  .transform((s): TrustSpecProvenance => ({
+    executed_sha256: s?.executedSha256 ?? null, spec_path: s?.specPath ?? null,
+  }));
+
+// redTest.captured → false on absence renders the HONEST first-class "not captured" state (never a pass).
+const trustRedTestSchema = z
+  .object({ captured: z.boolean().nullish(), testedAt: zNullStr, method: zNullStr })
+  .nullish()
+  .transform((rt) => ({
+    captured: Boolean(rt?.captured), tested_at: rt?.testedAt ?? null, method: rt?.method ?? null,
+  }));
+
+const dimCell = z.object({ state: z.unknown() }).nullish();
+const trustDimensionsSchema = z
+  .object({ flap: dimCell, recheck: dimCell, monitorNoise: dimCell, spuriousRed: dimCell })
+  .nullish()
+  .transform((d): TrustDimensions => ({
+    flap: coerceDim(d?.flap?.state), recheck: coerceDim(d?.recheck?.state),
+    monitor_noise: coerceDim(d?.monitorNoise?.state), spurious_red: coerceDim(d?.spuriousRed?.state),
+  }));
+
+// ★ Absent/null flake budget is ABSENCE, not health → null (renderer shows "no flake-budget data"), NEVER a
+// synthetic {} → state:"ok" that reads healthy (the #177 fake-quiet). The two applicability markers pass verbatim;
+// an off-taxonomy state → "ok" (never a false "degraded"), matching the prior coercion exactly.
+const trustFlakeBudgetSchema = z
+  .object({
+    target: zCount,
+    targetIsDefault: z.boolean().nullish().transform((v) => v ?? true), // absent → the fleet default is in force
+    scheduledRuns: zCount, monitorSide: zCount, serviceSide: zCount, indeterminate: zCount,
+    budget: zCount, consumed: zCount, remaining: zCount, remainingPct: zNullNum, burnRate: zCount,
+    state: zEnumOr(FLAKE_BUDGET_STATES, "ok"), directedTask: zNullStr,
+  })
+  .nullish()
+  .transform((fb): TrustFlakeBudget | null =>
+    fb == null ? null : {
+      target: fb.target, target_is_default: fb.targetIsDefault, scheduled_runs: fb.scheduledRuns,
+      monitor_side: fb.monitorSide, service_side: fb.serviceSide, indeterminate: fb.indeterminate,
+      budget: fb.budget, consumed: fb.consumed, remaining: fb.remaining, remaining_pct: fb.remainingPct,
+      burn_rate: fb.burnRate, state: fb.state, directed_task: fb.directedTask,
+    });
+
+const trustRowSchema = z
+  .object({
+    checkId: z.number(), // REQUIRED — identity; absence = corruption → THROW → loud trust-error, not a green row
+    checkName: z.string(), // REQUIRED
+    sensitive: z.boolean().nullish().transform((v) => Boolean(v)),
+    lastGreenAt: zNullStr, // null = NEVER verified green (a first-class state), not an error
+    lastRunAt: zNullStr,
+    runCount: zCount, recheckCount: zCount, recheckRate: zNullNum,
+    recheckedPasses: zCount, // absent (pre-deploy) → 0 → annotation hidden; a DECLARED forward-compat default
+    flapCount: zCount, scheduledCount: zCount, flapRate: zNullNum,
+    incidents: trustIncidentsSchema,
+    redTest: trustRedTestSchema,
+    specProvenance: trustSpecProvenanceSchema,
+    dimensions: trustDimensionsSchema,
+    transients: trustTransientsSchema,
+    flakeBudget: trustFlakeBudgetSchema,
+    trust: zEnumOr(TRUST_CHIPS, "unverified"), // unknown/absent chip → "unverified" (never crashes the table)
+  })
+  .transform((r): TrustRow => ({
+    check_id: r.checkId, check_name: r.checkName, sensitive: r.sensitive,
+    last_green_at: r.lastGreenAt, last_run_at: r.lastRunAt,
+    run_count: r.runCount, recheck_count: r.recheckCount, recheck_rate: r.recheckRate,
+    rechecked_passes: r.recheckedPasses, flap_count: r.flapCount, scheduled_count: r.scheduledCount, flap_rate: r.flapRate,
+    incidents: r.incidents,
+    red_test_captured: r.redTest.captured, red_test_tested_at: r.redTest.tested_at, red_test_method: r.redTest.method,
+    spec_provenance: r.specProvenance, dimensions: r.dimensions, transients: r.transients,
+    flake_budget: r.flakeBudget, trust: r.trust,
+  }));
+
+/** Decode one trust row at the boundary. Throws (ZodError) on a missing required field → surfaces as a loud
+ *  ErrorState upstream (getTrustReport rethrows non-404s), never a fabricated green row. */
+function mapTrustRow(r: unknown): TrustRow {
+  return trustRowSchema.parse(r);
 }
 
 export async function getTrustReport(window: ReportWindow = "30d"): Promise<TrustReport | null> {
