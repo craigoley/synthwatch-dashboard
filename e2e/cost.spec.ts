@@ -93,14 +93,14 @@ test.describe("cost UI rework — Cost tab + card cost + modal live recompute", 
     await expect(page.getByTestId("modal-cost-projected")).toHaveCount(0); // no $ figure at all
   });
 
-  test("honest-render: 500 is loud on the reports Cost tab AND the monitor-detail panel (never absent)", async ({ page }) => {
+  // #279 deleted the monitor-detail cost panel (slimming the 2am fold); the fleet Cost tab keeps the loud
+  // honest-render on 500 (the monitor-cost-error assertion moved out with the panel it tested).
+  test("honest-render: 500 is loud on the reports Cost tab (never absent)", async ({ page }) => {
     const w = costWorld([costCheck({ checkId: 1, name: "API health", kind: "http" })]);
     w.reports500 = true;
     await mockApi(page, w);
     await page.goto("/reports?tab=cost");
     await expect(page.getByTestId("fleet-cost-error")).toBeVisible();
-    await page.goto("/checks/1");
-    await expect(page.getByTestId("monitor-cost-error")).toBeVisible();
   });
 
   // ★ Bug B: the divergence warning named "retries/failures" — a cause the metric CANNOT SEE (duration
@@ -125,16 +125,13 @@ test.describe("cost UI rework — Cost tab + card cost + modal live recompute", 
     await expect(badge).not.toContainText(/retr/i); // ★ must-go-red: no "retries"
     const title = (await badge.getAttribute("title")) ?? "";
     expect(title).toMatch(/interval changed recently/i); // the cadence-straddle attribution, from data
+    expect(title).toMatch(/runs in the last 7d/i); // expected-vs-actual counts live in the badge title
     expect(title).not.toMatch(/retr/i);
-
-    // and on the monitor-detail panel
-    await page.goto("/checks/1");
-    const detail = page.getByTestId("monitor-cost-divergence");
-    await expect(detail).toBeVisible();
-    await expect(detail).toContainText("runs in the last 7d");
-    await expect(detail).not.toContainText(/retr/i);
+    // (#279 deleted the monitor-detail cost panel; the divergence must-go-red is fully covered on the fleet badge.)
   });
 
+  // #279 deleted the monitor-detail cost panel; the confirmation-attribution must-go-red (#251) is preserved
+  // on the fleet Cost tab's divergence badge (same shared divergenceInfo() copy, carried in its title tooltip).
   test("divergence attributes to confirmation runs when present (still not retries)", async ({ page }) => {
     const flagged = costCheck({
       checkId: 2, name: "nextdoor-reservations", intervalSeconds: 900, regionCount: 3,
@@ -143,9 +140,9 @@ test.describe("cost UI rework — Cost tab + card cost + modal live recompute", 
       runCountRecent: 1900, runCountPrior: 1900, // no cadence step → the cause is the confirmation re-runs
     });
     await mockApi(page, costWorld([flagged]));
-    await page.goto("/checks/2");
-    const detail = page.getByTestId("monitor-cost-divergence");
-    await expect(detail).toContainText("40 confirmation re-runs");
-    await expect(detail).not.toContainText(/retr(y|ies)/i);
+    await page.goto("/reports?tab=cost");
+    const title = (await page.getByTestId("cost-divergence-2").getAttribute("title")) ?? "";
+    expect(title).toMatch(/40 confirmation re-runs/i); // attributed from the count column, not retries
+    expect(title).not.toMatch(/retr(y|ies)/i);
   });
 });
