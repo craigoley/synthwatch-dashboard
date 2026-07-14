@@ -47,19 +47,21 @@ function FleetPulse() {
   const warning = enabled.filter((c) => c.current_status === "warn").length;
   const passing = enabled.filter((c) => c.current_status === "pass").length;
 
+  // ★ a11y: each count also carries a GLYPH + a screen-reader label, so "which count is failing vs passing"
+  // isn't conveyed by the dot's COLOUR alone (a colourblind operator can't map "0 0 34" to severities).
   const items = [
-    { n: failing, cls: "sw-dot-fail", color: "var(--color-fail)" },
-    { n: warning, cls: "sw-dot-warn", color: "var(--color-warn)" },
-    { n: passing, cls: "sw-dot-pass", color: "var(--color-pass)" },
+    { n: failing, cls: "sw-dot-fail", color: "var(--color-fail)", glyph: "✕", label: "down" },
+    { n: warning, cls: "sw-dot-warn", color: "var(--color-warn)", glyph: "⚠", label: "warning" },
+    { n: passing, cls: "sw-dot-pass", color: "var(--color-pass)", glyph: "✓", label: "up" },
   ];
 
   return (
     <div className="flex items-center gap-3" aria-label="fleet status summary">
       {items.map((it, i) => (
-        <span key={i} className="flex items-center gap-1.5">
+        <span key={i} className="flex items-center gap-1" aria-label={`${it.n} ${it.label}`}>
           <span className={`sw-dot ${it.cls}`} />
-          <span className="sw-mono text-xs" style={{ color: it.color }}>
-            {it.n}
+          <span aria-hidden className="sw-mono text-xs" style={{ color: it.color }}>
+            {it.glyph} {it.n}
           </span>
         </span>
       ))}
