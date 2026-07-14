@@ -270,7 +270,13 @@ export function FlakeBudgetNote({ fb }: { fb: TrustFlakeBudget | null }) {
 export function TrustLegend() {
   return (
     <div className="sw-panel p-4 text-[12px]" data-testid="trust-legend">
-      <h3 className="mb-2 text-sm font-semibold text-[var(--color-ink)]">How the chip is derived</h3>
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-sm font-semibold text-[var(--color-ink)]">How the chip is derived</h3>
+        {/* ★ the 2am glossary — plain-language definitions of flap / spurious-red / flake budget / etc. */}
+        <Link href="/glossary" className="text-[11px] text-[var(--color-brand)] hover:underline" data-testid="trust-legend-glossary-link">
+          ⓘ What do these words mean? →
+        </Link>
+      </div>
       <p className="mb-3 text-[var(--color-ink-dim)]">
         No composite score, and no OR-collapse — each dimension is graded on its own axis (thresholds derived
         from the measured fleet distribution), and the chip is a derivation over them that names what flagged:
