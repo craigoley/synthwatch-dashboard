@@ -4,7 +4,7 @@ import { mockApi, defaultWorld } from "./mock";
 
 /**
  * §D1 monitor-trust scorecard — the "every green with its proof" pitch artifact. The tests that matter are the
- * HONEST-RENDER ones: redTest is never a pass, never-green is a first-class state (not an error), a null retry
+ * HONEST-RENDER ones: redTest is never a pass, never-green is a first-class state (not an error), a null recheck
  * rate shows "—" not "0%", and perf/unclassified incidents are never folded into "real outage". Those prove
  * the honesty the scorecard exists for.
  */
@@ -33,8 +33,8 @@ test.describe("trust scorecard — Reports 'Trust' tab", () => {
     const dims = page.getByTestId("trust-legend-dimensions");
     await expect(dims).toContainText("transient failures ÷ scheduled runs"); // flap formula
     await expect(dims).toContainText("flaky ≥ 5%"); // flap flaky threshold (measured-distribution)
-    await expect(dims).toContainText("runs needing a real retry ÷ runs"); // retry formula
-    await expect(dims).toContainText("flaky ≥ 10%"); // retry flaky threshold
+    await expect(dims).toContainText("confirmation re-checks ÷ runs"); // recheck formula
+    await expect(dims).toContainText("flaky ≥ 10%"); // recheck flaky threshold
     await expect(dims).toContainText("selector-drift incidents"); // monitor-noise formula
     await expect(dims).toContainText("MONITOR-SIDE transients ÷ scheduled runs"); // ★ spurious-red formula
     await expect(dims).toContainText("Service-side transients never count"); // ★ the safety property, stated
@@ -73,19 +73,19 @@ test.describe("trust scorecard — Reports 'Trust' tab", () => {
     await page.goto("/reports?tab=trust");
     await expect(page.getByTestId("trust-table")).toBeVisible();
 
-    // the flaky monitor (checkId 2) names its bad axes: retry flaky + monitor-noise flaky + spurious-red flaky, flap elevated.
+    // the flaky monitor (checkId 2) names its bad axes: recheck flaky + monitor-noise flaky + spurious-red flaky, flap elevated.
     const flaky = page.getByTestId("trust-row-2");
-    await expect(flaky.getByTestId("trust-dim-retry")).toHaveAttribute("data-state", "flaky");
+    await expect(flaky.getByTestId("trust-dim-recheck")).toHaveAttribute("data-state", "flaky");
     await expect(flaky.getByTestId("trust-dim-monitor_noise")).toHaveAttribute("data-state", "flaky");
     await expect(flaky.getByTestId("trust-dim-spurious_red")).toHaveAttribute("data-state", "flaky");
     await expect(flaky.getByTestId("trust-dim-flap")).toHaveAttribute("data-state", "elevated");
 
-    // the nominal monitor (checkId 3) shows retry ELEVATED (blocks proven-live, not yet flaky).
-    await expect(page.getByTestId("trust-row-3").getByTestId("trust-dim-retry")).toHaveAttribute("data-state", "elevated");
+    // the nominal monitor (checkId 3) shows recheck ELEVATED (blocks proven-live, not yet flaky).
+    await expect(page.getByTestId("trust-row-3").getByTestId("trust-dim-recheck")).toHaveAttribute("data-state", "elevated");
 
     // the proven-live monitor (checkId 1) reads clean on EVERY axis — that's what "proven live" means now.
     const clean = page.getByTestId("trust-row-1");
-    for (const axis of ["flap", "retry", "monitor_noise", "spurious_red"]) {
+    for (const axis of ["flap", "recheck", "monitor_noise", "spurious_red"]) {
       await expect(clean.getByTestId(`trust-dim-${axis}`)).toHaveAttribute("data-state", "ok");
     }
   });
@@ -119,7 +119,7 @@ test.describe("trust scorecard — Reports 'Trust' tab", () => {
   test("★ redTest CAPTURED renders 'red-tested' with its METHOD — executed vs attested render DISTINCTLY", async ({ page }) => {
     const inc = { total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0 };
     const sp = { executedSha256: "abc", specPath: "monitors/x.spec.ts" };
-    const base = { sensitive: false, lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:00:00Z", runCount: 10, retryCount: 0, retryRate: 0, incidents: inc, specProvenance: sp, trust: "proven-live" };
+    const base = { sensitive: false, lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:00:00Z", runCount: 10, recheckCount: 0, recheckRate: 0, incidents: inc, specProvenance: sp, trust: "proven-live" };
     const w = defaultWorld();
     w.trustMonitors = [
       { ...base, checkId: 101, checkName: "mon-executed", redTest: { captured: true, testedAt: "2026-06-28T00:00:00Z", method: "executed-red-fixture" } },
@@ -144,12 +144,12 @@ test.describe("trust scorecard — Reports 'Trust' tab", () => {
     await expect(cell).not.toContainText("Invalid");
   });
 
-  test("★ null retry rate shows '—', never '0%' (no fake zero)", async ({ page }) => {
+  test("★ null recheck rate shows '—', never '0%' (no fake zero)", async ({ page }) => {
     await mockApi(page, defaultWorld());
     await page.goto("/reports?tab=trust");
-    const retry = page.getByTestId("trust-retry-4"); // checkId 4 = 0 runs → retryRate null
-    await expect(retry).toContainText("—");
-    await expect(retry).not.toContainText("0%");
+    const recheck = page.getByTestId("trust-recheck-4"); // checkId 4 = 0 runs → recheckRate null
+    await expect(recheck).toContainText("—");
+    await expect(recheck).not.toContainText("0%");
   });
 
   test("★ perf/unclassified incidents are NOT folded into real-outage (reds = real / other)", async ({ page }) => {
@@ -164,19 +164,19 @@ test.describe("trust scorecard — Reports 'Trust' tab", () => {
   test("★ degrading-but-green: the retried-passes annotation COEXISTS with proven-live (never a demotion)", async ({ page }) => {
     await mockApi(page, defaultWorld());
     await page.goto("/reports?tab=trust");
-    const row = page.getByTestId("trust-row-1"); // API health: proven-live AND retriedPasses = 4
+    const row = page.getByTestId("trust-row-1"); // API health: proven-live AND recheckedPasses = 4
     // ★ the chip is UNCHANGED (still proven-live) — the annotation is additive, not a downgrade
     await expect(row.getByTestId("trust-chip-proven-live")).toBeVisible();
-    const note = row.getByTestId("trust-retried-passes");
+    const note = row.getByTestId("trust-rechecked-passes");
     await expect(note).toBeVisible();
-    await expect(note).toContainText("4 passes needed retries");
+    await expect(note).toContainText("4 passes needed re-checks");
   });
 
-  test("★ the annotation is ABSENT when retriedPasses is 0 (no false warning on a clean monitor)", async ({ page }) => {
+  test("★ the annotation is ABSENT when recheckedPasses is 0 (no false warning on a clean monitor)", async ({ page }) => {
     await mockApi(page, defaultWorld());
     await page.goto("/reports?tab=trust");
-    // check 3 omits retriedPasses → the tolerant mapper reads 0 → no annotation
-    await expect(page.getByTestId("trust-row-3").getByTestId("trust-retried-passes")).toHaveCount(0);
+    // check 3 omits recheckedPasses → the tolerant mapper reads 0 → no annotation
+    await expect(page.getByTestId("trust-row-3").getByTestId("trust-rechecked-passes")).toHaveCount(0);
   });
 
   test("null-safe: endpoint 404 → the table self-hides to a quiet unavailable state, no crash", async ({ page }) => {
@@ -192,7 +192,7 @@ test.describe("trust scorecard — Reports 'Trust' tab", () => {
 });
 
 test.describe("trust card — monitor detail", () => {
-  test("renders the chip, retry sparkline, and full incident breakdown (perf in its own bucket)", async ({ page }) => {
+  test("renders the chip, recheck sparkline, and full incident breakdown (perf in its own bucket)", async ({ page }) => {
     await mockApi(page, defaultWorld());
     await page.goto("/checks/3"); // nominal + a perfRegression incident
 
@@ -202,7 +202,7 @@ test.describe("trust card — monitor detail", () => {
     await expect(page.getByTestId("trust-redtest")).toContainText("not captured");
     // forensic detail (sparkline / by-cause / full hash) lives behind the ONE "Details" disclosure — one tap
     await page.getByTestId("trust-details-toggle").click();
-    await expect(page.getByTestId("trust-retry-sparkline")).toBeVisible();
+    await expect(page.getByTestId("trust-recheck-sparkline")).toBeVisible();
     // ★ every bucket shown separately — perf-regression and unclassified are NOT merged into real-outage
     await expect(page.getByTestId("trust-incident-real_outage")).toContainText("1");
     await expect(page.getByTestId("trust-incident-perf_regression")).toContainText("1");
@@ -213,10 +213,10 @@ test.describe("trust card — monitor detail", () => {
 
   test("★ detail card shows the degrading-but-green annotation alongside a proven-live chip", async ({ page }) => {
     await mockApi(page, defaultWorld());
-    await page.goto("/checks/1"); // API health: proven-live + retriedPasses 4
+    await page.goto("/checks/1"); // API health: proven-live + recheckedPasses 4
     const card = page.getByTestId("trust-card");
     await expect(card.getByTestId("trust-chip-proven-live")).toBeVisible();  // ★ chip UNCHANGED — not a demotion
-    await expect(card.getByTestId("trust-retried-passes")).toContainText("4 passes needed retries");
+    await expect(card.getByTestId("trust-rechecked-passes")).toContainText("4 passes needed re-checks");
   });
 
   test("null-safe: 404 → the trust card self-hides, rest of the detail page renders", async ({ page }) => {
@@ -237,12 +237,12 @@ test.describe("trust card — monitor detail", () => {
       {
         checkId: 1, checkName: "API health", sensitive: false,
         lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
-        runCount: 500, retryCount: 6, retryRate: 0.012, retriedPasses: 0,
+        runCount: 500, recheckCount: 6, recheckRate: 0.012, recheckedPasses: 0,
         flapCount: 9, scheduledCount: 142, flapRate: 0.0634,
         incidents: { total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0 },
         redTest: { captured: false },
         specProvenance: { executedSha256: "abc123def456", specPath: "monitors/api/health.spec.ts" },
-        dimensions: { flap: { state: "flaky" }, retry: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "flaky" } },
+        dimensions: { flap: { state: "flaky" }, recheck: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "flaky" } },
         transients: { monitorSide: 9, serviceSide: 0, indeterminate: 0, spuriousRedRate: 0.0634 },
         trust: "flaky",
         flakeBudget: {
@@ -285,11 +285,11 @@ test.describe("trust card — monitor detail", () => {
       {
         checkId: 1, checkName: "API health", sensitive: false,
         lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
-        runCount: 500, retryCount: 6, retryRate: 0.012, retriedPasses: 0,
+        runCount: 500, recheckCount: 6, recheckRate: 0.012, recheckedPasses: 0,
         incidents: { total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0 },
         redTest: { captured: false },
         specProvenance: { executedSha256: "abc123def456", specPath: "monitors/api/health.spec.ts" },
-        dimensions: { flap: { state: "ok" }, retry: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "ok" } },
+        dimensions: { flap: { state: "ok" }, recheck: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "ok" } },
         trust: "proven-live",
         // flakeBudget deliberately OMITTED — models the API dropping the field.
       },
@@ -315,9 +315,9 @@ test.describe("trust card — monitor detail", () => {
       {
         checkId: 7, checkName: "Budget-less monitor", sensitive: false,
         lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
-        runCount: 100, retryCount: 1, retryRate: 0.01, incidents: { total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0 },
+        runCount: 100, recheckCount: 1, recheckRate: 0.01, incidents: { total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0 },
         redTest: { captured: false }, specProvenance: { executedSha256: "0007", specPath: "monitors/x.spec.ts" },
-        dimensions: { flap: { state: "ok" }, retry: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "ok" } },
+        dimensions: { flap: { state: "ok" }, recheck: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "ok" } },
         trust: "proven-live",
         // flakeBudget OMITTED
       },
@@ -337,7 +337,7 @@ test.describe("trust card — monitor detail", () => {
       {
         checkId: 1, checkName: "API health", sensitive: false,
         lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z", // ★ WITH a green
-        runCount: 500, retryCount: 6, retryRate: 0.012, // ★ WITH runs → chip is NOT "unverified"
+        runCount: 500, recheckCount: 6, recheckRate: 0.012, // ★ WITH runs → chip is NOT "unverified"
         incidents: { total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0 },
         redTest: { captured: false }, specProvenance: { executedSha256: "abc123def456", specPath: "monitors/api/health.spec.ts" },
         trust: "nominal", // the API-computed chip — reads fine on its own
@@ -351,7 +351,7 @@ test.describe("trust card — monitor detail", () => {
     const strip = page.getByTestId("trust-card-dimensions");
     await expect(strip).toBeVisible();
     // ★ every axis reads UNKNOWN, never "ok"
-    for (const k of ["flap", "retry", "monitor_noise", "spurious_red"]) {
+    for (const k of ["flap", "recheck", "monitor_noise", "spurious_red"]) {
       await expect(strip.getByTestId(`trust-dim-${k}`)).toHaveAttribute("data-state", "unknown");
     }
     await expect(strip.getByTestId("trust-dim-flap")).toContainText(/no data/i);
@@ -364,9 +364,9 @@ test.describe("trust card — monitor detail", () => {
     // regression guard: valid states are untouched — only ABSENT → unknown changed.
     await mockApi(page, defaultWorld());
     await page.goto("/reports?tab=trust");
-    // check 2 (Homepage flow): retry flaky, spurious-red flaky — present states render as before.
+    // check 2 (Homepage flow): recheck flaky, spurious-red flaky — present states render as before.
     const row2 = page.getByTestId("trust-row-2");
-    await expect(row2.getByTestId("trust-dim-retry")).toHaveAttribute("data-state", "flaky");
+    await expect(row2.getByTestId("trust-dim-recheck")).toHaveAttribute("data-state", "flaky");
     await expect(row2.getByTestId("trust-dim-flap")).toHaveAttribute("data-state", "elevated");
     await expect(row2.locator('[data-state="unknown"]')).toHaveCount(0); // present payload → no unknowns
   });
@@ -379,9 +379,9 @@ test.describe("trust card — monitor detail", () => {
       {
         checkId: 1, checkName: "API health", sensitive: false,
         lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
-        runCount: 500, retryCount: 6, retryRate: 0.012,
+        runCount: 500, recheckCount: 6, recheckRate: 0.012,
         redTest: { captured: false }, specProvenance: { executedSha256: "abc123def456", specPath: "monitors/api/health.spec.ts" },
-        dimensions: { flap: { state: "ok" }, retry: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "ok" } },
+        dimensions: { flap: { state: "ok" }, recheck: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: "ok" } },
         flakeBudget: { state: "ok", target: 0.02, targetIsDefault: true, scheduledRuns: 500, monitorSide: 0, serviceSide: 0, indeterminate: 0, budget: 10, consumed: 0, remaining: 10, remainingPct: 1, burnRate: 0, directedTask: null },
         trust: "proven-live",
         // incidents DELIBERATELY OMITTED → maps to null → explicit "no data".
@@ -419,14 +419,14 @@ test.describe("trust card — monitor detail", () => {
 // "don't look here for this kind"; "no data yet" = "ask me again later". They must NOT read the same.
 test.describe("trust dimensions — three applicability states render distinctly (#246)", () => {
   const trustInc = () => ({ total: 0, realOutage: 0, flakyTransient: 0, selectorDrift: 0, environmentRegional: 0, perfRegression: 0, unclassified: 0 });
-  const dims = (spuriousRed: string) => ({ flap: { state: "ok" }, retry: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: spuriousRed } });
+  const dims = (spuriousRed: string) => ({ flap: { state: "ok" }, recheck: { state: "ok" }, monitorNoise: { state: "ok" }, spuriousRed: { state: spuriousRed } });
   const budget = (state: string, scheduledRuns: number) => ({
     state, target: 0.02, targetIsDefault: true, scheduledRuns, monitorSide: 0, serviceSide: 0, indeterminate: 0,
     budget: scheduledRuns * 0.02, consumed: 0, remaining: scheduledRuns * 0.02, remainingPct: 1, burnRate: 0, directedTask: null,
   });
   const base = {
     sensitive: false, lastGreenAt: "2026-07-01T20:00:00Z", lastRunAt: "2026-07-01T20:05:00Z",
-    retryCount: 0, retryRate: 0, incidents: trustInc(), redTest: { captured: false },
+    recheckCount: 0, recheckRate: 0, incidents: trustInc(), redTest: { captured: false },
     specProvenance: { executedSha256: "abc", specPath: "monitors/x.spec.ts" }, trust: "proven-live" as const,
   };
   // A. a MATURE browser check → measured-and-fine. B. an http check → not-measurable. C. a NEW browser check → no-data-yet.

@@ -886,7 +886,7 @@ export type TrustDimensionState = "ok" | "elevated" | "flaky" | "not-applicable"
 // calm "ok" AND the two applicability markers above (which are first-class API values, not a payload gap).
 export interface TrustDimensions {
   flap: TrustDimensionState | null; // superseded transients ÷ scheduled runs (browser/multistep; 0 for http/dns/ssl)
-  retry: TrustDimensionState | null; // runs needing a real retry ÷ runs (all kinds)
+  recheck: TrustDimensionState | null; // confirmation re-checks ÷ runs (all kinds)
   monitor_noise: TrustDimensionState | null; // RCA flaky-transient + selector-drift "cry wolf" incidents (a count)
   // ★ B3-2 stage 2: MONITOR-SIDE transients ÷ scheduled (the "cried wolf on a monitor-side red" axis). ONLY
   // monitor-side counts — a service-side transient (a real brief outage the monitor caught) never flags this.
@@ -943,11 +943,11 @@ export interface TrustRow {
   last_green_at: string | null; // null = NEVER verified green (a first-class state, not an error)
   last_run_at: string | null;
   run_count: number;
-  retry_count: number;
-  retry_rate: number | null; // null = no runs → "—", never 0%
-  // ★ "degrading-but-green" early warning: PASS/WARN runs that STILL needed a real retry. DISPLAY-ONLY — it
-  // does NOT feed `trust` (a proven-live monitor with retried passes stays proven-live). 0 → annotation hidden.
-  retried_passes: number;
+  recheck_count: number;
+  recheck_rate: number | null; // null = no runs → "—", never 0%
+  // ★ "degrading-but-green" early warning: PASS/WARN runs that STILL needed a re-check. DISPLAY-ONLY — it
+  // does NOT feed `trust` (a proven-live monitor with rechecked passes stays proven-live). 0 → annotation hidden.
+  rechecked_passes: number;
   // ★ Confirmation-retry P2 — flakiness surfaced: transient failures (a scheduled run that failed then a fresh
   // confirmation passed → confirmed not-real, excluded from availability/SLO) ÷ scheduled (non-sandbox) runs.
   // Raw counts + the rate so the UI can say "6 transient failures / 142 runs (4.2%)". flap_rate null = no
@@ -981,16 +981,16 @@ export interface TrustReport {
   window: string;
   monitors: TrustRow[];
 }
-export interface TrustRetryPoint {
+export interface TrustRecheckPoint {
   day: string;
   run_count: number;
-  retry_count: number;
-  retry_rate: number | null; // null when run_count 0 — a GAP in the sparkline, never 0
+  recheck_count: number;
+  recheck_rate: number | null; // null when run_count 0 — a GAP in the sparkline, never 0
 }
 export interface TrustDetail {
   window: string;
   monitor: TrustRow;
-  retry_series: TrustRetryPoint[];
+  recheck_series: TrustRecheckPoint[];
 }
 
 // Reports P6 — the verdict-taxonomy breakdown (incidents.rca.classification). `precision` = real-outage /
