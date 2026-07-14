@@ -27,6 +27,18 @@ function precisionTone(p: number): string {
   return "fail";
 }
 
+// ★ Minimum-sample gate (three-state discipline, like the trust dimensions: measured / no-data-yet). DERIVED,
+// not an invented N: the precision verdict is trustworthy only if a SINGLE reclassification wouldn't move it
+// across a tone band. Craig's "25% from 1 of 4" flips fail→warn on one incident — a confidently-wrong signal.
+// Below that, we show the sample ("N of M classified"), never the percentage.
+function precisionIsFragile(realOutages: number, classified: number): boolean {
+  if (classified <= 0) return true;
+  const base = precisionTone(realOutages / classified);
+  const up = precisionTone(Math.min(classified, realOutages + 1) / classified);
+  const down = precisionTone(Math.max(0, realOutages - 1) / classified);
+  return up !== base || down !== base;
+}
+
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 
 function Shell({ window, stamp, children }: { window: ReportWindow; stamp?: ReactNode; children: ReactNode }) {
@@ -84,20 +96,36 @@ export function IncidentBreakdownCard({ window, tags = [] }: { window: ReportWin
   }
 
   const tone = precisionTone(data.precision);
+  const fragile = precisionIsFragile(data.realOutages, data.classified);
 
   return (
     <Shell window={window} stamp={stamp}>
-      {/* ★ Lead with the alert-precision answer to "how many reds were real". */}
-      <div className="flex items-baseline gap-2">
-        <span className="text-3xl font-semibold tabular-nums" style={{ color: `var(--color-${tone})` }}>
-          {pct(data.precision)}
-        </span>
-        <span className="text-sm text-[var(--color-ink-dim)]">of classified reds were real outages</span>
-      </div>
-      <p className="mt-1 text-xs text-[var(--color-ink-faint)]">
-        {data.realOutages} of {data.classified} classified
-        {data.unclassified > 0 ? ` · ${data.unclassified} not yet classified` : ""} · {data.total} total
-      </p>
+      {/* ★ Lead with the alert-precision answer — UNLESS the sample is too thin for the % to be stable, in which
+          case show the sample instead of a confidently-wrong verdict (the min-sample gate). */}
+      {fragile ? (
+        <div data-testid="alert-quality-thin">
+          <p className="text-sm text-[var(--color-ink)]">
+            Not enough data to grade — <span className="font-semibold">{data.classified}</span> of {data.total} classified.
+          </p>
+          <p className="mt-1 text-xs text-[var(--color-ink-faint)]">
+            With this few classified reds, one reclassification would flip the verdict — a precision % would be
+            confidently wrong. It appears once the sample is large enough to be stable.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-semibold tabular-nums" style={{ color: `var(--color-${tone})` }} data-testid="alert-quality-precision">
+              {pct(data.precision)}
+            </span>
+            <span className="text-sm text-[var(--color-ink-dim)]">of classified reds were real outages</span>
+          </div>
+          <p className="mt-1 text-xs text-[var(--color-ink-faint)]">
+            {data.realOutages} of {data.classified} classified
+            {data.unclassified > 0 ? ` · ${data.unclassified} not yet classified` : ""} · {data.total} total
+          </p>
+        </>
+      )}
 
       {/* Per-classification breakdown */}
       <ul className="mt-4 space-y-2">
