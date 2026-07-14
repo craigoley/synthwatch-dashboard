@@ -4,6 +4,8 @@ Operator console for the self-hosted **SynthWatch** synthetic monitoring system.
 A Next.js (App Router, TypeScript) app deployed on Vercel that reads from — and
 does CRUD against — the standalone **SynthWatch C# API** on Azure.
 
+> _Verified 2026-07-14 — prose with **no automated check**. Route counts, file paths, and behaviour here can drift; if the code disagrees, the code is authoritative._
+
 ---
 
 ## Architecture — a thin client over the C# API
@@ -92,6 +94,8 @@ state is server state + URL params — **no browser storage APIs**.
 
 ### Pages
 
+There are **14 page routes** (`src/app/**/page.tsx`) plus 2 route handlers — not 4. The primary four:
+
 - **`/`** — status grid: a card per check with current state, last run, 24h
   p50/p95 and a sparkline. Sorted open-incident → enabled → disabled. Filter by
   status/kind/search (URL params).
@@ -101,6 +105,10 @@ state is server state + URL params — **no browser storage APIs**.
 - **`/incidents`** — open + resolved incidents with severity, duration, summary.
 - **`/monitors`** — CRUD: create/edit/pause/delete via the API, with a soft-delete
   default and an explicit hard-delete confirm.
+
+The rest: `/incidents/[id]`, `/reports`, `/settings/environments`, `/specs`, `/status`,
+`/users`, `/glossary`, `/trust`, `/notifications`, and `/throw-test` (dev/error-boundary
+test). Route handlers: `/screenshot-proxy/[runId]` and `/api/probe-echo`.
 
 ---
 
@@ -118,8 +126,11 @@ src/
   app/
     page.tsx             # status grid
     checks/[id]/page.tsx # check detail
-    incidents/page.tsx
+    incidents/page.tsx   # (+ incidents/[id])
     monitors/page.tsx
+    reports/  status/  users/  specs/  glossary/  trust/   # + 10 more page routes
+    notifications/  settings/environments/
+    screenshot-proxy/[runId]/route.ts  api/probe-echo/route.ts   # route handlers
   components/…           # UI (charts, funnel bar, cards, forms, SLA, …)
 ```
 

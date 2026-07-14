@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ToneBadge } from "@/components/status-badge";
 import type { IncidentRca, RcaClassification } from "@/lib/types";
 
@@ -34,6 +35,10 @@ export function RcaPanel({ rca }: { rca: IncidentRca }) {
         <span className="sw-mono rounded-full border border-[var(--color-border-strong)] px-1.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-dim)]">
           {rca.confidence} confidence
         </span>
+        {/* jargon lands here first (selector drift / flaky-transient / real outage) → link the glossary AT the confusion */}
+        <Link href="/glossary" className="ml-auto text-[11px] text-[var(--color-brand)] hover:underline" data-testid="rca-glossary-link">
+          ⓘ terms →
+        </Link>
       </div>
       {rca.summary && <p className="mb-3 text-sm text-[var(--color-ink-dim)]">{rca.summary}</p>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

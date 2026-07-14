@@ -88,13 +88,19 @@ function DivergenceFlag({ c }: { c: CostCheck }) {
   const info = divergenceInfo(c);
   if (!info) return null;
   return (
-    <span
-      data-testid={`cost-divergence-${c.check_id}`}
-      className="sw-mono text-[10px]"
-      style={{ color: "var(--color-warn)" }}
-      title={info.title}
-    >
-      {info.badge}
+    <span className="inline-flex items-center gap-1">
+      <span
+        data-testid={`cost-divergence-${c.check_id}`}
+        className="sw-mono text-[10px]"
+        style={{ color: "var(--color-warn)" }}
+        title={info.title}
+      >
+        {info.badge}
+      </span>
+      {/* "divergence" is jargon — link the glossary AT the point of confusion, not only from the trust legend */}
+      <Link href="/glossary" className="text-[10px] text-[var(--color-brand)] hover:underline" data-testid="cost-divergence-glossary-link" title="What does divergence mean?">
+        ⓘ
+      </Link>
     </span>
   );
 }

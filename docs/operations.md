@@ -1,7 +1,12 @@
 # Operations runbook — accounts, sign-in, and access
 
 How to onboard/offboard a team member and what they'll experience signing in.
-Everything below is grounded in this repo's source (file:line cited). Steps that
+
+> _Verified 2026-07-14 — prose with **no automated check**. If the code disagrees, the code is authoritative._
+
+Everything below is grounded in this repo's source, **cited by SYMBOL** (function /
+export name) rather than by line — a symbol survives a refactor; a line number drifts
+(these api-client anchors had drifted ~600 lines before this). Steps that
 live in the **synthwatch-api** repo (the C# API on Azure) and can't be confirmed
 from here are labeled **needs-verification** — confirm them against that repo
 before relying on the specifics.
@@ -25,10 +30,10 @@ An **admin** does this entirely in the dashboard at **`/users`** (the nav link
 is admin-only, but the URL works directly):
 
 - **Add:** enter the email under "Add an editor" → `POST /api/editors {email}`
-  (`src/lib/api-client.ts:2144`). The address can then sign in with write
+  (`api-client.ts` `addEditor`). The address can then sign in with write
   access immediately — no deploy, no restart.
 - **Remove:** "Remove" next to the editor → `DELETE /api/editors/{email}`
-  (`src/lib/api-client.ts:2154`). Their existing session's *role* comes
+  (`api-client.ts` `removeEditor`). Their existing session's *role* comes
   from the server on every re-validation, so removal takes effect without
   waiting for the 30-day expiry (see §2).
 - **Grant from a request:** people who ask for access via the login modal land
@@ -36,13 +41,13 @@ is admin-only, but the URL works directly):
   grants (and clears the request); "Dismiss" clears it without granting.
 
 All these endpoints are **admin-gated server-side** — a non-admin gets a 403
-(`src/lib/api-client.ts:2114`); the page hiding itself from non-admins is UX
+(`api-client.ts`, the `addEditor`/`removeEditor` editor-management block — admin-only); the page hiding itself from non-admins is UX
 only (`src/app/users/page.tsx:65-72`).
 
 ### Admins — env-configured on the API, not manageable in the UI
 
 There is deliberately **no UI path to mint an admin**: `addEditor` takes only an
-email, no role parameter (`src/lib/api-client.ts:2144`), and nothing in
+email, no role parameter (`api-client.ts` `addEditor`), and nothing in
 this repo's source mutates a role. Admin identity comes from an allowlist
 environment variable read by the **C# API**. The only reference in this repo is
 the `/users` empty-state hint: *"Admins (from ADMIN_EMAILS) always have access;
@@ -67,15 +72,15 @@ env list, nobody can reach `/users` to add editors.
 
 1. **"Sign in to edit"** in the header opens the login modal (any page).
 2. **Email step** → `POST /api/auth/request-code`
-   (`src/lib/api-client.ts:2066-2072`). The response message is deliberately
+   (`api-client.ts` `authRequestCode`). The response message is deliberately
    **enumeration-safe** — the same "check your email" copy whether or not the
    address has access, so an outsider can't probe who's on the list. If no code
    arrives, that usually means the address isn't an editor/admin yet.
 3. **Code step** — a 6-digit OTP from the email → `POST /api/auth/verify`
-   (`src/lib/api-client.ts:2075-2085`), which mints the session
+   (`api-client.ts` `authVerify`), which mints the session
    `{token, email, role, expiresAt}`. A bad/expired code is a 400 shown inline.
 4. **No access?** "Request it" in the modal → `POST /api/auth/request-access`
-   (`src/lib/api-client.ts:2106-2112`, also enumeration-safe) → lands in the
+   (`api-client.ts` `authRequestAccess`, also enumeration-safe) → lands in the
    admin's `/users` queue (§1).
 
 **Session mechanics** (all verified in `src/lib/auth.ts`):
@@ -91,7 +96,7 @@ env list, nobody can reach `/users` to add editors.
 - **There is no renewal** — at 30 days the session hard-expires; the next authed
   action gets a 401, the session is cleared, and the login modal reopens for a
   fresh OTP (`src/lib/api-client.ts` 401 interceptor). Sign-out revokes
-  server-side (`POST /api/auth/logout`, `api-client.ts:2097-2103`).
+  server-side (`POST /api/auth/logout`, `api-client.ts` `authLogout`).
 - The email itself (OTP delivery) is sent by the API/runner side —
   **needs-verification:** which channel/provider sends it and its
   sender address live in the synthwatch-api repo.
