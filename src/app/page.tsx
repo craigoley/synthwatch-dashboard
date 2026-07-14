@@ -66,14 +66,25 @@ function matches(
 }
 
 /**
- * ★ 2am routing banner. Surfaces OPEN incidents and any resolved in the last 24h, linking to the Incidents
- * page (the root-cause surface). Self-hides when there's nothing — no clutter on a quiet fleet. Counts only,
- * no verdict (the RCA lives on the Incidents page; it isn't promoted here).
+ * ★ The banner is a "what needs me NOW" surface, so a recency window on the resolved count is deliberate —
+ * unlike the check page (MonitorIncidentLink), which links to a check's most-recent incident at ANY age and
+ * lets the operator judge relevance. One on-call rotation ≈ 24h: an incident that resolved overnight is still
+ * worth a glance at the start of a shift, but a week-old one is history and belongs on /incidents, not nagging
+ * the status header forever. Named, not a bare literal, so the choice is auditable. (from #282 24h-cliff audit)
+ */
+const RESOLVED_BANNER_WINDOW_HOURS = 24;
+
+/**
+ * ★ 2am routing banner. Surfaces OPEN incidents and any resolved within the on-call window above, linking to the
+ * Incidents page (the root-cause surface). Self-hides when there's nothing — no clutter on a quiet fleet. Counts
+ * only, no verdict (the RCA lives on the Incidents page; it isn't promoted here — the classifier is unproven).
  */
 function IncidentBanner() {
   const { data } = useIncidents();
   const open = data?.open ?? [];
-  const recentResolved = (data?.resolved ?? []).filter((i) => isWithinHours(i.resolved_at, 24));
+  const recentResolved = (data?.resolved ?? []).filter((i) =>
+    isWithinHours(i.resolved_at, RESOLVED_BANNER_WINDOW_HOURS),
+  );
   if (open.length === 0 && recentResolved.length === 0) return null;
   const isOpen = open.length > 0;
   const tone = isOpen ? "var(--color-fail)" : "var(--color-ink-dim)";

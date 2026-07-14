@@ -46,6 +46,27 @@ test.describe("incident routing — grid banner + check-page link", () => {
     await expect(link).not.toContainText(/real outage|monitor-side|service-side|flaky selector/i);
   });
 
+  test("★ check-detail links to the MOST RECENT incident even when it resolved >24h ago (no recency cliff)", async ({ page }) => {
+    const w = defaultWorld();
+    const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+    // The check's most recent incident resolved 3 DAYS ago — the old 24h filter would have dropped it, stranding
+    // the operator from the RCA that still lives on /incidents. The banner's 24h window is unaffected (this is the
+    // check page). An older resolved incident is also present to prove we pick the most-recent by resolved_at.
+    w.incidents = [
+      incident({ id: 921, checkId: 1, status: "resolved", severity: "critical", openedAt: daysAgo(3.2), resolvedAt: daysAgo(3), summary: "recent-but-old" }),
+      incident({ id: 920, checkId: 1, status: "resolved", severity: "warning", openedAt: daysAgo(40), resolvedAt: daysAgo(39), summary: "ancient" }),
+    ];
+    await mockApi(page, w);
+    await page.goto("/checks/1");
+    const link = page.getByTestId("monitor-incident-link");
+    await expect(link).toBeVisible();
+    await expect(link).toContainText("Last incident #921"); // the newer resolved_at, not #920
+    await expect(link).toContainText(/resolved 3d ago/i); // age shown so the operator judges relevance
+    await expect(link).toHaveAttribute("href", "/incidents/921");
+    // ★ still link only — no RCA verdict on the check page
+    await expect(link).not.toContainText(/real outage|monitor-side|service-side|flaky selector/i);
+  });
+
   test("check-detail incident link hides when the check has no open / recent incident", async ({ page }) => {
     const w = defaultWorld();
     w.incidents = []; // none for check 1
