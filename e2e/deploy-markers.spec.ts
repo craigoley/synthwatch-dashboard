@@ -19,6 +19,7 @@ test.describe("charts — deploy-marker overlay", () => {
     });
     await mockApi(page, world);
     await page.goto("/checks/1");
+    await page.getByTestId("metrics-toggle").click(); // #279: the availability chart now lives under the collapse-by-default Metrics section
     await page.waitForTimeout(600); // let the overlay fetch + recharts paint
 
     // ★ the overlay fetched deploys for the check's host (a deploy is per-host)
@@ -35,6 +36,7 @@ test.describe("charts — deploy-marker overlay", () => {
     world.deploys = []; // endpoint present but nothing detected yet
     await mockApi(page, world);
     await page.goto("/checks/1");
+    await page.getByTestId("metrics-toggle").click(); // #279: the availability chart now lives under the collapse-by-default Metrics section
     await page.waitForTimeout(500);
 
     const card = page.locator(".sw-panel", { hasText: "Availability over time" });
@@ -48,6 +50,7 @@ test.describe("charts — deploy-marker overlay", () => {
     world.deploys500 = true; // the overlay fetch ERRORS (not 404-absent, not empty-200)
     await mockApi(page, world);
     await page.goto("/checks/1");
+    await page.getByTestId("metrics-toggle").click(); // #279: the availability chart now lives under the collapse-by-default Metrics section
 
     // ★ the chart itself is unaffected — only the overlay failed
     const card = page.locator(".sw-panel", { hasText: "Availability over time" });
@@ -61,6 +64,7 @@ test.describe("charts — deploy-marker overlay", () => {
     world.reportsServed = false; // GET /reports/deploys 404s
     await mockApi(page, world);
     await page.goto("/checks/1");
+    await page.getByTestId("metrics-toggle").click(); // #279: the availability chart now lives under the collapse-by-default Metrics section
     await page.waitForTimeout(500);
 
     await expect(page.locator(".sw-panel", { hasText: "Availability over time" }).locator(".recharts-line-curve").first()).toBeVisible();
