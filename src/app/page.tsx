@@ -4,7 +4,8 @@ import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { useChecks, useSla, useTags, useCostReport } from "@/lib/client";
+import { useChecks, useSla, useTags, useCostReport, useIncidents } from "@/lib/client";
+import { isWithinHours } from "@/lib/format";
 import { CheckCard } from "@/components/check-card";
 import { costEstimateLabel } from "@/components/cost";
 import { FleetSlaSummary } from "@/components/sla";
@@ -62,6 +63,45 @@ function matches(
       // before the purge (removed supersedes archived, same precedence as the Archived tab above).
       return check.removed_at != null || check.archived_at == null;
   }
+}
+
+/**
+ * ★ 2am routing banner. Surfaces OPEN incidents and any resolved in the last 24h, linking to the Incidents
+ * page (the root-cause surface). Self-hides when there's nothing — no clutter on a quiet fleet. Counts only,
+ * no verdict (the RCA lives on the Incidents page; it isn't promoted here).
+ */
+function IncidentBanner() {
+  const { data } = useIncidents();
+  const open = data?.open ?? [];
+  const recentResolved = (data?.resolved ?? []).filter((i) => isWithinHours(i.resolved_at, 24));
+  if (open.length === 0 && recentResolved.length === 0) return null;
+  const isOpen = open.length > 0;
+  const tone = isOpen ? "var(--color-fail)" : "var(--color-ink-dim)";
+  return (
+    <Link
+      href="/incidents"
+      data-testid="status-incident-banner"
+      className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border px-4 py-2.5 text-sm transition hover:bg-[var(--color-panel-2)]"
+      style={{
+        borderColor: isOpen ? "color-mix(in srgb, var(--color-fail) 34%, transparent)" : "var(--color-border)",
+        background: isOpen ? "color-mix(in srgb, var(--color-fail) 8%, transparent)" : undefined,
+      }}
+    >
+      <span aria-hidden style={{ color: tone }}>⚠</span>
+      {open.length > 0 && (
+        <span className="font-medium" style={{ color: "var(--color-fail)" }}>
+          {open.length} open incident{open.length === 1 ? "" : "s"}
+        </span>
+      )}
+      {open.length > 0 && recentResolved.length > 0 && <span className="text-[var(--color-ink-faint)]">·</span>}
+      {recentResolved.length > 0 && (
+        <span className="text-[var(--color-ink-dim)]">
+          {recentResolved.length} resolved in the last 24h
+        </span>
+      )}
+      <span className="ml-auto text-[var(--color-brand)]">View incidents →</span>
+    </Link>
+  );
 }
 
 function FilterTab({
@@ -160,6 +200,11 @@ function StatusGrid() {
           </Link>
         )}
       </header>
+
+      {/* ★ 2am routing: when the grid is all-green after a resolved incident, "Needs attention" is empty and the
+          grid is a dead end. This banner surfaces OPEN + recently-resolved incidents and routes to the
+          Incidents page (which carries the root cause), so a paged operator isn't stranded. */}
+      <IncidentBanner />
 
       {/* Chat-to-prefill — the SAME shared describe-input as /monitors; parse → seed the create modal (editor-only). */}
       {canWrite && <MonitorChatInput onPrefill={create.openPrefilled} />}
