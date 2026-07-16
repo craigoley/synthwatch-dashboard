@@ -16,10 +16,10 @@ This repo has its **own** dev loop (the #318 devcontainer covers only the runner
 
 ```bash
 git clone https://github.com/craigoley/synthwatch-dashboard && cd synthwatch-dashboard
-npm install
-npm run typecheck          # tsc --noEmit
-npm run e2e                # Playwright against the mocked API (no live backend needed)
-npm run dev                # local server on :3000
+pnpm install --frozen-lockfile
+pnpm typecheck             # tsc --noEmit
+pnpm e2e                   # Playwright against the mocked API (no live backend needed)
+pnpm dev                   # local server on :3000
 ```
 
 Then: trivial change → branch → push → **open a PR** → CI green → **auto-merges** (`auto-merge.yml`).
