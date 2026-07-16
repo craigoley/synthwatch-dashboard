@@ -2492,9 +2492,10 @@ function mapCostCheck(r: Record<string, unknown>): CostCheck {
     interval_seconds: num(r.intervalSeconds),
     region_count: num(r.regionCount),
     avg_duration_s: nul(r.avgDurationS), // null = no runs in window → projection unavailable (never a fake 0)
+    estimated_monthly: nul(r.estimatedMonthly), // 0091 — PRIMARY per-monitor $; null when no runs (never a fake $0)
     active_seconds: num(r.activeSeconds), // 0089 — attributable compute (Σ 7d active-seconds)
     active_seconds_pct: nul(r.activeSecondsPct), // 0089 — % of fleet; null when fleet total is 0 (never a fake 0%)
-    projected_monthly: num(r.projectedMonthly), // DEMOTED modeled $ (secondary, never the headline)
+    projected_monthly: num(r.projectedMonthly), // from-zero $ (drift reference, not displayed)
     measured_monthly_7d: num(r.measuredMonthly7d),
     divergence_ratio: nul(r.divergenceRatio),
     divergence_flag: Boolean(r.divergenceFlag),
@@ -2523,6 +2524,7 @@ export async function getCostReport(): Promise<CostReport | null> {
     rate_source: String(raw?.rateSource ?? ""),
     rate_set_date: String(raw?.rateSetDate ?? ""),
     azure: mapAzureCost(raw?.azure), // ★ null preserved → the panel shows the deep-link fallback, never a fake $0
+    estimated_monthly_total: Number(raw?.estimatedMonthlyTotal ?? 0), // 0091 — the fleet estimate (grant-corrected anchor)
     total_projected_monthly: Number(raw?.totalProjectedMonthly ?? 0),
     total_measured_monthly: Number(raw?.totalMeasuredMonthly ?? 0),
     top_cost_drivers: arr(raw?.topCostDrivers),

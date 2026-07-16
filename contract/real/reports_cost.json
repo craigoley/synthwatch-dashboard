@@ -24,7 +24,8 @@
       "confirmationCount7d": 12,
       "sandboxCount7d": 38,
       "runCountRecent": 174,
-      "runCountPrior": 73
+      "runCountPrior": 73,
+      "estimatedMonthly": 12.66
     },
     {
       "checkId": 77,
@@ -44,7 +45,8 @@
       "confirmationCount7d": 0,
       "sandboxCount7d": 0,
       "runCountRecent": 503,
-      "runCountPrior": 995
+      "runCountPrior": 995,
+      "estimatedMonthly": 8.53
     },
     {
       "checkId": 74,
@@ -64,7 +66,8 @@
       "confirmationCount7d": 0,
       "sandboxCount7d": 0,
       "runCountRecent": 1005,
-      "runCountPrior": 1007
+      "runCountPrior": 1007,
+      "estimatedMonthly": 6.67
     },
     {
       "checkId": 197,
@@ -84,7 +87,8 @@
       "confirmationCount7d": 0,
       "sandboxCount7d": 0,
       "runCountRecent": 670,
-      "runCountPrior": 780
+      "runCountPrior": 780,
+      "estimatedMonthly": 5.77
     },
     {
       "checkId": 80,
@@ -104,7 +108,8 @@
       "confirmationCount7d": 0,
       "sandboxCount7d": 0,
       "runCountRecent": 670,
-      "runCountPrior": 780
+      "runCountPrior": 780,
+      "estimatedMonthly": 5.47
     }
   ],
   "checks": [
@@ -126,7 +131,8 @@
       "confirmationCount7d": 12,
       "sandboxCount7d": 38,
       "runCountRecent": 174,
-      "runCountPrior": 73
+      "runCountPrior": 73,
+      "estimatedMonthly": 12.66
     },
     {
       "checkId": 77,
@@ -146,7 +152,8 @@
       "confirmationCount7d": 0,
       "sandboxCount7d": 0,
       "runCountRecent": 503,
-      "runCountPrior": 995
+      "runCountPrior": 995,
+      "estimatedMonthly": 8.53
     },
     {
       "checkId": 74,
@@ -166,7 +173,8 @@
       "confirmationCount7d": 0,
       "sandboxCount7d": 0,
       "runCountRecent": 1005,
-      "runCountPrior": 1007
+      "runCountPrior": 1007,
+      "estimatedMonthly": 6.67
     },
     {
       "checkId": 197,
@@ -186,7 +194,8 @@
       "confirmationCount7d": 0,
       "sandboxCount7d": 0,
       "runCountRecent": 670,
-      "runCountPrior": 780
+      "runCountPrior": 780,
+      "estimatedMonthly": 5.77
     },
     {
       "checkId": 80,
@@ -206,7 +215,8 @@
       "confirmationCount7d": 0,
       "sandboxCount7d": 0,
       "runCountRecent": 670,
-      "runCountPrior": 780
+      "runCountPrior": 780,
+      "estimatedMonthly": 5.47
     },
     {
       "checkId": 223,
@@ -226,7 +236,8 @@
       "confirmationCount7d": 0,
       "sandboxCount7d": 0,
       "runCountRecent": 670,
-      "runCountPrior": 780
+      "runCountPrior": 780,
+      "estimatedMonthly": 5.05
     }
   ],
   "azure": {
@@ -238,5 +249,6 @@
     "forecastMonth": 76.3,
     "portalUrl": "https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/costanalysis/scope/%2Fsubscriptions%2Fxxxx%2FresourceGroups%2Fsynthwatch-rg",
     "fetchedAt": "2026-07-16T06:00:00+00:00"
-  }
+  },
+  "estimatedMonthlyTotal": 44.15
 }

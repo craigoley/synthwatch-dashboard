@@ -28,9 +28,10 @@ async function withRealResponse<T>(body: unknown, fn: () => Promise<T>): Promise
 test.describe("API contract — /reports/cost mapper vs the real response", () => {
   test("aggregate + rate provenance mapped by the real field names", async () => {
     const raw = real("reports_cost");
-    for (const f of ["generatedAt", "rateUsed", "rateSource", "rateSetDate", "azure", "totalProjectedMonthly", "totalMeasuredMonthly", "topCostDrivers", "checks"]) {
+    for (const f of ["generatedAt", "rateUsed", "rateSource", "rateSetDate", "azure", "estimatedMonthlyTotal", "totalProjectedMonthly", "totalMeasuredMonthly", "topCostDrivers", "checks"]) {
       expect(raw, `report has ${f}`).toHaveProperty(f);
     }
+    expect(((await withRealResponse(raw, () => getCostReport())))!.estimated_monthly_total).toBe(Number(raw.estimatedMonthlyTotal)); // 0091 fleet estimate
     const rep = await withRealResponse(raw, () => getCostReport());
     expect(rep, "getCostReport returns a report (not null) for a 200").toBeTruthy();
     expect(rep!.rate_used).toBe(Number(raw.rateUsed)); // ★ echoed rate — the UI reads it, never hardcodes
@@ -59,7 +60,7 @@ test.describe("API contract — /reports/cost mapper vs the real response", () =
     const raw = real("reports_cost");
     const rows = (raw.checks as Record<string, unknown>[]);
     expect(rows.length, "capture has ≥1 check").toBeGreaterThan(0);
-    for (const f of ["checkId", "sourceKey", "name", "kind", "intervalSeconds", "regionCount", "avgDurationS", "activeSeconds", "activeSecondsPct", "projectedMonthly", "measuredMonthly7d", "divergenceRatio", "divergenceFlag", "runCount7d", "confirmationCount7d", "sandboxCount7d", "runCountRecent", "runCountPrior"]) {
+    for (const f of ["checkId", "sourceKey", "name", "kind", "intervalSeconds", "regionCount", "avgDurationS", "estimatedMonthly", "activeSeconds", "activeSecondsPct", "projectedMonthly", "measuredMonthly7d", "divergenceRatio", "divergenceFlag", "runCount7d", "confirmationCount7d", "sandboxCount7d", "runCountRecent", "runCountPrior"]) {
       expect(rows[0], `check row has ${f}`).toHaveProperty(f);
     }
     const rep = await withRealResponse(raw, () => getCostReport());
@@ -69,6 +70,7 @@ test.describe("API contract — /reports/cost mapper vs the real response", () =
       expect(m!.interval_seconds).toBe(Number(rr.intervalSeconds));
       expect(m!.region_count).toBe(Number(rr.regionCount)); // the literal region multiplier
       expect(m!.avg_duration_s).toBe(rr.avgDurationS == null ? null : Number(rr.avgDurationS)); // null preserved (no runs) — never a fake 0
+      expect(m!.estimated_monthly).toBe(rr.estimatedMonthly == null ? null : Number(rr.estimatedMonthly)); // 0091 — primary $, null-safe
       expect(m!.active_seconds).toBe(Number(rr.activeSeconds)); // 0089 — attributable compute
       expect(m!.active_seconds_pct).toBe(rr.activeSecondsPct == null ? null : Number(rr.activeSecondsPct)); // 0089 — share, null-safe
       expect(m!.projected_monthly).toBe(Number(rr.projectedMonthly));

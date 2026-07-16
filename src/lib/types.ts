@@ -609,12 +609,13 @@ export interface CostCheck {
   avg_duration_s: number | null;
   /** ★ 0089 — the HONEST per-monitor metric: Σ measured active-seconds over 7d (the attributable compute). */
   active_seconds: number;
-  /** ★ 0089 — this monitor's share of FLEET compute (% of fleet active-seconds); null when no monitor ran in
-   *  the window. This RANKS the breakdown — a proportion cancels the systematic error the per-monitor $ carried
-   *  (per-subscription free grant + non-ACA line items), so it is attributable where a dollar is not. */
+  /** ★ 0091 — the PRIMARY per-monitor $ (restored): free-grant-aware, Σ = the reconcile anchor. null when the
+   *  monitor had no runs (never a fake $0). Labeled "est." — an estimate with the free-grant math behind it. */
+  estimated_monthly: number | null;
+  /** ★ 0089 — this monitor's SHARE of fleet compute (% of active-seconds); null when no monitor ran. Shown as
+   *  a SECONDARY signal BESIDE the dollar (a proportion is attributable; a per-monitor dollar is an estimate). */
   active_seconds_pct: number | null;
-  /** ★ DEMOTED (staged deletion): the old modeled from-zero $ — kept on the wire, shown only as a labeled
-   *  secondary "steady-state estimate", NEVER as the headline (the headline is Azure's actual number). */
+  /** from-zero $ (the compute weight / drift reference) — no longer the displayed per-monitor figure. */
   projected_monthly: number;
   measured_monthly_7d: number;
   /** measured/projected; null when projected is 0 / no runs. ★ This is a PURE run-count ratio: since
@@ -663,8 +664,11 @@ export interface CostReport {
   /** ★ The HONEST dollar headline: Azure's ACTUAL MTD + forecast (pulled, not modeled). null = absent/stale →
    *  the panel shows a "see Azure Cost Management" deep-link fallback, NEVER a fabricated $0. */
   azure: AzureCost | null;
-  /** ★ DEMOTED: the fleet modeled projection — shown as a labeled secondary beside Azure's number, and as a
-   *  drift check (modeled vs Azure), NEVER as the headline. */
+  /** ★ 0091 — the fleet ESTIMATE the per-monitor dollars sum to: the reconcile anchor (grant-corrected fleet
+   *  total, or a pinned target). Shown as the labeled "steady-state estimate" secondary beside Azure's actual,
+   *  and as the drift check (estimate vs Azure forecast). Stands alone (no dependency on the Azure block). */
+  estimated_monthly_total: number;
+  /** from-zero fleet total (drift reference) — NOT the displayed estimate. */
   total_projected_monthly: number;
   total_measured_monthly: number;
   /** Top-N monitors by projected cost — #229's insight: WHICH monitors dominate is the actionable part. */
