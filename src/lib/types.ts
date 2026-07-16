@@ -607,6 +607,14 @@ export interface CostCheck {
   region_count: number;
   /** avg(duration_ms)/1000 over the last 7d; null = no runs in the window (→ projection can't be computed). */
   avg_duration_s: number | null;
+  /** ★ 0089 — the HONEST per-monitor metric: Σ measured active-seconds over 7d (the attributable compute). */
+  active_seconds: number;
+  /** ★ 0089 — this monitor's share of FLEET compute (% of fleet active-seconds); null when no monitor ran in
+   *  the window. This RANKS the breakdown — a proportion cancels the systematic error the per-monitor $ carried
+   *  (per-subscription free grant + non-ACA line items), so it is attributable where a dollar is not. */
+  active_seconds_pct: number | null;
+  /** ★ DEMOTED (staged deletion): the old modeled from-zero $ — kept on the wire, shown only as a labeled
+   *  secondary "steady-state estimate", NEVER as the headline (the headline is Azure's actual number). */
   projected_monthly: number;
   measured_monthly_7d: number;
   /** measured/projected; null when projected is 0 / no runs. ★ This is a PURE run-count ratio: since
@@ -628,6 +636,23 @@ export interface CostCheck {
   run_count_prior: number;
 }
 
+/**
+ * The Azure Cost Management figures the runner PULLS (azure_cost, 0090) and the API serves VERBATIM — Azure's
+ * ACTUAL bill for the RG scope, not a modeled number. ★ The whole object is NULL on the wire when we couldn't
+ * reach Cost Management (no pull cached / role not propagated / API error) OR the cached figure is for a past
+ * billing month (stale). null ≠ 0 ≠ small: the panel renders absence as a portal deep-link fallback, never $0.
+ */
+export interface AzureCost {
+  scope: string; // e.g. 'resourceGroups/synthwatch-rg' — the query scope the figures cover
+  currency: string; // ISO currency Azure reported (e.g. 'USD')
+  billing_month: string; // 'YYYY-MM-01' — the month these figures cover
+  mtd_actual: number; // month-to-date ACTUAL cost, all meters in scope
+  mtd_days: number; // days elapsed in the billing month at fetch (the ramp denominator)
+  forecast_month: number | null; // Azure's OWN end-of-month forecast; null when none returned
+  portal_url: string; // deep link to Cost Management for the scope
+  fetched_at: string; // ISO — when the runner pulled it ("as of" + staleness)
+}
+
 export interface CostReport {
   generated_at: string;
   /** $/active-second used for this response — DERIVED (two ACA meters × the live allocation), echoed so the
@@ -635,6 +660,11 @@ export interface CostReport {
   rate_used: number;
   rate_source: string;
   rate_set_date: string;
+  /** ★ The HONEST dollar headline: Azure's ACTUAL MTD + forecast (pulled, not modeled). null = absent/stale →
+   *  the panel shows a "see Azure Cost Management" deep-link fallback, NEVER a fabricated $0. */
+  azure: AzureCost | null;
+  /** ★ DEMOTED: the fleet modeled projection — shown as a labeled secondary beside Azure's number, and as a
+   *  drift check (modeled vs Azure), NEVER as the headline. */
   total_projected_monthly: number;
   total_measured_monthly: number;
   /** Top-N monitors by projected cost — #229's insight: WHICH monitors dominate is the actionable part. */

@@ -62,6 +62,7 @@ import type {
   SloReport,
   CostReport,
   CostCheck,
+  AzureCost,
   DeploysReport,
   EgressReport,
   EgressWindow,
@@ -2491,7 +2492,9 @@ function mapCostCheck(r: Record<string, unknown>): CostCheck {
     interval_seconds: num(r.intervalSeconds),
     region_count: num(r.regionCount),
     avg_duration_s: nul(r.avgDurationS), // null = no runs in window → projection unavailable (never a fake 0)
-    projected_monthly: num(r.projectedMonthly),
+    active_seconds: num(r.activeSeconds), // 0089 — attributable compute (Σ 7d active-seconds)
+    active_seconds_pct: nul(r.activeSecondsPct), // 0089 — % of fleet; null when fleet total is 0 (never a fake 0%)
+    projected_monthly: num(r.projectedMonthly), // DEMOTED modeled $ (secondary, never the headline)
     measured_monthly_7d: num(r.measuredMonthly7d),
     divergence_ratio: nul(r.divergenceRatio),
     divergence_flag: Boolean(r.divergenceFlag),
@@ -2519,10 +2522,28 @@ export async function getCostReport(): Promise<CostReport | null> {
     rate_used: Number(raw?.rateUsed ?? 0),
     rate_source: String(raw?.rateSource ?? ""),
     rate_set_date: String(raw?.rateSetDate ?? ""),
+    azure: mapAzureCost(raw?.azure), // ★ null preserved → the panel shows the deep-link fallback, never a fake $0
     total_projected_monthly: Number(raw?.totalProjectedMonthly ?? 0),
     total_measured_monthly: Number(raw?.totalMeasuredMonthly ?? 0),
     top_cost_drivers: arr(raw?.topCostDrivers),
     checks: arr(raw?.checks),
+  };
+}
+
+/** Map the Azure block, PRESERVING absence: a null/absent block on the wire → null here (never a fabricated
+ *  zero-cost object). The panel keys its "Cost data unavailable" fallback on exactly this null. */
+function mapAzureCost(v: unknown): AzureCost | null {
+  if (v == null || typeof v !== "object") return null;
+  const a = v as Record<string, unknown>;
+  return {
+    scope: String(a.scope ?? ""),
+    currency: String(a.currency ?? "USD"),
+    billing_month: String(a.billingMonth ?? ""),
+    mtd_actual: Number(a.mtdActual ?? 0),
+    mtd_days: Number(a.mtdDays ?? 0),
+    forecast_month: a.forecastMonth == null ? null : Number(a.forecastMonth),
+    portal_url: String(a.portalUrl ?? ""),
+    fetched_at: String(a.fetchedAt ?? ""),
   };
 }
 

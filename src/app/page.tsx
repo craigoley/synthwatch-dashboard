@@ -153,10 +153,11 @@ function StatusGrid() {
     return map;
   }, [sla24h]);
 
-  // Per-check projected $/mo from /reports/cost (no per-card compute, no API change — recon 2026-07-08).
+  // Per-check COMPUTE SHARE (% of fleet active-seconds, 0089) from /reports/cost — the attributable metric the
+  // card shows in place of the old per-monitor $ (Azure bills the fleet, not per monitor).
   const costByCheck = useMemo(() => {
-    const map = new Map<number, number>();
-    for (const c of costReport?.checks ?? []) map.set(c.check_id, c.projected_monthly);
+    const map = new Map<number, number | null>();
+    for (const c of costReport?.checks ?? []) map.set(c.check_id, c.active_seconds_pct);
     return map;
   }, [costReport]);
   const costLabel = costReport ? costEstimateLabel(costReport) : undefined;
@@ -332,7 +333,7 @@ function StatusGrid() {
                 check={c}
                 availability={sla?.pct ?? null}
                 availabilityInsufficient={sla?.insufficient ?? false}
-                projectedCost={costByCheck.get(c.id) ?? null}
+                computeSharePct={costByCheck.get(c.id) ?? null}
                 costEstimateLabel={costLabel}
               />
             );
