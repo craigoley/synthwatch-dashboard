@@ -106,6 +106,24 @@ test.describe("cost panel — Azure headline + per-monitor dollar breakdown", ()
     await expect(page.getByTestId("fleet-cost-dollar-30")).not.toContainText("$0.00");
   });
 
+  // ★ absent-vs-zero, one more time: a monitor that RAN but rounds below a cent must read "<$0.01", NOT "$0.00"
+  // (which reads as FREE). A no-DATA monitor keeps "—". Prove-can-fail: the sub-cent row must NOT render "$0.00".
+  test("★ ran-but-sub-cent monitor shows '<$0.01', not a lying '$0.00' — '—' absent state untouched", async ({ page }) => {
+    const subcent = costCheck({ checkId: 1, name: "cert-expiry", kind: "http", estimatedMonthly: 0, activeSecondsPct: 0.05 }); // ran, share sub-cent → API rounds $ to 0
+    const normal = costCheck({ checkId: 2, name: "shop-flow", kind: "browser", estimatedMonthly: 12.5, activeSecondsPct: 40 });
+    const absent = costCheck({ checkId: 3, name: "paused", kind: "http", estimatedMonthly: null, activeSecondsPct: null }); // didn't run
+    await mockApi(page, costWorld([subcent, normal, absent]));
+    await page.goto("/reports?tab=cost");
+    // ran-but-tiny → "<$0.01/mo", and MUST NOT read "$0.00" (the lie)
+    await expect(page.getByTestId("fleet-cost-dollar-1")).toContainText("<$0.01/mo");
+    await expect(page.getByTestId("fleet-cost-dollar-1")).not.toContainText("$0.00");
+    // a normal monitor still shows its dollar
+    await expect(page.getByTestId("fleet-cost-dollar-2")).toContainText("$12.50/mo");
+    // ★ the absent state is UNTOUCHED — no-data still "—", never "<$0.01" or "$0.00"
+    await expect(page.getByTestId("fleet-cost-dollar-3")).toContainText("—");
+    await expect(page.getByTestId("fleet-cost-dollar-3")).not.toContainText("$");
+  });
+
   test("★ NO TRUNCATION: EVERY active monitor renders — count matches, not a magic 8 (the #1 complaint)", async ({ page }) => {
     // 14 monitors — well past the old .slice(0,8). The row count must equal the monitor count.
     const checks = Array.from({ length: 14 }, (_, i) =>
