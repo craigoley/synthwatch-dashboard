@@ -54,6 +54,17 @@ export function sharePct(pct: number | null): string {
   return `${pct.toFixed(pct < 10 ? 1 : 0)}%`;
 }
 
+/** The per-monitor estimate label — the absent-vs-zero distinction, honestly:
+ *   null  = the monitor DIDN'T run → "—" (honest-absent).
+ *   0     = it RAN but the estimate rounds below a cent → "<$0.01/mo" (NOT free — the API sends null, not 0,
+ *           when there are no runs, so an exact 0 means it ran and its share is sub-cent).
+ *   else  = its dollar. */
+export function estimatedLabel(est: number | null): string {
+  if (est == null) return "—";
+  if (est === 0) return "<$0.01/mo";
+  return `${money(est)}/mo`;
+}
+
 /** The estimate provenance line, read from the endpoint's echoed rate (never hardcoded). */
 export function costEstimateLabel(r: CostReport): string {
   return `Estimate · rate $${r.rate_used}/active-s (${r.rate_source}, set ${r.rate_set_date}). The Azure bill is ground truth.`;
@@ -285,7 +296,7 @@ export function FleetCostSummary() {
               <span className="flex shrink-0 items-baseline gap-2">
                 {/* PRIMARY: the dollar estimate */}
                 <span className="sw-mono text-[var(--color-ink)]" data-testid={`fleet-cost-dollar-${c.check_id}`}>
-                  {c.estimated_monthly == null ? "—" : `${money(c.estimated_monthly)}/mo`}
+                  {estimatedLabel(c.estimated_monthly)}
                 </span>
                 {/* SECONDARY: compute share, beside the dollar */}
                 <span
