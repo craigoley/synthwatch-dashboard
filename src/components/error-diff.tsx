@@ -385,6 +385,13 @@ export function ErrorDiff({ checkId, runId }: { checkId: number; runId?: number 
   const { data, error, isLoading, mutate } = useErrorDiff(checkId, runId);
   const { data: mutes, mutate: mutateMutes } = useErrorMutes(checkId);
 
+  // ★ Collapsed by DEFAULT. The panel now lives BELOW the Metrics section (moved down from primary
+  //   evidence) — a below-the-fold reference surface, not the 2am headline. Per-session React state
+  //   only: NO localStorage/sessionStorage (unsupported here, and a per-session default is correct).
+  //   The header keeps the new-error COUNT visible while collapsed (see below) — honest-render: hide
+  //   the detail, never the fact that new errors exist.
+  const [open, setOpen] = useState(false);
+
   // Revalidate BOTH reads after a mute/unmute so the row moves buckets + the notes stay in sync.
   const onChanged = async () => {
     await Promise.all([mutate(), mutateMutes()]);
@@ -415,38 +422,69 @@ export function ErrorDiff({ checkId, runId }: { checkId: number; runId?: number 
   const notesByFp = new Map((mutes ?? []).map((m) => [m.fingerprint, m.note] as const));
 
   return (
-    <Shell>
-      <p className="sw-mono mb-2 text-[11px] text-[var(--color-ink-faint)]" data-testid="error-diff-context">
-        {context}
-      </p>
-
-      <TruncationNote diff={data} />
-
-      {/* NEW — leads, always expanded (the regression signal). Each row can be muted (editor). */}
-      <div data-testid="error-diff-new">
-        <div className="mb-1 flex items-center gap-2">
-          <span className="text-[12px] font-semibold text-[var(--color-ink)]">New</span>
-          <span className="sw-mono text-[11px] text-[var(--color-ink-faint)]">
-            {newFirst} first-party{data.counts.new_third_party > 0 ? ` · ${data.counts.new_third_party} third-party` : ""}
+    <section className="sw-panel p-4" data-testid="error-diff">
+      {/* Real <button> header (a11y bar from #280): aria-expanded, focusable, Enter/Space toggles — the
+          ▸/▾ glyph alone never conveys state. Heading wraps the button, mirroring the Metrics disclosure. */}
+      <h3 className="text-sm font-semibold text-[var(--color-ink)]">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-controls="error-diff-body"
+          data-testid="error-diff-toggle"
+          className="flex w-full items-center gap-2 text-left"
+        >
+          <span aria-hidden className="text-[10px] text-[var(--color-ink-faint)]">{open ? "▾" : "▸"}</span>
+          Error diff
+          {/* ★ Count stays visible WHILE COLLAPSED so a closed panel still signals when there's something
+              worth expanding. `newFirst` = new FIRST-PARTY errors — the regression signal the whole panel
+              is built around; third-party tracker noise is deliberately NOT folded in here (counting it
+              would re-create the fatigue the panel fights). Colored fail when non-zero, faint at zero. */}
+          <span
+            data-testid="error-diff-new-count"
+            className="sw-mono text-[12px] font-normal"
+            style={{ color: newFirst > 0 ? TONE_VAR.fail : "var(--color-ink-faint)" }}
+          >
+            ({newFirst} new)
           </span>
-        </div>
-        {data.new_errors.length === 0 ? (
-          <p className="text-[12px] text-[var(--color-pass)]" data-testid="error-diff-empty">
-            ✓ No new errors vs the last {runs} run{runs === 1 ? "" : "s"}.
-          </p>
-        ) : (
-          <Bucket
-            items={data.new_errors}
-            testId="error-diff-new-body"
-            renderAction={(i) => <MuteControl checkId={checkId} item={i} onChanged={onChanged} />}
-          />
-        )}
-      </div>
+        </button>
+      </h3>
 
-      <MutedDisclosure checkId={checkId} items={data.muted} notesByFp={notesByFp} onChanged={onChanged} />
-      <CollapsedBucket label="Persistent" items={data.persistent} testId="error-diff-persistent" />
-      <CollapsedBucket label="Resolved" items={data.resolved} testId="error-diff-resolved" />
-    </Shell>
+      {open && (
+        <div id="error-diff-body" className="mt-2">
+          <p className="sw-mono mb-2 text-[11px] text-[var(--color-ink-faint)]" data-testid="error-diff-context">
+            {context}
+          </p>
+
+          <TruncationNote diff={data} />
+
+          {/* NEW — leads, always expanded within the panel (the regression signal). Each row can be muted. */}
+          <div data-testid="error-diff-new">
+            <div className="mb-1 flex items-center gap-2">
+              <span className="text-[12px] font-semibold text-[var(--color-ink)]">New</span>
+              <span className="sw-mono text-[11px] text-[var(--color-ink-faint)]">
+                {newFirst} first-party{data.counts.new_third_party > 0 ? ` · ${data.counts.new_third_party} third-party` : ""}
+              </span>
+            </div>
+            {data.new_errors.length === 0 ? (
+              <p className="text-[12px] text-[var(--color-pass)]" data-testid="error-diff-empty">
+                ✓ No new errors vs the last {runs} run{runs === 1 ? "" : "s"}.
+              </p>
+            ) : (
+              <Bucket
+                items={data.new_errors}
+                testId="error-diff-new-body"
+                renderAction={(i) => <MuteControl checkId={checkId} item={i} onChanged={onChanged} />}
+              />
+            )}
+          </div>
+
+          <MutedDisclosure checkId={checkId} items={data.muted} notesByFp={notesByFp} onChanged={onChanged} />
+          <CollapsedBucket label="Persistent" items={data.persistent} testId="error-diff-persistent" />
+          <CollapsedBucket label="Resolved" items={data.resolved} testId="error-diff-resolved" />
+        </div>
+      )}
+    </section>
   );
 }
 

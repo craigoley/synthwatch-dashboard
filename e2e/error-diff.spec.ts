@@ -21,6 +21,16 @@ function worldWithDiff(diff: RawObj) {
   return w;
 }
 
+// The panel is now COLLAPSED BY DEFAULT (moved below Metrics — a below-the-fold reference surface). Every
+// test that reads its detail (context/buckets/truncation) must open it first via the header toggle.
+async function expandDiff(page: import("@playwright/test").Page) {
+  const panel = page.getByTestId("error-diff");
+  await expect(panel).toBeVisible();
+  const toggle = panel.getByTestId("error-diff-toggle");
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+}
+
 const FULL_DIFF: RawObj = {
   checkId: 1, runId: 946553, runStartedAt: "2026-07-11T23:57:19Z", location: "eastus2",
   baselineRunIds: [946000, 946100, 946200, 946300],
@@ -38,10 +48,76 @@ const FULL_DIFF: RawObj = {
   truncated: true, baselineRunCount: 4,
 };
 
+// ★ Placement + collapse contract: the panel MOVED below the Metrics section (a below-the-fold reference
+// surface, not primary evidence), is collapsed by default, and keeps the "(N new)" first-party count
+// visible while collapsed so the regression signal is never re-buried. Header is a real keyboard button.
+test.describe("monitor detail — error-diff placement + collapse", () => {
+  test("★ renders BELOW the Metrics section (moved down from primary evidence)", async ({ page }) => {
+    await mockApi(page, worldWithDiff(FULL_DIFF));
+    await page.goto("/checks/1");
+
+    await expect(page.getByTestId("error-diff")).toBeVisible();
+    // DOM order: metrics-section must precede error-diff. (Both elements always render for a browser check.)
+    const metricsBeforeDiff = await page.evaluate(() => {
+      const m = document.querySelector('[data-testid="metrics-section"]');
+      const e = document.querySelector('[data-testid="error-diff"]');
+      if (!m || !e) return null;
+      return !!(m.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    expect(metricsBeforeDiff).toBe(true);
+  });
+
+  test("★ collapsed by default; '(N new)' count shows WHILE collapsed; click expands; keyboard toggles", async ({ page }) => {
+    await mockApi(page, worldWithDiff(FULL_DIFF));
+    await page.goto("/checks/1");
+
+    const panel = page.getByTestId("error-diff");
+    const toggle = panel.getByTestId("error-diff-toggle");
+    const count = panel.getByTestId("error-diff-new-count");
+
+    // collapsed by default — the body is NOT in the DOM, but the count IS (3 first-party new in FULL_DIFF).
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(panel.getByTestId("error-diff-new")).toHaveCount(0);
+    await expect(count).toBeVisible();
+    await expect(count).toHaveText(/\(3 new\)/);
+
+    // click expands — the NEW detail body appears; the count stays.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(panel.getByTestId("error-diff-new-body")).toBeVisible();
+    await expect(count).toBeVisible();
+
+    // keyboard: focus the header button, Enter collapses, Space re-expands (the #280 a11y bar).
+    await toggle.focus();
+    await page.keyboard.press("Enter");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(panel.getByTestId("error-diff-new")).toHaveCount(0);
+    // ★ the load-bearing assertion: the count is STILL visible while collapsed.
+    await expect(count).toBeVisible();
+    await expect(count).toHaveText(/\(3 new\)/);
+    await page.keyboard.press(" ");
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("★ the count-while-collapsed assertion CAN FAIL — a zero-new diff reads (0 new), not (3 new)", async ({ page }) => {
+    // Proves the count is data-derived, not a constant: with no new errors it reads (0 new), so a test
+    // asserting "(3 new)" here would go red. The count reflects the actual first-party new-error total.
+    const zero: RawObj = { ...FULL_DIFF, new: [], counts: { ...(FULL_DIFF.counts as RawObj), newFirstParty: 0, newThirdParty: 0 } };
+    await mockApi(page, worldWithDiff(zero));
+    await page.goto("/checks/1");
+
+    const count = page.getByTestId("error-diff").getByTestId("error-diff-new-count");
+    await expect(count).toBeVisible(); // shown even collapsed
+    await expect(count).toHaveText(/\(0 new\)/);
+    await expect(count).not.toHaveText(/\(3 new\)/);
+  });
+});
+
 test.describe("monitor detail — error-diff panel", () => {
   test("NEW leads, first-party severity-sorted, third-party behind a counted toggle, truncation flagged", async ({ page }) => {
     await mockApi(page, worldWithDiff(FULL_DIFF));
     await page.goto("/checks/1");
+    await expandDiff(page);
 
     const panel = page.getByTestId("error-diff");
     await expect(panel).toBeVisible();
@@ -76,6 +152,7 @@ test.describe("monitor detail — error-diff panel", () => {
     const empty: RawObj = { ...FULL_DIFF, new: [], counts: { ...(FULL_DIFF.counts as RawObj), newFirstParty: 0, newThirdParty: 0 }, truncated: false };
     await mockApi(page, worldWithDiff(empty));
     await page.goto("/checks/1");
+    await expandDiff(page);
 
     await expect(page.getByTestId("error-diff-empty")).toContainText(/no new errors/i);
     await expect(page.getByTestId("error-diff-empty")).toContainText("last 4 runs");
@@ -85,6 +162,7 @@ test.describe("monitor detail — error-diff panel", () => {
   test("P4: a NEW error shows the deploy it first appeared after (correlation)", async ({ page }) => {
     await mockApi(page, worldWithDiff(FULL_DIFF));
     await page.goto("/checks/1");
+    await expandDiff(page);
 
     // The 5xx row carries firstSeenAfterDeploy → the panel renders "first seen after deploy abc1234 · …".
     const deploy = page.getByTestId("error-diff-new-body").getByTestId("ediff-deploy").first();
@@ -95,6 +173,7 @@ test.describe("monitor detail — error-diff panel", () => {
   test("P4: mute a NEW error → it leaves NEW, shows in the muted disclosure, unmute restores it", async ({ page }) => {
     await mockApi(page, worldWithDiff(FULL_DIFF)); // seeded editor → mute controls visible
     await page.goto("/checks/1");
+    await expandDiff(page);
 
     const newBody = page.getByTestId("error-diff-new-body");
     await expect(newBody.getByTestId("ediff-row")).toHaveCount(3);
@@ -142,6 +221,7 @@ test.describe("monitor detail — error-diff truncation, by class", () => {
     const diff: RawObj = { ...FULL_DIFF, truncated: true, firstPartyTruncated: true, droppedThirdParty: 12 };
     await mockApi(page, worldWithDiff(diff));
     await page.goto("/checks/1");
+    await expandDiff(page);
 
     const note = page.getByTestId("error-diff-truncated");
     await expect(note).toContainText(/first-party errors were dropped/i);
@@ -153,6 +233,7 @@ test.describe("monitor detail — error-diff truncation, by class", () => {
     const diff: RawObj = { ...FULL_DIFF, truncated: true, firstPartyTruncated: false, droppedThirdParty: 7 };
     await mockApi(page, worldWithDiff(diff));
     await page.goto("/checks/1");
+    await expandDiff(page);
 
     const note = page.getByTestId("error-diff-truncated-third-party");
     await expect(note).toContainText("7 third-party errors were dropped");
@@ -164,6 +245,7 @@ test.describe("monitor detail — error-diff truncation, by class", () => {
     const diff: RawObj = { ...FULL_DIFF, truncated: true, firstPartyTruncated: false, droppedThirdParty: 1 };
     await mockApi(page, worldWithDiff(diff));
     await page.goto("/checks/1");
+    await expandDiff(page);
 
     await expect(page.getByTestId("error-diff-truncated-third-party")).toContainText("1 third-party error was dropped");
   });
@@ -173,6 +255,7 @@ test.describe("monitor detail — error-diff truncation, by class", () => {
     // capture was complete, so it must stay LOUD — the calm "complete" copy would be a fake-healthy claim.
     await mockApi(page, worldWithDiff({ ...FULL_DIFF, truncated: true }));
     await page.goto("/checks/1");
+    await expandDiff(page);
 
     await expect(page.getByTestId("error-diff-truncated")).toContainText(/some errors were dropped/i);
     await expect(page.getByTestId("error-diff-truncated")).toContainText(/incomplete/i);
