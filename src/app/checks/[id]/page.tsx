@@ -710,20 +710,6 @@ export default function CheckDetailPage() {
         <StepChainPanel steps={check.steps ?? []} latest={recent_runs[0] ?? null} />
       )}
 
-      {/* Error diff (P3) — "what's newly broken since the last runs?" Browser/multistep only (trace-derived
-          error signals); self-hides (404) until a run has signals.
-          ★ Pass-2 fix: scope to the most recent FAILED run, not the latest run. The latest run is usually
-          PASSING, so this panel used to diff a passing run and sit under a green PASS badge — "right
-          evidence, wrong event", actively misleading. Now it shows the FAILURE's new errors (falling back to
-          the latest run only when nothing recent failed). Chosen over deleting the panel, which would drop
-          the mute + persistent/resolved review it also carries. */}
-      {(check.kind === "browser" || check.kind === "multistep") && (
-        <ErrorDiff
-          checkId={check.id}
-          runId={(recent_runs.find((r) => r.status === "fail" || r.status === "error") ?? recent_runs[0])?.id ?? null}
-        />
-      )}
-
       {/* Model-B credential editor (Step C). Editor-only (canWrite); the API also nulls the masked slots for
           a non-write session, so a viewer never sees it. Write-only: values are set, never read back. */}
       <CredentialsPanel check={check} />
@@ -792,6 +778,21 @@ export default function CheckDetailPage() {
           </div>
         )}
       </section>
+
+      {/* Error diff (P3) — "what's newly broken since the last runs?" Browser/multistep only (trace-derived
+          error signals); self-hides (404) until a run has signals.
+          ★ Scope: the most recent FAILED run, not the latest (usually PASSING) run — so it shows the
+          FAILURE's new errors, not a green run's, falling back to the latest run only when nothing recent
+          failed (the #279/Pass-2 fix — see PR body for the below-Metrics placement tradeoff).
+          ★ Placement: MOVED here, directly below Metrics. It is collapsed-by-default now (a below-the-fold
+          reference panel), and its header keeps the "(N new)" first-party count visible while collapsed so
+          the regression signal is never re-buried. */}
+      {(check.kind === "browser" || check.kind === "multistep") && (
+        <ErrorDiff
+          checkId={check.id}
+          runId={(recent_runs.find((r) => r.status === "fail" || r.status === "error") ?? recent_runs[0])?.id ?? null}
+        />
+      )}
 
       {/* Browser checks: the last-known-good success trace (baseline to diff against failures).
           Hidden until the monitor has had a success (success_trace_at set). */}
