@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { CheckWithStatus } from "@/lib/types";
 import { StatusBadge, TONE_VAR } from "@/components/status-badge";
 import { Sparkline } from "@/components/sparkline";
-import { money } from "@/components/cost";
+import { sharePct } from "@/components/cost";
 import { TagChips } from "@/components/tag-chips";
 import { EnvBadge } from "@/components/env-badge";
 import { AvailabilityValue } from "@/components/sla";
@@ -27,14 +27,15 @@ export function CheckCard({
   check,
   availability = null,
   availabilityInsufficient = false,
-  projectedCost = null,
+  computeSharePct = null,
   costEstimateLabel,
 }: {
   check: CheckWithStatus;
   availability?: number | null;
   availabilityInsufficient?: boolean;
-  /** Projected $/mo from /reports/cost (null when the endpoint is absent or the check has no cost row, e.g. paused). */
-  projectedCost?: number | null;
+  /** ★ This monitor's SHARE of fleet compute (% of active-seconds, 0089) — the attributable metric, replacing
+   *  the old per-monitor $ (false precision on a per-subscription free grant). null = no cost row / paused. */
+  computeSharePct?: number | null;
   /** The endpoint's echoed rate label (tooltip) — never hardcoded (rate provenance from /reports/cost). */
   costEstimateLabel?: string;
 }) {
@@ -191,14 +192,15 @@ export function CheckCard({
         </span>
         <span className="flex shrink-0 items-center gap-2">
           <span className="sw-mono text-[11px] text-[var(--color-ink-faint)]">{check.runs_24h} runs/24h</span>
-          {/* Per-monitor projected compute cost (est.) — from /reports/cost; self-hides when absent (e.g. paused). */}
-          {projectedCost != null && projectedCost > 0 && (
+          {/* Per-monitor COMPUTE SHARE (% of fleet active-seconds) — from /reports/cost; self-hides when absent
+              (e.g. paused / no runs). Replaces the old per-monitor $ (Azure bills the fleet, not per monitor). */}
+          {computeSharePct != null && computeSharePct > 0 && (
             <span
               className="sw-mono text-[11px] text-[var(--color-ink-dim)]"
               data-testid={`card-cost-${check.id}`}
-              title={costEstimateLabel ?? "estimated monthly compute cost"}
+              title={costEstimateLabel ?? "share of fleet compute (active-seconds), not a billed amount"}
             >
-              · ~{money(projectedCost)}/mo est.
+              · {sharePct(computeSharePct)} compute
             </span>
           )}
         </span>

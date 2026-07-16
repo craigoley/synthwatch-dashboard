@@ -28,7 +28,7 @@ async function withRealResponse<T>(body: unknown, fn: () => Promise<T>): Promise
 test.describe("API contract — /reports/cost mapper vs the real response", () => {
   test("aggregate + rate provenance mapped by the real field names", async () => {
     const raw = real("reports_cost");
-    for (const f of ["generatedAt", "rateUsed", "rateSource", "rateSetDate", "totalProjectedMonthly", "totalMeasuredMonthly", "topCostDrivers", "checks"]) {
+    for (const f of ["generatedAt", "rateUsed", "rateSource", "rateSetDate", "azure", "totalProjectedMonthly", "totalMeasuredMonthly", "topCostDrivers", "checks"]) {
       expect(raw, `report has ${f}`).toHaveProperty(f);
     }
     const rep = await withRealResponse(raw, () => getCostReport());
@@ -40,13 +40,26 @@ test.describe("API contract — /reports/cost mapper vs the real response", () =
     expect(rep!.total_measured_monthly).toBe(Number(raw.totalMeasuredMonthly));
     expect(rep!.checks.length).toBe(raw.checks.length);
     expect(rep!.top_cost_drivers.length).toBe(raw.topCostDrivers.length);
+
+    // ★ The Azure headline block (0090) — the honest dollar figure the panel DISPLAYS. Pin its field names so
+    // the mapper can't silently drift; a null block (absent pull) maps to null (proven in the mapper unit).
+    const az = raw.azure as Record<string, unknown>;
+    for (const f of ["scope", "currency", "billingMonth", "mtdActual", "mtdDays", "forecastMonth", "portalUrl", "fetchedAt"]) {
+      expect(az, `azure block has ${f}`).toHaveProperty(f);
+    }
+    expect(rep!.azure).not.toBeNull();
+    expect(rep!.azure!.mtd_actual).toBe(Number(az.mtdActual));
+    expect(rep!.azure!.forecast_month).toBe(az.forecastMonth == null ? null : Number(az.forecastMonth));
+    expect(rep!.azure!.mtd_days).toBe(Number(az.mtdDays));
+    expect(rep!.azure!.portal_url).toBe(az.portalUrl); // the fallback deep-link target
+    expect(rep!.azure!.fetched_at).toBe(az.fetchedAt); // the "as of" + staleness source
   });
 
   test("per-check row mapped by the real field names (avgDurationS null-safe, divergence flag)", async () => {
     const raw = real("reports_cost");
     const rows = (raw.checks as Record<string, unknown>[]);
     expect(rows.length, "capture has ≥1 check").toBeGreaterThan(0);
-    for (const f of ["checkId", "sourceKey", "name", "kind", "intervalSeconds", "regionCount", "avgDurationS", "projectedMonthly", "measuredMonthly7d", "divergenceRatio", "divergenceFlag", "runCount7d", "confirmationCount7d", "sandboxCount7d", "runCountRecent", "runCountPrior"]) {
+    for (const f of ["checkId", "sourceKey", "name", "kind", "intervalSeconds", "regionCount", "avgDurationS", "activeSeconds", "activeSecondsPct", "projectedMonthly", "measuredMonthly7d", "divergenceRatio", "divergenceFlag", "runCount7d", "confirmationCount7d", "sandboxCount7d", "runCountRecent", "runCountPrior"]) {
       expect(rows[0], `check row has ${f}`).toHaveProperty(f);
     }
     const rep = await withRealResponse(raw, () => getCostReport());
@@ -56,6 +69,8 @@ test.describe("API contract — /reports/cost mapper vs the real response", () =
       expect(m!.interval_seconds).toBe(Number(rr.intervalSeconds));
       expect(m!.region_count).toBe(Number(rr.regionCount)); // the literal region multiplier
       expect(m!.avg_duration_s).toBe(rr.avgDurationS == null ? null : Number(rr.avgDurationS)); // null preserved (no runs) — never a fake 0
+      expect(m!.active_seconds).toBe(Number(rr.activeSeconds)); // 0089 — attributable compute
+      expect(m!.active_seconds_pct).toBe(rr.activeSecondsPct == null ? null : Number(rr.activeSecondsPct)); // 0089 — share, null-safe
       expect(m!.projected_monthly).toBe(Number(rr.projectedMonthly));
       expect(m!.divergence_flag).toBe(Boolean(rr.divergenceFlag));
       expect(m!.run_count_7d).toBe(Number(rr.runCount7d)); // 0078 attribution counts mapped
