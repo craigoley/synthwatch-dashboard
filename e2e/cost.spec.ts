@@ -17,7 +17,7 @@ const AZURE = (o: RawObj = {}): RawObj => ({
 });
 const costCheck = (o: RawObj): RawObj => ({
   checkId: 0, sourceKey: null, name: "monitor", kind: "browser", intervalSeconds: 900, regionCount: 3,
-  avgDurationS: 20, activeSeconds: 100, activeSecondsPct: 10,
+  avgDurationS: 20, estimatedMonthly: 5, activeSeconds: 100, activeSecondsPct: 10,
   projectedMonthly: 5, measuredMonthly7d: 5, divergenceRatio: 1.0, divergenceFlag: false, ...o,
 });
 // opts.azure: omit → a populated block; pass `null` → the honest-absent (fallback) path.
@@ -28,15 +28,16 @@ function costWorld(checks: RawObj[], opts: { azure?: RawObj | null } & RawObj = 
     generatedAt: "2026-07-08T12:00:00Z", rateUsed: RATE,
     rateSource: "ACA Consumption active meters (2.0 vCPU / 4 GiB)", rateSetDate: "2026-07-08",
     azure: azure === undefined ? AZURE() : azure,
-    totalProjectedMonthly: 67.42, totalMeasuredMonthly: 71.1,
+    estimatedMonthlyTotal: 79.93, // 0091 — the grant-corrected fleet estimate (the labeled secondary + drift)
+    totalProjectedMonthly: 85.33, totalMeasuredMonthly: 88.41,
     topCostDrivers: checks, checks, ...agg,
   };
   return w;
 }
 
-test.describe("cost panel — Azure headline + compute-share breakdown", () => {
-  test("fleet Cost tab: Azure MTD/forecast headline + share breakdown; GONE from home", async ({ page }) => {
-    await mockApi(page, costWorld([costCheck({ checkId: 77, name: "wegmans-recipe-nav", activeSecondsPct: 22 })]));
+test.describe("cost panel — Azure headline + per-monitor dollar breakdown", () => {
+  test("fleet Cost tab: Azure headline + per-monitor $ (primary) + share (secondary); GONE from home", async ({ page }) => {
+    await mockApi(page, costWorld([costCheck({ checkId: 77, name: "wegmans-recipe-nav", estimatedMonthly: 17.5, activeSecondsPct: 22 })]));
 
     await page.goto("/"); // ★ not on home
     await expect(page.getByTestId("fleet-cost-summary")).toHaveCount(0);
@@ -47,27 +48,27 @@ test.describe("cost panel — Azure headline + compute-share breakdown", () => {
     await expect(page.getByTestId("fleet-cost-azure-mtd")).toContainText("$47.17");
     await expect(page.getByTestId("fleet-cost-azure-forecast")).toContainText("$76.30");
     await expect(page.getByTestId("fleet-cost-azure-asof")).toContainText(/as of/i);
-    // 2 — breakdown = compute share
+    // 2 — breakdown = the DOLLAR (primary) with the share beside it (secondary)
     await expect(page.getByTestId("cost-driver-77")).toContainText("wegmans-recipe-nav");
+    await expect(page.getByTestId("fleet-cost-dollar-77")).toContainText("$17.50/mo");
     await expect(page.getByTestId("fleet-cost-share-77")).toContainText("22%");
-    await expect(page.getByTestId("fleet-cost-share-note")).toContainText(/fleet compute/i);
   });
 
   test("★ the HEADLINE is Azure's number, not the modeled estimate (which is demoted to a labeled secondary)", async ({ page }) => {
     await mockApi(page, costWorld([costCheck({ checkId: 1 })]));
     await page.goto("/reports?tab=cost");
-    // headline shows Azure MTD 47.17 — NOT the modeled fleet total 67.42
+    // headline shows Azure MTD 47.17 — NOT the modeled fleet total
     await expect(page.getByTestId("fleet-cost-azure-mtd")).toContainText("$47.17");
-    await expect(page.getByTestId("fleet-cost-azure-mtd")).not.toContainText("67.42");
-    // the modeled figure exists, but only as the labeled "steady-state estimate" secondary
+    await expect(page.getByTestId("fleet-cost-azure-mtd")).not.toContainText("79.93");
+    // the modeled figure exists, but only as the labeled "steady-state estimate" secondary (the grant-corrected total)
     await expect(page.getByTestId("fleet-cost-estimate")).toContainText(/steady-state estimate/i);
-    await expect(page.getByTestId("fleet-cost-estimate-value")).toContainText("$67.42");
-    // and it doubles as a drift check vs Azure's forecast (67.42 / 76.30 = 0.88×)
-    await expect(page.getByTestId("fleet-cost-drift")).toContainText("0.88× vs Azure forecast");
+    await expect(page.getByTestId("fleet-cost-estimate-value")).toContainText("$79.93");
+    // and it doubles as a drift check vs Azure's forecast (79.93 / 76.30 = 1.05×)
+    await expect(page.getByTestId("fleet-cost-drift")).toContainText("1.05× vs Azure forecast");
   });
 
-  test("★ azure ABSENT → deep-link fallback, NEVER a fabricated $0", async ({ page }) => {
-    await mockApi(page, costWorld([costCheck({ checkId: 1, name: "API health" })], { azure: null }));
+  test("★ azure ABSENT → deep-link fallback, NEVER a fabricated $0; the per-monitor dollars STILL render", async ({ page }) => {
+    await mockApi(page, costWorld([costCheck({ checkId: 1, name: "API health", estimatedMonthly: 3.5 })], { azure: null }));
     await page.goto("/reports?tab=cost");
     // the honest-absent state, visually distinct (dashed unavailable card), keyed on azure == null
     await expect(page.getByTestId("fleet-cost-azure-unavailable")).toBeVisible();
@@ -78,8 +79,9 @@ test.describe("cost panel — Azure headline + compute-share breakdown", () => {
     // ★ no fabricated $0 and no MTD number in the headline area — absent ≠ zero
     await expect(page.getByTestId("fleet-cost-azure-unavailable")).not.toContainText("$0.00");
     await expect(page.getByTestId("fleet-cost-azure-mtd")).toHaveCount(0);
-    // the modeled estimate still shows as the labeled secondary (never promoted to headline)
-    await expect(page.getByTestId("fleet-cost-estimate-value")).toContainText("$67.42");
+    // ★ the per-monitor dollars DO NOT depend on the Azure block — they render regardless
+    await expect(page.getByTestId("fleet-cost-dollar-1")).toContainText("$3.50/mo");
+    await expect(page.getByTestId("fleet-cost-estimate-value")).toContainText("$79.93");
   });
 
   test("stale pulled figure is SHOWN but flagged 'may be stale' — not silently presented as current", async ({ page }) => {
@@ -90,35 +92,38 @@ test.describe("cost panel — Azure headline + compute-share breakdown", () => {
     await expect(page.getByTestId("fleet-cost-azure-asof")).toContainText(/may be stale/i); // but flagged
   });
 
-  test("★ breakdown RANKS by compute share — the high-frequency low-share monitor sinks (the reorder IS the feature)", async ({ page }) => {
-    // deliberately passed in NON-share order; the UI must sort by share, not fetch order.
-    const dns = costCheck({ checkId: 10, name: "dns-check", kind: "dns", activeSecondsPct: 0.7, runCount7d: 9999 });
-    const shop = costCheck({ checkId: 20, name: "shop-flow", kind: "browser", activeSecondsPct: 60 });
-    const http = costCheck({ checkId: 30, name: "http-check", kind: "http", activeSecondsPct: 14 });
-    await mockApi(page, costWorld([dns, shop, http]));
+  test("★ breakdown RANKS by the DOLLAR estimate (primary); a no-runs monitor shows '—', never $0", async ({ page }) => {
+    // deliberately passed in NON-$ order; the UI must sort by the dollar.
+    const dns = costCheck({ checkId: 10, name: "dns-check", kind: "dns", estimatedMonthly: 0.18, activeSecondsPct: 0.7 });
+    const shop = costCheck({ checkId: 20, name: "shop-flow", kind: "browser", estimatedMonthly: 22.0, activeSecondsPct: 60 });
+    const norun = costCheck({ checkId: 30, name: "paused", kind: "http", estimatedMonthly: null, activeSecondsPct: null });
+    await mockApi(page, costWorld([dns, shop, norun]));
     await page.goto("/reports?tab=cost");
     const rows = page.getByTestId("fleet-cost-drivers").getByRole("listitem");
-    await expect(rows.nth(0)).toContainText("shop-flow"); // 60% — first
-    await expect(rows.nth(2)).toContainText("dns-check"); // 0.7% — LAST, though it fires the most (the point)
-    await expect(page.getByTestId("fleet-cost-share-10")).toContainText("0.7%");
+    await expect(rows.nth(0)).toContainText("shop-flow"); // $22 — first
+    await expect(page.getByTestId("fleet-cost-dollar-20")).toContainText("$22.00/mo");
+    await expect(page.getByTestId("fleet-cost-dollar-30")).toContainText("—"); // no runs → em-dash, NEVER $0.00
+    await expect(page.getByTestId("fleet-cost-dollar-30")).not.toContainText("$0.00");
   });
 
-  test("NO CLIENT CAP: every returned check renders in the breakdown (ranked by share)", async ({ page }) => {
-    const checks = Array.from({ length: 12 }, (_, i) =>
-      costCheck({ checkId: 100 + i, name: `driver-${i}`, activeSecondsPct: 12 - i })
+  test("★ NO TRUNCATION: EVERY active monitor renders — count matches, not a magic 8 (the #1 complaint)", async ({ page }) => {
+    // 14 monitors — well past the old .slice(0,8). The row count must equal the monitor count.
+    const checks = Array.from({ length: 14 }, (_, i) =>
+      costCheck({ checkId: 100 + i, name: `mon-${i}`, estimatedMonthly: 14 - i })
     );
     await mockApi(page, costWorld(checks));
     await page.goto("/reports?tab=cost");
     const rows = page.getByTestId("fleet-cost-drivers").getByRole("listitem");
-    await expect(rows).toHaveCount(8); // the panel shows the top 8 by share (a labeled breakdown, not the full fleet)
-    await expect(page.getByTestId("cost-driver-100")).toBeVisible(); // highest share, first
+    await expect(rows).toHaveCount(14); // ★ count-matches (prove-can-fail: would be 8 with the old cap)
+    await expect(page.getByTestId("fleet-cost-monitor-count")).toContainText("14 monitors");
+    await expect(page.getByTestId("cost-driver-113")).toBeVisible(); // the 14th (past the old 8-cap) renders
   });
 
-  test("monitor card shows its COMPUTE SHARE (not a per-monitor $); a check with no cost row shows none", async ({ page }) => {
-    await mockApi(page, costWorld([costCheck({ checkId: 1, name: "API health", kind: "http", activeSecondsPct: 3.2 })]));
+  test("monitor card shows its per-monitor $ estimate (primary) + share (secondary); no cost row → none", async ({ page }) => {
+    await mockApi(page, costWorld([costCheck({ checkId: 1, name: "API health", kind: "http", estimatedMonthly: 0.7, activeSecondsPct: 3.2 })]));
     await page.goto("/");
-    await expect(page.getByTestId("card-cost-1")).toContainText("3.2% compute"); // share, not $
-    await expect(page.getByTestId("card-cost-1")).not.toContainText("$"); // ★ no per-monitor dollar
+    await expect(page.getByTestId("card-cost-1")).toContainText("~$0.70/mo est."); // ★ the dollar, restored
+    await expect(page.getByTestId("card-cost-1")).toContainText("3.2%"); // share, beside it (secondary)
     await expect(page.getByTestId("card-cost-2")).toHaveCount(0); // check 2 absent from the report → no cost line
   });
 

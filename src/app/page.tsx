@@ -153,11 +153,11 @@ function StatusGrid() {
     return map;
   }, [sla24h]);
 
-  // Per-check COMPUTE SHARE (% of fleet active-seconds, 0089) from /reports/cost — the attributable metric the
-  // card shows in place of the old per-monitor $ (Azure bills the fleet, not per monitor).
+  // Per-check $ estimate (0091, PRIMARY) + compute share (0089, SECONDARY) from /reports/cost — the card shows
+  // the dollar with the share beside it.
   const costByCheck = useMemo(() => {
-    const map = new Map<number, number | null>();
-    for (const c of costReport?.checks ?? []) map.set(c.check_id, c.active_seconds_pct);
+    const map = new Map<number, { dollar: number | null; share: number | null }>();
+    for (const c of costReport?.checks ?? []) map.set(c.check_id, { dollar: c.estimated_monthly, share: c.active_seconds_pct });
     return map;
   }, [costReport]);
   const costLabel = costReport ? costEstimateLabel(costReport) : undefined;
@@ -333,7 +333,8 @@ function StatusGrid() {
                 check={c}
                 availability={sla?.pct ?? null}
                 availabilityInsufficient={sla?.insufficient ?? false}
-                computeSharePct={costByCheck.get(c.id) ?? null}
+                estimatedMonthly={costByCheck.get(c.id)?.dollar ?? null}
+                computeSharePct={costByCheck.get(c.id)?.share ?? null}
                 costEstimateLabel={costLabel}
               />
             );

@@ -6,15 +6,15 @@ import { useCostReport } from "@/lib/client";
 import type { CostCheck, CostReport } from "@/lib/types";
 
 /**
- * The cost panel. THREE real numbers, zero invented ones (the cost-honesty rebuild — runner 0089/0090, api
- * #263):
+ * The cost panel (runner 0089/0090/0091, api #263/#264):
  *   1. HEADLINE = Azure's ACTUAL bill (the `azure` block: MTD + forecast, pulled not modeled). Absent →
  *      a "see Azure Cost Management" deep-link fallback, NEVER a fabricated $0 (absent ≠ zero ≠ small).
- *   2. BREAKDOWN = per-monitor COMPUTE SHARE (`active_seconds_pct`), ranked. The old per-monitor $ was false
- *      precision on a per-subscription free grant — deleted from the view. A proportion is attributable; a
- *      per-monitor dollar is not (Azure bills the fleet, not per monitor).
- *   3. The modeled projection is DEMOTED to a labeled secondary beside Azure's number — two numbers, two
- *      questions, each labeled — and doubles as a drift check ("is our estimate tracking reality?").
+ *   2. BREAKDOWN = per-monitor DOLLAR estimate (PRIMARY, `estimated_monthly`) + compute share (SECONDARY,
+ *      `active_seconds_pct`) beside it, for EVERY active monitor (no truncation). The dollar is free-grant-
+ *      aware and reconciled to the fleet total — an "est." with real math, not false precision. The dollars
+ *      stand alone regardless of whether the Azure block is live.
+ *   3. The fleet modeled estimate (grant-corrected total) is a labeled secondary beside Azure's number, and
+ *      doubles as a drift check ("is our estimate tracking reality?").
  */
 
 export const SECONDS_PER_MONTH = 2_592_000; // 30d × 86400 — matches the API's runs/month divisor.
@@ -145,9 +145,11 @@ function DivergenceFlag({ c }: { c: CostCheck }) {
  * "what a full month at today's rate costs", a different question from "what Azure says I've spent".
  */
 function ModeledEstimate({ report, azureForecast }: { report: CostReport; azureForecast: number | null }) {
+  // ★ 0091: the fleet estimate is the free-grant-corrected total (estimated_monthly_total = Σ per-monitor),
+  // NOT the from-zero total — the grant pulls it closer to Azure. Drift is that estimate ÷ Azure's forecast.
   const drift =
     azureForecast != null && azureForecast > 0
-      ? report.total_projected_monthly / azureForecast
+      ? report.estimated_monthly_total / azureForecast
       : null;
   return (
     <div className="text-right" data-testid="fleet-cost-estimate">
@@ -155,7 +157,7 @@ function ModeledEstimate({ report, azureForecast }: { report: CostReport; azureF
         Steady-state estimate <span className="normal-case">(modeled, 7d)</span>
       </div>
       <div className="sw-mono text-sm text-[var(--color-ink-dim)]" data-testid="fleet-cost-estimate-value">
-        {money(report.total_projected_monthly)}
+        {money(report.estimated_monthly_total)}
         <span className="ml-1 text-[10px] font-normal text-[var(--color-ink-faint)]">/mo</span>
       </div>
       {drift != null && (
@@ -255,21 +257,22 @@ export function FleetCostSummary() {
     );
   }
   if (!data) return null; // loading or 404 (not deployed) → nothing
-  // ★ Rank by COMPUTE SHARE, not the old $ (that reorder IS the feature — the cheap high-frequency DNS check
-  // that topped no $ list is honestly 0.71% here). Nulls (no runs in the window) sort last.
-  const ranked = [...data.checks]
-    .sort((a, b) => (b.active_seconds_pct ?? -1) - (a.active_seconds_pct ?? -1))
-    .slice(0, 8);
+  // ★ Rank by the DOLLAR estimate (primary), null last. ★ NO .slice — render EVERY active monitor (the
+  // truncation-to-8 bug). The API already excludes archived (#313) and returns the full list.
+  const ranked = [...data.checks].sort(
+    (a, b) => (b.estimated_monthly ?? -1) - (a.estimated_monthly ?? -1),
+  );
 
   return (
     <div className="sw-panel p-4" data-testid="fleet-cost-summary">
       {/* 1 — THE HEADLINE: Azure's actual number, or the honest-absent fallback (keyed on azure == null). */}
       {data.azure ? <AzureHeadline azure={data.azure} report={data} /> : <AzureUnavailable report={data} />}
 
-      {/* 2 — THE BREAKDOWN: per-monitor compute SHARE, ranked (no per-monitor $). */}
+      {/* 2 — THE BREAKDOWN: per-monitor DOLLAR (primary) + compute share (secondary), ALL monitors. */}
       <div className="mt-4">
-        <div className="mb-1.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
-          Compute share by monitor
+        <div className="mb-1.5 flex items-baseline justify-between text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+          <span>Estimated cost by monitor</span>
+          <span data-testid="fleet-cost-monitor-count">{ranked.length} monitors</span>
         </div>
         <ul className="space-y-1" data-testid="fleet-cost-drivers">
           {ranked.map((c) => (
@@ -279,18 +282,26 @@ export function FleetCostSummary() {
                 <span className="truncate text-[var(--color-ink)]">{c.name}</span>
                 <DivergenceFlag c={c} />
               </Link>
-              <span
-                className="sw-mono shrink-0 text-[var(--color-ink-dim)]"
-                data-testid={`fleet-cost-share-${c.check_id}`}
-                title="Share of fleet compute (active-seconds), not a billed amount — Azure bills the fleet, not per monitor."
-              >
-                {sharePct(c.active_seconds_pct)}
+              <span className="flex shrink-0 items-baseline gap-2">
+                {/* PRIMARY: the dollar estimate */}
+                <span className="sw-mono text-[var(--color-ink)]" data-testid={`fleet-cost-dollar-${c.check_id}`}>
+                  {c.estimated_monthly == null ? "—" : `${money(c.estimated_monthly)}/mo`}
+                </span>
+                {/* SECONDARY: compute share, beside the dollar */}
+                <span
+                  className="sw-mono text-[10px] text-[var(--color-ink-faint)]"
+                  data-testid={`fleet-cost-share-${c.check_id}`}
+                  title="Share of fleet compute (active-seconds). The dollar is an estimate reconciled to the fleet total; share is the attributable proportion."
+                >
+                  {sharePct(c.active_seconds_pct)}
+                </span>
               </span>
             </li>
           ))}
         </ul>
         <p className="mt-2 text-[10px] text-[var(--color-ink-faint)]" data-testid="fleet-cost-share-note">
-          % of fleet compute (active-seconds) — attributable, unlike a per-monitor dollar. Rate:{" "}
+          Per-monitor <strong>estimate</strong> (labeled est.) — the free-grant-corrected fleet total allocated by
+          compute share; Σ reconciles to the fleet estimate, not a billed per-monitor amount. Rate:{" "}
           <span className="sw-mono">${data.rate_used}/active-s</span> ({data.rate_source}).
         </p>
       </div>
