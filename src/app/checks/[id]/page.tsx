@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
-import { useCheck, useMetrics, updateCheck, revalidateChecks, runCheckNow, revalidateRunHistory, useSpecCache, useIncidentHistory } from "@/lib/client";
+import { useCheck, useMetrics, useSla, updateCheck, revalidateChecks, runCheckNow, revalidateRunHistory, useSpecCache, useIncidentHistory } from "@/lib/client";
 import { useAuth } from "@/components/auth-provider";
 import { AvailabilityChart, LatencyChart, MetricsCharts } from "@/components/charts";
 import { CheckSlaPanel, SloPanel } from "@/components/sla";
@@ -368,6 +368,9 @@ export default function CheckDetailPage() {
 
   const { data, error, isLoading } = useCheck(valid ? id : null, { expectRun });
   const { data: metrics } = useMetrics(valid ? id : null);
+  // 24h completed-run count for the header meta line — the SAME fleet SLA the grid card reads (SWR-deduped),
+  // so no per-check call and the number matches what the card showed before runs/24h moved here.
+  const { data: sla24h } = useSla("24h");
 
   // The latest run's status drives the live indicator + when to stop the fast poll.
   const latestRunStatus = data?.recent_runs?.[0]?.status ?? null;
@@ -419,6 +422,7 @@ export default function CheckDetailPage() {
   if (!data) return <EmptyState title="Monitor not found." />;
 
   const { check, recent_runs } = data;
+  const runs24h = sla24h?.items?.find((r) => r.check_id === check.id)?.completed_runs ?? null;
 
   async function togglePause() {
     setPausing(true);
@@ -544,6 +548,13 @@ export default function CheckDetailPage() {
               </a>
             )}
             <span>· last run {formatRelative(recent_runs[0]?.started_at)}</span>
+            {/* ★ runs/24h RELOCATED here from the grid card (declutter): operational recency detail, next to
+                "last run" where the same context lives — off the at-a-glance card, present where you drill in.
+                Sourced from the SAME 24h SLA the card's availability uses (completed_runs), SWR-deduped; renders
+                only once the window has data. */}
+            {runs24h != null && (
+              <span className="sw-mono" data-testid="detail-runs-24h">· {runs24h} runs/24h</span>
+            )}
           </div>
           <TagChips tags={check.tags} className="mt-2" />
         </div>
