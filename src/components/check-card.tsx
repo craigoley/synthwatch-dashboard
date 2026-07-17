@@ -57,12 +57,27 @@ export function CheckCard({
   const locDegraded = locs.filter((l) => l.status === "warn").length;
   const regional = locs.length > 1 && locDown > 0 && locDown < locs.length;
   const degraded = locs.length > 1 && locDown === 0 && locDegraded > 0;
-  const rail =
+  // ★ railToken drives BOTH the rail color AND the scannability treatment (data-health below), so a card's
+  // tint/border/rail can never disagree — one source of truth. Same precedence as before: an open incident is
+  // red; a regional/degraded (some-locations) blip is amber; otherwise the settled status' own token.
+  const railToken =
     check.open_incident_count > 0
-      ? TONE_VAR.fail
+      ? "fail"
       : regional || degraded
-        ? TONE_VAR.warn
-        : RAIL[meta.token];
+        ? "warn"
+        : meta.token;
+  const rail = TONE_VAR[railToken] ?? RAIL[meta.token];
+  // ★ Scannability class for the grid sweep: "fail" (red) for down, "warn" (amber) for degrading, "ok" for
+  // healthy/idle — so FEW cards pop and a real one is FINDABLE the moment it first goes red (before an
+  // incident even opens, when it's currently quietest). Archived is retired → never pops. NOT color-alone:
+  // this pairs with the dot+text StatusBadge and the "regional/degraded N/M" meta labels (#280).
+  const health = isArchived
+    ? "ok"
+    : railToken === "fail" // an 'error' RunStatus already maps to the "fail" token (lib/status), so this covers both
+      ? "fail"
+      : railToken === "warn"
+        ? "warn"
+        : "ok";
 
   return (
     <Link
@@ -70,6 +85,7 @@ export function CheckCard({
       // ★ sw-running-cell: an ADDITIVE blue background wash while a run is in flight (complements the
       // sw-dot-running dot at grid scale). It does NOT touch the settled rail/pill — green/pass stays green.
       className={`sw-card sw-rail block p-4${isRunning ? " sw-running-cell" : ""}`}
+      data-health={health}
       data-running={isRunning ? "true" : undefined}
       style={{ ["--rail" as string]: rail, opacity: check.enabled ? 1 : 0.62 }}
     >
@@ -190,18 +206,18 @@ export function CheckCard({
           last run {formatRelative(check.last_started_at)}
         </span>
         <span className="flex shrink-0 items-center gap-2">
-          <span className="sw-mono text-[11px] text-[var(--color-ink-faint)]">{check.runs_24h} runs/24h</span>
-          {/* Per-monitor $ estimate (PRIMARY, labeled est.) — from /reports/cost; self-hides when absent
-              (e.g. paused / no runs). ★ The compute-SHARE % lives on the monitor DETAIL page + Reports > Cost,
-              where fleet context exists — on a status card it's fleet-relative noise that doesn't help the
-              "which monitor needs me now" decision. The dollar is the glance-value and stays. */}
+          {/* ★ runs/24h RELOCATED to the monitor detail page (checks/[id]) — a healthy monitor's run count
+              doesn't drive "which needs me now", and removing it de-crowds this row so "last run" stops
+              wrapping at narrow widths (1024px, the 3-col worst case). Per-monitor $ estimate (PRIMARY, est.)
+              stays — it self-hides when absent (paused / no runs). Compute-SHARE % lives on the detail page +
+              Reports > Cost, not on a status card. */}
           {estimatedMonthly != null && estimatedMonthly > 0 && (
             <span
               className="sw-mono text-[11px] text-[var(--color-ink-dim)]"
               data-testid={`card-cost-${check.id}`}
               title={costEstimateLabel ?? "estimated monthly compute cost (free-grant-aware, reconciled to the fleet total)"}
             >
-              · ~{money(estimatedMonthly)}/mo est.
+              ~{money(estimatedMonthly)}/mo est.
             </span>
           )}
         </span>

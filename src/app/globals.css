@@ -154,6 +154,44 @@
     box-shadow: 0 0 14px -2px var(--rail, transparent);
   }
 
+  /* ★ Scannability treatment (data-health): a DOWN (red) or DEGRADING (amber) card must POP in a full-grid
+     sweep the moment it first goes red — before an incident opens, when it's currently quietest and had only
+     a thin 3px rail + small badge among healthy neighbours. ADDITIVE to the dot+text StatusBadge (never
+     color-alone, #280): a stronger colored border + a thicker rail + a faint state-tinted background. Only
+     fail/warn get it, so FEW cards pop and a real one is findable; healthy/idle/archived stay unchanged. */
+  .sw-card[data-health="fail"] {
+    border-color: color-mix(in srgb, var(--color-fail) 42%, var(--color-border));
+  }
+  .sw-card[data-health="warn"] {
+    border-color: color-mix(in srgb, var(--color-warn) 38%, var(--color-border));
+  }
+  /* Thicker rail reinforces the tint (3→5px). Keyed on the same data-health so rail + tint never disagree. */
+  .sw-rail[data-health="fail"]::before,
+  .sw-rail[data-health="warn"]::before {
+    width: 5px;
+  }
+  /* The background tint. Scoped :not(.sw-running-cell): a running card owns background-image for its blue
+     wash, so we DON'T fight it there — the red/amber border + thick rail still pop over the wash (a
+     running-and-failing card stays visibly red). For the far more common not-running case, the tint applies. */
+  .sw-card[data-health="fail"]:not(.sw-running-cell) {
+    background-image:
+      linear-gradient(
+        0deg,
+        color-mix(in srgb, var(--color-fail) 9%, transparent),
+        color-mix(in srgb, var(--color-fail) 9%, transparent)
+      ),
+      linear-gradient(180deg, var(--color-panel) 0%, var(--color-bg-elev) 100%);
+  }
+  .sw-card[data-health="warn"]:not(.sw-running-cell) {
+    background-image:
+      linear-gradient(
+        0deg,
+        color-mix(in srgb, var(--color-warn) 8%, transparent),
+        color-mix(in srgb, var(--color-warn) 8%, transparent)
+      ),
+      linear-gradient(180deg, var(--color-panel) 0%, var(--color-bg-elev) 100%);
+  }
+
   /* status dots with a soft glow */
   .sw-dot {
     display: inline-block;
