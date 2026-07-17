@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { CheckWithStatus } from "@/lib/types";
 import { StatusBadge, TONE_VAR } from "@/components/status-badge";
 import { Sparkline } from "@/components/sparkline";
-import { money, sharePct } from "@/components/cost";
+import { money } from "@/components/cost";
 import { TagChips } from "@/components/tag-chips";
 import { EnvBadge } from "@/components/env-badge";
 import { AvailabilityValue } from "@/components/sla";
@@ -28,7 +28,6 @@ export function CheckCard({
   availability = null,
   availabilityInsufficient = false,
   estimatedMonthly = null,
-  computeSharePct = null,
   costEstimateLabel,
 }: {
   check: CheckWithStatus;
@@ -36,8 +35,6 @@ export function CheckCard({
   availabilityInsufficient?: boolean;
   /** ★ PRIMARY per-monitor $ estimate (0091, free-grant-aware) — labeled "est.". null = no cost row / paused. */
   estimatedMonthly?: number | null;
-  /** SECONDARY: this monitor's share of fleet compute (% of active-seconds, 0089), shown beside the dollar. */
-  computeSharePct?: number | null;
   /** The endpoint's echoed rate label (tooltip) — never hardcoded (rate provenance from /reports/cost). */
   costEstimateLabel?: string;
 }) {
@@ -194,8 +191,10 @@ export function CheckCard({
         </span>
         <span className="flex shrink-0 items-center gap-2">
           <span className="sw-mono text-[11px] text-[var(--color-ink-faint)]">{check.runs_24h} runs/24h</span>
-          {/* Per-monitor $ estimate (PRIMARY, labeled est.) + compute share (SECONDARY) — from /reports/cost;
-              self-hides when absent (e.g. paused / no runs). */}
+          {/* Per-monitor $ estimate (PRIMARY, labeled est.) — from /reports/cost; self-hides when absent
+              (e.g. paused / no runs). ★ The compute-SHARE % lives on the monitor DETAIL page + Reports > Cost,
+              where fleet context exists — on a status card it's fleet-relative noise that doesn't help the
+              "which monitor needs me now" decision. The dollar is the glance-value and stays. */}
           {estimatedMonthly != null && estimatedMonthly > 0 && (
             <span
               className="sw-mono text-[11px] text-[var(--color-ink-dim)]"
@@ -203,9 +202,6 @@ export function CheckCard({
               title={costEstimateLabel ?? "estimated monthly compute cost (free-grant-aware, reconciled to the fleet total)"}
             >
               · ~{money(estimatedMonthly)}/mo est.
-              {computeSharePct != null && computeSharePct > 0 && (
-                <span className="text-[var(--color-ink-faint)]"> ({sharePct(computeSharePct)})</span>
-              )}
             </span>
           )}
         </span>

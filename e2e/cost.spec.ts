@@ -137,11 +137,14 @@ test.describe("cost panel — Azure headline + per-monitor dollar breakdown", ()
     await expect(page.getByTestId("cost-driver-113")).toBeVisible(); // the 14th (past the old 8-cap) renders
   });
 
-  test("monitor card shows its per-monitor $ estimate (primary) + share (secondary); no cost row → none", async ({ page }) => {
+  test("monitor card shows its per-monitor $ estimate; the compute-share % is NOT on the card; no cost row → none", async ({ page }) => {
     await mockApi(page, costWorld([costCheck({ checkId: 1, name: "API health", kind: "http", estimatedMonthly: 0.7, activeSecondsPct: 3.2 })]));
     await page.goto("/");
-    await expect(page.getByTestId("card-cost-1")).toContainText("~$0.70/mo est."); // ★ the dollar, restored
-    await expect(page.getByTestId("card-cost-1")).toContainText("3.2%"); // share, beside it (secondary)
+    await expect(page.getByTestId("card-cost-1")).toContainText("~$0.70/mo est."); // ★ the dollar stays (glance-value)
+    // ★ compute-share % dropped from the card: it's fleet-relative, so it lives on the monitor detail page +
+    // Reports > Cost (where fleet context exists), not on a status card. activeSecondsPct=3.2 is seeded but
+    // must NOT render here.
+    await expect(page.getByTestId("card-cost-1")).not.toContainText("%");
     await expect(page.getByTestId("card-cost-2")).toHaveCount(0); // check 2 absent from the report → no cost line
   });
 
