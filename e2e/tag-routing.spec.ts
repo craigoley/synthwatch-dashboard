@@ -40,6 +40,49 @@ test.describe("tag-routing — editor", () => {
     await expect(page.getByTestId("toast-success")).toBeVisible();
   });
 
+  // ★ The tag pickers render the HOUSE dropdown (Combobox: sw-panel, anchored, keyboard nav, click-away) —
+  // NOT the native <datalist> popover that read like a tooltip. Mirrors the monitor form's tag editor.
+  test("★ tag pickers use the house dropdown (sw-panel/listbox), not a native popover; select + keyboard + dismiss work", async ({ page }) => {
+    const w = defaultWorld();
+    w.channels = [ch(1, "Email")];
+    tagCheck1(w, [{ key: "team", value: "web" }]);
+    w.routing = { severity: { critical: { channelIds: [1] }, warning: { channelIds: [] } }, perCheck: {} };
+    w.tags = [
+      { key: "team", value: "web", count: 1 },
+      { key: "env", value: "prod", count: 1 },
+    ];
+    await mockApi(page, w);
+    await page.goto("/notifications");
+
+    // focus the KEY picker → the house listbox opens with the app panel chrome (opaque/bordered/z-lifted),
+    // an ARIA listbox (a real anchored menu) — never a native/tooltip popover.
+    const keyInput = page.getByTestId("routing-tag-key-input");
+    await keyInput.click();
+    const keyList = page.getByTestId("routing-tag-key-input-list");
+    await expect(keyList).toBeVisible();
+    await expect(keyList).toHaveClass(/sw-panel/); // ★ the house dropdown, not native chrome
+    await expect(keyList).toHaveAttribute("role", "listbox");
+
+    // selecting an option (click) fills the field
+    await page.getByTestId("routing-tag-key-input-option-team").click();
+    await expect(keyInput).toHaveValue("team");
+
+    // VALUE picker: keyboard nav (↓ + Enter) picks a suggestion
+    const valInput = page.getByTestId("routing-tag-value-input");
+    await valInput.click();
+    await expect(page.getByTestId("routing-tag-value-input-list")).toBeVisible();
+    await valInput.press("ArrowDown"); // 0 (web) → 1 (prod)
+    await valInput.press("Enter");
+    await expect(valInput).toHaveValue("prod");
+
+    // Escape dismisses (keyboard closing works — not a stuck tooltip). ArrowDown reopens the list (the input
+    // stays focused after Enter, so a re-click wouldn't re-fire focus — ArrowDown is the honest reopen).
+    await valInput.press("ArrowDown");
+    await expect(page.getByTestId("routing-tag-value-input-list")).toBeVisible();
+    await valInput.press("Escape");
+    await expect(page.getByTestId("routing-tag-value-input-list")).toHaveCount(0);
+  });
+
   test("remove a tag-rule group", async ({ page }) => {
     const w = defaultWorld();
     w.channels = [ch(1, "Email")];
