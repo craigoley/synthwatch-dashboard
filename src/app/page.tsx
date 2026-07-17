@@ -153,11 +153,11 @@ function StatusGrid() {
     return map;
   }, [sla24h]);
 
-  // Per-check $ estimate (0091, PRIMARY) + compute share (0089, SECONDARY) from /reports/cost — the card shows
-  // the dollar with the share beside it.
+  // Per-check $ estimate (0091) from /reports/cost — the card shows the dollar only. The compute-share %
+  // (0089) is intentionally NOT on the card: it's fleet-relative and lives on the detail page + Reports > Cost.
   const costByCheck = useMemo(() => {
-    const map = new Map<number, { dollar: number | null; share: number | null }>();
-    for (const c of costReport?.checks ?? []) map.set(c.check_id, { dollar: c.estimated_monthly, share: c.active_seconds_pct });
+    const map = new Map<number, number | null>();
+    for (const c of costReport?.checks ?? []) map.set(c.check_id, c.estimated_monthly);
     return map;
   }, [costReport]);
   const costLabel = costReport ? costEstimateLabel(costReport) : undefined;
@@ -189,6 +189,19 @@ function StatusGrid() {
   const filtered = useMemo(
     () => (data ?? []).filter((c) => matches(c, status, kind, q, selectedTags, env)),
     [data, status, kind, q, selectedTags, env],
+  );
+  // ★ The "N of M" DENOMINATOR is the CURRENT tab's universe (the status filter alone), NOT the whole fleet.
+  // useChecks() returns archived + removed rows too (the Archived/Removed tabs read them), so `data.length`
+  // counts monitors the default "All" view structurally excludes (archived is opt-in via its own tab). With
+  // the fleet as the denominator, an UNFILTERED "All" view read "Showing 34 of 37" — implying an active
+  // filter when none is set, and leaking 3 archived rows the view can't show. This is the archived-leak class
+  // (cost_projection / narrative / availability / incident-breakdown): the count and the list must agree on
+  // what "a monitor" is. Using the same `matches()` predicate the grid uses — with the OTHER facets off —
+  // makes M = "monitors in THIS tab", so N === M on an unfiltered tab (the line hides) and "N of M" appears
+  // only when a real facet (kind / env / search / tag) narrows the list.
+  const statusUniverse = useMemo(
+    () => (data ?? []).filter((c) => matches(c, status, "all", "", [], "all")),
+    [data, status],
   );
   // The env facet only appears when the fleet actually HAS a non-prod check — a pure-prod fleet's grid is
   // visually unchanged (no extra control). Env is the authoritative column, never the user-mutable env: tag.
@@ -289,11 +302,13 @@ function StatusGrid() {
         onClear={clearTags}
       />
 
-      {/* ★ Make an active filter OBVIOUS: a clear "showing N of M" whenever the list is a subset (any filter).
-          The fleet SLA summary above stays WHOLE-fleet on purpose (it's a fleet metric, not a filtered view). */}
-      {data && filtered.length !== data.length && (
+      {/* ★ Make an active filter OBVIOUS: a clear "showing N of M" whenever a facet narrows THIS tab. M is the
+          current tab's universe (statusUniverse), not the whole fleet — so an unfiltered tab shows nothing
+          (N === M) instead of the archived-leak "34 of 37". The fleet SLA summary above stays WHOLE-fleet on
+          purpose (it's a fleet metric, not a filtered view). */}
+      {filtered.length !== statusUniverse.length && (
         <p className="text-[11px] text-[var(--color-ink-faint)]" data-testid="filter-count">
-          Showing {filtered.length} of {data.length} monitors
+          Showing {filtered.length} of {statusUniverse.length} monitors
         </p>
       )}
 
@@ -333,8 +348,7 @@ function StatusGrid() {
                 check={c}
                 availability={sla?.pct ?? null}
                 availabilityInsufficient={sla?.insufficient ?? false}
-                estimatedMonthly={costByCheck.get(c.id)?.dollar ?? null}
-                computeSharePct={costByCheck.get(c.id)?.share ?? null}
+                estimatedMonthly={costByCheck.get(c.id) ?? null}
                 costEstimateLabel={costLabel}
               />
             );

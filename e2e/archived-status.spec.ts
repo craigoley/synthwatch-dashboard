@@ -41,8 +41,11 @@ test.describe("archived monitors — status grid", () => {
     await expect(page.locator('a[href="/checks/1"]')).toBeVisible();
     await expect(page.locator('a[href="/checks/3"]')).toBeVisible();
     await expect(page.locator('a[href="/checks/2"]')).toHaveCount(0);
-    // the subset is flagged honestly (the existing filter-count affordance)
-    await expect(page.getByTestId("filter-count")).toContainText("Showing 2 of 3");
+    // ★ archived is NOT in the operational-view denominator (the archived-leak fix): "N of M" uses the
+    // current tab's universe, so an unfiltered All view with only an archived extra is NOT a subset → the
+    // line hides. (It previously leaked "Showing 2 of 3", implying an active filter on an unfiltered view.)
+    // Archived stays discoverable via the Archived tab — checked below — not via the fleet denominator.
+    await expect(page.getByTestId("filter-count")).toHaveCount(0);
 
     // ★ findability: one tap into the Archived tab and it's there — hidden from ops, never unfindable
     await page.getByRole("button", { name: "Archived" }).click();
