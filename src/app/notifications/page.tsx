@@ -15,6 +15,7 @@ import {
 } from "@/lib/client";
 import { ApiRequestError } from "@/lib/api-client";
 import { Modal } from "@/components/modal";
+import { Combobox } from "@/components/combobox";
 import { ChannelForm } from "@/components/channel-form";
 import { useAuth } from "@/components/auth-provider";
 import { SignInToEdit, SignInToView } from "@/components/write-gate";
@@ -777,30 +778,32 @@ export default function NotificationsPage() {
                     );
                   })}
                 </div>
+                {/* House dropdown (Combobox: sw-panel, anchored, keyboard nav, click-away) — NOT the native
+                    <datalist> popover that reads like a tooltip. Mirrors monitor-form.tsx:279/:291. */}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <input
-                    className="sw-input sw-mono w-32 text-[13px]"
-                    list="sw-routing-tag-keys"
-                    value={newTagKey}
-                    onChange={(e) => setNewTagKey(e.target.value)}
-                    placeholder="key"
-                    aria-label="tag rule key"
-                  />
-                  <datalist id="sw-routing-tag-keys">
-                    {tagKeyOptions.map((k) => <option key={k} value={k} />)}
-                  </datalist>
+                  <div className="w-32">
+                    <Combobox
+                      value={newTagKey}
+                      onChange={setNewTagKey}
+                      options={tagKeyOptions}
+                      onEnter={addTagGroup}
+                      placeholder="key"
+                      ariaLabel="tag rule key"
+                      testId="routing-tag-key-input"
+                    />
+                  </div>
                   <span className="text-[var(--color-ink-faint)]">:</span>
-                  <input
-                    className="sw-input sw-mono w-40 text-[13px]"
-                    list="sw-routing-tag-values"
-                    value={newTagValue}
-                    onChange={(e) => setNewTagValue(e.target.value)}
-                    placeholder="value"
-                    aria-label="tag rule value"
-                  />
-                  <datalist id="sw-routing-tag-values">
-                    {tagValueOptions.map((v) => <option key={v} value={v} />)}
-                  </datalist>
+                  <div className="w-40">
+                    <Combobox
+                      value={newTagValue}
+                      onChange={setNewTagValue}
+                      options={tagValueOptions}
+                      onEnter={addTagGroup}
+                      placeholder="value"
+                      ariaLabel="tag rule value"
+                      testId="routing-tag-value-input"
+                    />
+                  </div>
                   <button
                     onClick={addTagGroup}
                     disabled={!newTagKey.trim() || !newTagValue.trim()}
