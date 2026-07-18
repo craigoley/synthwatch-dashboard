@@ -78,7 +78,7 @@ export function TraceSummary({ runId }: { runId: number }) {
   );
 }
 
-function SummaryBody({ s }: { s: TraceSignalsSummary }) {
+export function SummaryBody({ s }: { s: TraceSignalsSummary }) {
   const errors = s.console.messages.filter((m) => m.level === "error" || m.level === "pageerror");
   const warns = s.console.messages.filter((m) => m.level === "warning");
   const clean = s.network.failed.length === 0 && errors.length === 0 && warns.length === 0;

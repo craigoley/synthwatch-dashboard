@@ -168,6 +168,8 @@ Page routes:
 Route handlers:
 
 - `/api/probe-echo`
+- `/preview-screenshot/[token]`
+- `/preview-trace/[token]`
 - `/screenshot-proxy/[runId]`
 <!-- ROUTES:END -->
 
