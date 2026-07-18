@@ -2896,3 +2896,66 @@ export async function getParseIntent(text: string): Promise<ParseIntentResult> {
     notes: (raw?.notes as string) ?? null,
   };
 }
+
+// ── Preview (the "Tests" area) — spec preview-run in the low-privilege synthwatch-sandbox job ─────────────
+// A preview NEVER creates a monitor / touches the fleet — the only path to production stays the repo PR.
+// The result today carries the compiled test names + captured stdout (the tier-1 browser trace — steps,
+// timings, screenshots, trace_signals — is a follow-up; `trace:"seam"` inside stdout marks it). Pass-1 runs
+// UNAUTHENTICATED against a public/non-prod target, so an authed monitor's login step fails visibly.
+
+/** The sandbox's result JSON (the `trace` string once the run completes). */
+export interface PreviewResult {
+  ok: boolean;
+  tests: string[];
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+  exitCode: number | null;
+}
+
+export type PreviewStatus = "running" | "done" | "failed" | "timeout";
+
+export interface PreviewPoll {
+  token: string;
+  status: PreviewStatus;
+  /** Parsed from the API's `trace` string once `status === "done"`; null while running or on a non-done state. */
+  result: PreviewResult | null;
+}
+
+/** The caller's live bounds so the UI shows "N of M" instead of a mystery 429. */
+export interface PreviewQuota {
+  running: number;
+  maxConcurrent: number;
+  hourly: number;
+  maxPerHour: number;
+}
+
+/** POST /preview — enqueue + start a sandbox preview. Throws ApiRequestError(429) when a bound is hit. */
+export async function createPreview(spec: string, targetUrl?: string): Promise<{ token: string }> {
+  return request<{ token: string }>("/preview", undefined, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ spec, ...(targetUrl ? { targetUrl } : {}) }),
+  });
+}
+
+/** GET /preview/{token} — poll; parses the trace JSON into `result` once done. */
+export async function getPreview(token: string): Promise<PreviewPoll> {
+  const raw = await request<{ token: string; status: PreviewStatus; trace: string | null }>(
+    `/preview/${encodeURIComponent(token)}`,
+  );
+  let result: PreviewResult | null = null;
+  if (raw.trace) {
+    try {
+      result = JSON.parse(raw.trace) as PreviewResult;
+    } catch {
+      result = null; // a malformed trace degrades to "no parsed result", never throws
+    }
+  }
+  return { token: raw.token, status: raw.status, result };
+}
+
+/** GET /preview/quota — the caller's live running/hourly counts + the caps. */
+export async function getPreviewQuota(): Promise<PreviewQuota> {
+  return request<PreviewQuota>("/preview/quota");
+}

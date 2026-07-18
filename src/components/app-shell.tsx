@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useChecks } from "@/lib/client";
 import { useAuth } from "@/components/auth-provider";
 
-const NAV: { href: string; label: string; match: (p: string) => boolean; adminOnly?: boolean }[] = [
+const NAV: { href: string; label: string; match: (p: string) => boolean; adminOnly?: boolean; editorOnly?: boolean }[] = [
   { href: "/", label: "Status", match: (p: string) => p === "/" || p.startsWith("/checks") },
   { href: "/incidents", label: "Incidents", match: (p: string) => p.startsWith("/incidents") },
   { href: "/monitors", label: "Monitors", match: (p: string) => p.startsWith("/monitors") },
@@ -14,6 +14,9 @@ const NAV: { href: string; label: string; match: (p: string) => boolean; adminOn
   { href: "/notifications", label: "Notifications", match: (p: string) => p.startsWith("/notifications") },
   { href: "/reports", label: "Reports", match: (p: string) => p.startsWith("/reports") || p.startsWith("/trust") },
   { href: "/settings/environments", label: "Environments", match: (p: string) => p.startsWith("/settings/environments") },
+  // Editor/admin-only. Hiding it is UX; /api/preview is editor-gated server-side regardless (the real boundary,
+  // and the /tests route itself gates too — a preview is a code-execution surface).
+  { href: "/tests", label: "Tests", match: (p: string) => p.startsWith("/tests"), editorOnly: true },
   // Admin-only. Hiding it is UX; /api/editors is admin-gated server-side regardless (the real boundary).
   { href: "/users", label: "Users", match: (p: string) => p.startsWith("/users"), adminOnly: true },
 ];
@@ -103,7 +106,7 @@ function AccountControl() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "/";
-  const { isAdmin } = useAuth();
+  const { isAdmin, canWrite } = useAuth();
 
   // The public status page is stakeholder-facing — it brings its own clean chrome
   // and must not show the operator nav / fleet pulse.
@@ -138,7 +141,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               h-14 row (see above — one row only fits from ~1150px; sm: left a 640–1150px band where the
               nowrap row overflowed with no recovery, #254's review catch). */}
           <nav className="order-last w-full flex flex-wrap items-center gap-1 xl:order-none xl:ml-2 xl:w-auto xl:flex-nowrap">
-            {NAV.filter((item) => !item.adminOnly || isAdmin).map((item) => {
+            {NAV.filter((item) => (!item.adminOnly || isAdmin) && (!item.editorOnly || canWrite)).map((item) => {
               const active = item.match(pathname);
               return (
                 <Link
