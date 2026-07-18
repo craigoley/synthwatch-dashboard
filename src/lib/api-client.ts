@@ -2903,7 +2903,17 @@ export async function getParseIntent(text: string): Promise<ParseIntentResult> {
 // timings, screenshots, trace_signals — is a follow-up; `trace:"seam"` inside stdout marks it). Pass-1 runs
 // UNAUTHENTICATED against a public/non-prod target, so an authed monitor's login step fails visibly.
 
-/** The sandbox's result JSON (the `trace` string once the run completes). */
+/** One recorded step of the preview flow (the run_steps shape, sans a real run id). */
+export interface PreviewStep {
+  index: number;
+  name: string;
+  status: string;
+  durationMs: number;
+  errorMessage: string | null;
+}
+
+/** The sandbox's result JSON (the `trace` string once the run completes). B2 adds the REAL trace: the
+ *  per-step timings, trace_signals, and flags for the streamed screenshot/trace.zip artifacts. */
 export interface PreviewResult {
   ok: boolean;
   tests: string[];
@@ -2911,6 +2921,15 @@ export interface PreviewResult {
   stderr: string;
   timedOut: boolean;
   exitCode: number | null;
+  // ── B2 (present once the browser run produced a trace; absent on older/compile-failed results) ──
+  status?: "pass" | "fail" | "error" | null;
+  error?: string | null;
+  failedStep?: string | null;
+  steps?: PreviewStep[];
+  traceSignals?: TraceSignalsSummary | null;
+  /** True iff the sandbox uploaded the artifact (false when absent / dropped for size). */
+  hasTrace?: boolean;
+  hasScreenshot?: boolean;
 }
 
 export type PreviewStatus = "running" | "done" | "failed" | "timeout";

@@ -16,7 +16,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 
 import { useAuth } from "@/components/auth-provider";
+import { FunnelBarStatic } from "@/components/funnel-bar";
 import { EmptyState } from "@/components/states";
+import { SummaryBody } from "@/components/trace-summary";
+import { TraceViewer } from "@/components/trace-viewer";
 import {
   ApiRequestError,
   createPreview,
@@ -25,7 +28,9 @@ import {
   type PreviewPoll,
   type PreviewQuota,
   type PreviewResult,
+  type PreviewStep,
 } from "@/lib/api-client";
+import type { RunStep, RunStepStatus } from "@/lib/types";
 
 const EXAMPLE_SPEC = `import { test, expect, step } from '../../lib/flow';
 
@@ -383,49 +388,141 @@ function DoneView({ poll }: { poll: PreviewPoll }) {
     );
   }
 
-  const passed = result.ok && !result.timedOut && result.exitCode === 0;
+  // B2: a browser run reports result.status ('pass'|'fail'|'error'). Older / compile-failed results have none.
+  const ranBrowser = result.status != null;
+  const passed = ranBrowser ? result.status === "pass" : result.ok && result.exitCode === 0;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <StatusPill
           glyph={passed ? "✓" : "✕"}
-          label={passed ? "Spec compiled & loaded" : "Spec did not pass"}
+          label={
+            passed
+              ? "Passed"
+              : result.failedStep
+                ? `Failed at "${result.failedStep}"`
+                : ranBrowser
+                  ? "Failed"
+                  : "Spec did not pass"
+          }
           tone={passed ? "pass" : "fail"}
         />
-        {result.exitCode !== null && (
-          <span className="text-[12px] text-[var(--color-ink-dim)]">exit {result.exitCode}</span>
-        )}
+        {result.tests[0] && <span className="text-[12px] text-[var(--color-ink-dim)] font-mono">{result.tests[0]}</span>}
       </div>
 
-      {/* Tests the spec declared (compiled + registered). */}
-      <div>
-        <div className="sw-label mb-1">Tests declared</div>
-        {result.tests.length === 0 ? (
-          <p className="text-sm text-[var(--color-ink-dim)]">No tests were registered by the spec.</p>
-        ) : (
-          <ul className="space-y-1">
-            {result.tests.map((t, i) => (
-              <li key={i} className="flex items-center gap-2 text-sm text-[var(--color-ink)]">
-                <span aria-hidden="true" className="text-[var(--color-pass)]">
-                  ✓
-                </span>
-                <span className="font-mono text-[12px]">{t}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {result.error && <p className="text-sm text-[var(--color-ink)]">{result.error}</p>}
 
-      {result.stdout.trim() && <OutputBlock label="Output" text={result.stdout} />}
+      {/* ★ The REAL trace, rendered with the SAME components a check's detail view uses — steps + timings,
+          failure screenshot, and network/console signals. Anything the preview can't fill is honestly-absent
+          (a dashed "unavailable" block), never a fabricated zero. */}
+      {ranBrowser && <TraceView result={result} token={poll.token} />}
+
+      {result.stdout.trim() && <OutputBlock label="Console output" text={result.stdout} />}
       {result.stderr.trim() && <OutputBlock label="Errors" text={result.stderr} tone="fail" />}
 
-      {/* Honest framing of the deferred browser-trace increment (the B2 seam). */}
-      <p className="rounded-md border border-[var(--color-border)] bg-[var(--color-panel-2)] p-3 text-[12px] leading-relaxed text-[var(--color-ink-dim)]">
-        Pass-1 validates that the spec compiles, loads, and declares its tests. The full browser trace —
-        step timings, screenshots, and network/console signals, shown the way a real check&apos;s detail view
-        renders them — is a follow-up increment.
+      <p className="text-[11px] text-[var(--color-ink-dim)]">
+        This is the same trace a real check produces. A login-gated step will show as a failure here because the
+        preview runs unauthenticated (see the note above).
       </p>
     </div>
+  );
+}
+
+function toRunStep(s: PreviewStep): RunStep {
+  return {
+    id: s.index,
+    run_id: 0,
+    step_index: s.index,
+    name: s.name,
+    status: s.status as RunStepStatus,
+    duration_ms: s.durationMs,
+    error_message: s.errorMessage,
+    started_at: "",
+  };
+}
+
+/** The trace panels — the SAME FunnelBarStatic / SummaryBody / TraceViewer a real check's detail renders. */
+function TraceView({ result, token }: { result: PreviewResult; token: string }) {
+  const steps = (result.steps ?? []).map(toRunStep);
+  const didFail = result.status === "fail" || result.status === "error";
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="sw-label mb-1">Steps</div>
+        {steps.length > 0 ? (
+          <FunnelBarStatic steps={steps} />
+        ) : (
+          <Unavailable what="step timeline" why="the flow recorded no steps (it failed before the first step, or declared none)" />
+        )}
+      </div>
+
+      {didFail && (
+        <div>
+          <div className="sw-label mb-1">Screenshot at failure</div>
+          {result.hasScreenshot ? (
+            <PreviewScreenshot token={token} />
+          ) : (
+            <Unavailable what="failure screenshot" why="none was captured for this run" />
+          )}
+        </div>
+      )}
+
+      <div>
+        <div className="sw-label mb-1">Network &amp; console</div>
+        {result.traceSignals ? (
+          <SummaryBody s={result.traceSignals} />
+        ) : (
+          <Unavailable what="network/console signals" why="no trace was produced for this run" />
+        )}
+      </div>
+
+      <div>
+        <div className="sw-label mb-1">Playwright trace</div>
+        {result.hasTrace ? (
+          <TraceViewer
+            mintSas={async () => ({
+              // A same-origin proxy path (not a SAS) — the API MI streams the private blob; no widening.
+              url: `${window.location.origin}/preview-trace/${token}`,
+              expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
+            })}
+            openLabel="▸ View Playwright trace"
+            iframeTitle={`Playwright trace for preview ${token}`}
+            viewTestId="view-preview-trace"
+            iframeTestId="preview-trace-viewer"
+            downloadTestId="download-preview-trace"
+          />
+        ) : (
+          <Unavailable what="interactive trace" why="no trace.zip (the run produced none, or it exceeded the size cap)" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Honest-absent (the cost-panel dashed pattern): absent ≠ empty ≠ zero — say what's missing and why. */
+function Unavailable({ what, why }: { what: string; why: string }) {
+  return (
+    <div
+      className="rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2"
+      style={{ borderLeft: "3px solid var(--color-warn)" }}
+    >
+      <div className="text-[13px] text-[var(--color-ink-dim)]">No {what}</div>
+      <div className="text-[11px] text-[var(--color-ink-dim)]">{why}</div>
+    </div>
+  );
+}
+
+function PreviewScreenshot({ token }: { token: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <Unavailable what="failure screenshot" why="the artifact has expired or was removed" />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- a streamed same-origin proxy blob, not a static asset
+    <img
+      src={`/preview-screenshot/${token}`}
+      alt="Preview failure screenshot"
+      className="max-w-full rounded-md border border-[var(--color-border)]"
+      onError={() => setFailed(true)}
+    />
   );
 }
 
