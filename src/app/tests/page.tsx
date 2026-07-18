@@ -23,6 +23,7 @@ import {
   getPreview,
   getPreviewQuota,
   type PreviewPoll,
+  type PreviewQuota,
   type PreviewResult,
 } from "@/lib/api-client";
 
@@ -96,6 +97,10 @@ function TestsWorkbench() {
   const [spec, setSpec] = useState("");
   const [targetUrl, setTargetUrl] = useState("");
   const [run, setRun] = useState<RunState>({ phase: "idle" });
+  // ★ The poll effect keys on this STABLE token, NOT the whole `run` object — else every 'running' tick's
+  //   setRun mints a new `run`, tearing down + re-running the effect and firing GET back-to-back (a hot loop
+  //   against a rate-limited endpoint family). It's set when a preview starts, cleared on the terminal poll.
+  const [pollToken, setPollToken] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Live bounds — poll a bit faster while a preview is in flight so "N of 3 running" tracks reality. ──
@@ -109,23 +114,27 @@ function TestsWorkbench() {
   const tooLarge = specBytes > MAX_SPEC_BYTES;
   const canRun = spec.trim().length > 0 && !tooLarge && run.phase !== "starting" && run.phase !== "polling";
 
-  // ── Poll loop: while phase==="polling", GET /preview/{token} until a terminal status. ──
+  // ── Poll loop: keyed on the STABLE pollToken, so it sets up ONCE per preview and paces at POLL_MS. Each
+  //    tick's setRun updates the display WITHOUT re-running this effect (pollToken is unchanged); the terminal
+  //    tick clears pollToken, which re-runs the effect into its early return (cleanup stops the interval). ──
   useEffect(() => {
-    if (run.phase !== "polling") return;
+    if (!pollToken) return;
     let cancelled = false;
     const tick = async () => {
       try {
-        const poll = await getPreview(run.token);
+        const poll = await getPreview(pollToken);
         if (cancelled) return;
         if (poll.status === "running") {
-          setRun({ phase: "polling", token: run.token, poll });
+          setRun({ phase: "polling", token: pollToken, poll });
         } else {
-          setRun({ phase: "done", token: run.token, poll });
+          setRun({ phase: "done", token: pollToken, poll });
+          setPollToken(null);
           void refreshQuota();
         }
       } catch (e) {
         if (cancelled) return;
         setRun({ phase: "error", message: errMessage(e), status: errStatus(e) });
+        setPollToken(null);
       }
     };
     const id = setInterval(tick, POLL_MS);
@@ -134,13 +143,14 @@ function TestsWorkbench() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [run, refreshQuota]);
+  }, [pollToken, refreshQuota]);
 
   const onRun = useCallback(async () => {
     setRun({ phase: "starting" });
     try {
       const { token } = await createPreview(spec, targetUrl.trim() || undefined);
       setRun({ phase: "polling", token, poll: null });
+      setPollToken(token); // starts the poll effect
       void refreshQuota();
     } catch (e) {
       setRun({ phase: "error", message: errMessage(e), status: errStatus(e) });
@@ -256,7 +266,7 @@ function TestsWorkbench() {
 }
 
 /** Honest bounds gauge — "N of 3 running · M of 20 this hour", the same counts the API enforces. */
-function QuotaGauge({ quota }: { quota: { running: number; maxConcurrent: number; hourly: number; maxPerHour: number } | undefined }) {
+function QuotaGauge({ quota }: { quota: PreviewQuota | undefined }) {
   return (
     <div className="sw-card flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
       <span className="sw-eyebrow">Limits</span>
