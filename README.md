@@ -160,6 +160,7 @@ Page routes:
 - `/settings/environments`
 - `/specs`
 - `/status`
+- `/tests`
 - `/throw-test`
 - `/trust`
 - `/users`
