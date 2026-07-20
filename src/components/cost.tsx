@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { useCostReport } from "@/lib/client";
+import { AZURE_STALE_AFTER_MS, asOf } from "@/lib/staleness";
 import type { CostCheck, CostReport } from "@/lib/types";
 
 /**
@@ -22,8 +23,6 @@ export const SECONDS_PER_MONTH = 2_592_000; // 30d × 86400 — matches the API'
 // The generic Cost Management deep link for the absent-headline fallback (the scoped portal_url lives INSIDE
 // the azure block, so it's unavailable exactly when we need the fallback — this always resolves).
 const PORTAL_COST_MGMT = "https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/costanalysis";
-// Flag the pulled figure "may be stale" past ~2× the daily pull cadence (the rollup refreshes azure_cost daily).
-const AZURE_STALE_AFTER_MS = 48 * 60 * 60 * 1000;
 
 /** $ with honest small-value handling — never a fake $0.00 for a real-but-tiny cost. */
 export function money(n: number): string {
@@ -35,16 +34,6 @@ export function money(n: number): string {
 /** Azure figures WITH their reported currency — never assume $ (the RG could bill in another currency). */
 export function azureMoney(n: number, currency: string): string {
   return currency === "USD" || currency === "" ? `$${n.toFixed(2)}` : `${n.toFixed(2)} ${currency}`;
-}
-
-/** "as of <age>" + a staleness flag, from the pull's fetched_at. Absent/unparseable ⇒ treated as stale. */
-export function asOf(fetchedAtIso: string, now: number = Date.now()): { label: string; stale: boolean } {
-  const t = Date.parse(fetchedAtIso);
-  if (!Number.isFinite(t)) return { label: "unknown", stale: true };
-  const ageMs = now - t;
-  const h = Math.floor(ageMs / 3.6e6);
-  const label = ageMs < 3.6e6 ? "just now" : h < 48 ? `${h}h ago` : `${Math.round(h / 24)}d ago`;
-  return { label, stale: ageMs > AZURE_STALE_AFTER_MS };
 }
 
 /** Compute-share %, honest at the small end — a real-but-tiny share is "<0.1%", a null (no runs) is "—". */
@@ -187,7 +176,7 @@ function ModeledEstimate({ report, azureForecast }: { report: CostReport; azureF
 
 /** HEADLINE when the pull is present — Azure's ACTUAL number, with "as of" + a staleness flag. */
 function AzureHeadline({ azure, report }: { azure: NonNullable<CostReport["azure"]>; report: CostReport }) {
-  const { label, stale } = asOf(azure.fetched_at);
+  const { label, stale } = asOf(azure.fetched_at, AZURE_STALE_AFTER_MS);
   return (
     <div data-testid="fleet-cost-azure">
       <div className="flex flex-wrap items-end justify-between gap-3">

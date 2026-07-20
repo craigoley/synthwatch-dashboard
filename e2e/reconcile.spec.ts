@@ -41,19 +41,21 @@ function worldWithDrift() {
 }
 
 test.describe("phase 6b — reconcile drift surface", () => {
-  test("★ active monitors render ABOVE the demoted monitors-as-code (drift) section", async ({ page }) => {
+  test("★ reconcile leads the merged page (drift → auto-expanded) ABOVE the current monitors list", async ({ page }) => {
     await mockApi(page, worldWithDrift());
     await page.goto("/monitors");
 
+    // On the consolidated page reconcile is section 1: with drift it auto-expands and sits above the monitors.
+    const reconcile = page.getByTestId("reconcile-section");
     const firstMonitor = page.locator('a[href^="/checks/"]').first();
-    const driftSection = page.getByTestId("drift-section");
+    await expect(reconcile).toBeVisible();
+    await expect(page.getByTestId("reconcile-section-toggle")).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByTestId("reconcile-drift")).toBeVisible();
     await expect(firstMonitor).toBeVisible();
-    await expect(driftSection).toBeVisible();
-    await expect(driftSection).toContainText("Monitors as code"); // the labeled section break
-    // ★ the active set leads; drift is demoted below it.
+    // ★ reconcile leads; the current-monitors list follows below it.
+    const rBox = await reconcile.boundingBox();
     const mBox = await firstMonitor.boundingBox();
-    const dBox = await driftSection.boundingBox();
-    expect(mBox!.y).toBeLessThan(dBox!.y);
+    expect(rBox!.y).toBeLessThan(mBox!.y);
   });
 
   test("renders all 4 drift types, splitting config drift from the orphan known-gap", async ({ page }) => {

@@ -46,12 +46,15 @@ function worldWithUnmonitored() {
 
 const dialog = (page: Page) => page.getByRole("dialog");
 
+// Activation now lives in the merged /monitors "New monitors" section (the un-activated set-difference); the
+// setup buttons are scoped to that list. After activation the row leaves New monitors and shows Active in the
+// inline "Browse the full spec catalog" reveal.
 test.describe("phase 13 — spec activation (set up monitor)", () => {
   test("Unmonitored+Runnable → prefilled/locked form → submit creates the monitor → row flips Active", async ({ page }) => {
     await mockApi(page, worldWithUnmonitored());
-    await page.goto("/specs");
+    await page.goto("/monitors");
 
-    const setup = page.getByTestId("setup-wegmans-search-product");
+    const setup = page.getByTestId("new-monitors-table").getByTestId("setup-wegmans-search-product");
     await expect(setup).toBeEnabled();
     await setup.click();
 
@@ -75,27 +78,34 @@ test.describe("phase 13 — spec activation (set up monitor)", () => {
     // ★ Interval round-trips through the minutes UI: suggested 600s → shown as 10 min → sent back as 600s.
     expect(body.intervalSeconds).toBe(600);
 
-    // The catalog re-reads → the spec is now MONITORED, so it leaves the default "not set up" view (#141:
-    // the catalog defaults to not-set-up). Switch to "All" to confirm the row flipped Unmonitored → Active.
-    await page.getByTestId("view-all").click();
+    // The catalog re-reads → the spec is now MONITORED, so it leaves the "New monitors" set-difference.
+    // Reveal the full catalog to confirm the row flipped Unmonitored → Active.
+    await expect(page.getByTestId("new-monitors-table").getByTestId("spec-row-wegmans-search-product")).toHaveCount(0);
+    await page.getByTestId("browse-catalog").click();
     await expect
-      .poll(() => page.getByTestId("spec-row-wegmans-search-product").getAttribute("data-coverage"))
+      .poll(() =>
+        page
+          .getByTestId("full-catalog-table")
+          .getByTestId("spec-row-wegmans-search-product")
+          .getAttribute("data-coverage"),
+      )
       .toBe("active");
   });
 
   test("Orphan (not runnable) → 'Set up monitor' is DISABLED with the reason", async ({ page }) => {
     await mockApi(page, worldWithUnmonitored());
-    await page.goto("/specs");
+    await page.goto("/monitors");
 
-    const setup = page.getByTestId("setup-broken-spec");
+    // Both unmonitored specs surface in New monitors; the orphan's setup is blocked.
+    const nm = page.getByTestId("new-monitors-table");
+    const setup = nm.getByTestId("setup-broken-spec");
     await expect(setup).toBeDisabled();
     await expect(setup).toHaveAttribute("title", /won't compile/);
-    await expect(page.getByTestId("setup-blocked-broken-spec")).toBeVisible(); // fix-in-Git hint
-    await expect(page.getByTestId("spec-row-broken-spec")).toContainText("won't compile"); // probe reason
+    await expect(nm.getByTestId("setup-blocked-broken-spec")).toBeVisible(); // fix-in-Git hint
+    await expect(nm.getByTestId("spec-row-broken-spec")).toContainText("won't compile"); // probe reason
 
-    // An Active/Paused row has NO activation button (it already has a check) — sanity that the button
-    // is scoped to Unmonitored rows only.
-    await expect(page.getByTestId("setup-wegmans-search-product")).toBeEnabled();
+    // The runnable unmonitored row keeps an enabled activation button.
+    await expect(nm.getByTestId("setup-wegmans-search-product")).toBeEnabled();
   });
 
   test("duplicate source_key → a clear 'already exists' message (the API 409)", async ({ page }) => {
@@ -105,16 +115,16 @@ test.describe("phase 13 — spec activation (set up monitor)", () => {
       body: { error: "conflict", message: "A monitor for spec 'wegmans-search-product' already exists." },
     };
     await mockApi(page, w);
-    await page.goto("/specs");
+    await page.goto("/monitors");
 
-    await page.getByTestId("setup-wegmans-search-product").click();
+    await page.getByTestId("new-monitors-table").getByTestId("setup-wegmans-search-product").click();
     await dialog(page).getByRole("button", { name: "Set up monitor" }).click();
 
     await expect(dialog(page).getByText("A monitor for this spec already exists.")).toBeVisible();
     // The modal stays open (the activation didn't complete).
     await expect(dialog(page)).toBeVisible();
-    // ★ A FAILED setup leaves NO phantom row: the create threw → no cache invalidation → the row reflects
-    // truth (still unmonitored), never an optimistic "active" lie that didn't persist.
-    await expect(page.getByTestId("spec-row-wegmans-search-product")).not.toHaveAttribute("data-coverage", "active");
+    // ★ A FAILED setup leaves NO phantom row: the create threw → no cache invalidation → the row stays in
+    // New monitors (still unmonitored), never an optimistic "active" lie that didn't persist.
+    await expect(page.getByTestId("new-monitors-table").getByTestId("spec-row-wegmans-search-product")).toBeVisible();
   });
 });
