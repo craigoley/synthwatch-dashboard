@@ -18,7 +18,6 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 
 import { mutate } from "swr";
 
@@ -68,17 +67,19 @@ function PlanPreview({ plan }: { plan: ReconcileApplyPlanItem }) {
  * no live monitor) surfaces the unmonitored count when there is one.
  */
 function CatalogLink({ newCount }: { newCount: number }) {
+  // In-page anchor to the New monitors section (this surface + the catalog now share the /monitors page). A
+  // same-page hash scroll; the section header is always visible (even collapsed), so it lands on the count.
   return (
-    <Link
-      href="/specs"
+    <a
+      href="#new-monitors"
       data-testid="drift-catalog-link"
       className="inline-flex items-center gap-1 text-[12px] text-[var(--color-brand)] hover:underline"
     >
       {newCount > 0
-        ? `${newCount} spec${newCount === 1 ? "" : "s"} unmonitored — open the catalog`
-        : "Browse the spec catalog"}
-      <span aria-hidden>→</span>
-    </Link>
+        ? `${newCount} spec${newCount === 1 ? "" : "s"} unmonitored — set up below`
+        : "Browse declared specs"}
+      <span aria-hidden>↓</span>
+    </a>
   );
 }
 

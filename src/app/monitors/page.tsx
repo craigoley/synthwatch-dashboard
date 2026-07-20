@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { useChecks, updateCheck, deleteCheck, useTags, useReconcileDrift } from "@/lib/client";
+import { useChecks, updateCheck, deleteCheck, useTags, useReconcileDrift, useSpecCatalog } from "@/lib/client";
 import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
 import { ApiRequestError } from "@/lib/api-client";
 import { StatusDot } from "@/components/status-badge";
@@ -13,13 +13,34 @@ import { MonitorChatInput } from "@/components/monitor-chat-input";
 import { useCreateMonitor, CreateMonitorModal } from "@/components/create-monitor";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { ReconcileDriftSurface } from "@/components/reconcile-drift";
+import { CollapsibleSection } from "@/components/collapsible-section";
+import { SpecTable, CatalogControls, coverageOf, useSpecFilters, compareSpec } from "@/components/spec-catalog";
 import { RunAllControl } from "@/components/run-all";
 import { RedactionBadge, RedactionFleetSummary } from "@/components/redaction";
 import { useAuth } from "@/components/auth-provider";
 import { SignInToEdit } from "@/components/write-gate";
+import { usePersistedCollapse } from "@/lib/use-persisted-collapse";
+import { asOf, SPEC_CATALOG_STALE_AFTER_MS } from "@/lib/staleness";
+import { activationFrom } from "@/lib/specs";
 import { formatRelative } from "@/lib/format";
 import { daysUntilPurge } from "@/lib/status";
-import type { Check, CheckWithStatus } from "@/lib/types";
+import type { Check, CheckWithStatus, SpecCatalogEntry } from "@/lib/types";
+
+/** New-monitors section freshness — the ~24h reconcile-cron snapshot, "as of <age>" + a beyond-cron ⚠. */
+function CatalogStamp({ probedAt }: { probedAt: string | null }) {
+  if (!probedAt) return null;
+  const { label, stale } = asOf(probedAt, SPEC_CATALOG_STALE_AFTER_MS);
+  return (
+    <span
+      data-testid="new-monitors-stamp"
+      className="sw-mono whitespace-nowrap text-[10px] font-normal"
+      style={{ color: stale ? "var(--color-warn)" : "var(--color-ink-faint)" }}
+    >
+      {stale && <span aria-hidden>⚠ </span>}as of {label}
+      {stale && " — snapshot may be stale"}
+    </span>
+  );
+}
 
 function DeleteDialog({
   check,
@@ -124,15 +145,52 @@ export default function MonitorsPage() {
   // a read-gated 401 / a real failure must show the section so the surface's SignInToView/ErrorState is
   // visible (hiding an errored section would be the silent-swallow #175 forbids).
   const { data: drift, error: driftError } = useReconcileDrift();
+  // The spec catalog (git-declared specs) — a ~24h reconcile-cron SNAPSHOT (unlike the live checks above). Its
+  // own SWR key ["spec-catalog"] → deduped, and /specs (which fetched it) now redirects here, so NET-ZERO new
+  // fetches. undefined = loading, null = 404 (feature absent), object = data.
+  const { data: catalog } = useSpecCatalog();
   const { canWrite } = useAuth();
   const { selected, toggle, clear } = useTagFilter();
   const create = useCreateMonitor();
   const [editing, setEditing] = useState<Check | null>(null);
   const [deleting, setDeleting] = useState<CheckWithStatus | null>(null);
   const [pausingId, setPausingId] = useState<number | null>(null);
+  const [activating, setActivating] = useState<SpecCatalogEntry | null>(null);
+  const [showAllSpecs, setShowAllSpecs] = useState(false);
+  const catalogFilters = useSpecFilters();
 
   // Monitors filter off their own embedded tags (check.tags), AND of all selected.
   const visible = (data ?? []).filter((c) => matchesTags(c.tags, selected));
+
+  // ── Section signals (computed at page level so the collapsed HEADER can always announce them) ──
+  // Reconcile: distinct non-orphan source_keys that differ from Git (matches ReconcileDriftSurface's configMonitors).
+  const driftCount = drift ? new Set(drift.items.filter((r) => r.drift_type !== "orphan").map((r) => r.source_key)).size : 0;
+  // New monitors: the set-difference — git-declared specs with no check yet. Empties to zero when healthy.
+  const catalogItems = catalog?.items ?? [];
+  const unActivated = catalogItems.filter((s) => coverageOf(s) === "unmonitored").sort((a, b) => a.name.localeCompare(b.name));
+  // Full-catalog reveal, tag-filtered + sorted.
+  const allFiltered = (catalogFilters.tags.length ? catalogItems.filter((s) => catalogFilters.tags.every((t) => s.tags.includes(t))) : catalogItems)
+    .slice()
+    .sort((a, b) => compareSpec(a, b, catalogFilters.sort.col, catalogFilters.sort.dir));
+
+  // Collapse state (tri-state, per-browser localStorage). "auto" default = OPEN when there's something to show;
+  // an explicit toggle pins it. The BODY collapses; the header signal never does (a pinned-closed section still
+  // announces new drift / new specs). ★ per-browser, not per-user — the same open question as the sticky
+  // filters; decide them together later.
+  const reconcile = usePersistedCollapse("synthwatch:monitors-reconcile", driftCount > 0);
+  const newMonitors = usePersistedCollapse("synthwatch:monitors-new-monitors", unActivated.length > 0);
+
+  // /specs → /monitors?from=catalog: force-expand + scroll to the new-monitors section (an explicit intent
+  // overrides a pinned-closed state for this visit, without pinning it open).
+  const [fromCatalog, setFromCatalog] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("from") !== "catalog") return;
+    setFromCatalog(true);
+    // Scroll once the section exists (after the catalog resolves and the section renders).
+    const el = document.getElementById("new-monitors");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [catalog]);
 
   async function togglePause(check: CheckWithStatus) {
     setPausingId(check.id);
@@ -156,10 +214,102 @@ export default function MonitorsPage() {
 
   return (
     <div className="space-y-6">
+      {/* ── 1 · RECONCILE / DRIFT — moved to the TOP, wrapped in a disclosure. #299 flow UNCHANGED inside the
+          surface. Drift → auto-expanded + "⚠ N differ"; in-sync → auto-collapsed + "In sync with Git". The
+          header signal is ALWAYS visible, so a pinned-closed section still announces new drift. ── */}
+      {(drift || driftError) && (
+        <CollapsibleSection
+          id="reconcile"
+          label="Reconcile drift"
+          testId="reconcile-section"
+          open={reconcile.open}
+          onToggle={reconcile.toggle}
+          header={
+            <span className="flex flex-wrap items-baseline gap-x-2">
+              {driftCount > 0 ? (
+                <span style={{ color: "var(--color-warn)" }}>
+                  ⚠ {driftCount} monitor{driftCount === 1 ? "" : "s"} differ from Git
+                </span>
+              ) : (
+                "In sync with Git"
+              )}
+              {drift?.detected_at && (
+                <span
+                  data-testid="reconcile-stamp"
+                  className="sw-mono whitespace-nowrap text-[10px] font-normal text-[var(--color-ink-faint)]"
+                >
+                  reconciled {formatRelative(drift.detected_at)}
+                </span>
+              )}
+            </span>
+          }
+          subtitle="Review & apply differences between Git and live monitors"
+        >
+          <ReconcileDriftSurface />
+        </CollapsibleSection>
+      )}
+
+      {/* ── 2 · NEW MONITORS — the un-activated SET-DIFFERENCE (git-declared, no check yet). Empties to zero
+          when healthy. Stamped "as of <snapshot>" (a ~24h cron, unlike the live fleet below). ── */}
+      {catalog && (
+        <CollapsibleSection
+          id="new-monitors"
+          label="New monitors"
+          testId="new-monitors-section"
+          open={newMonitors.open || fromCatalog}
+          onToggle={newMonitors.toggle}
+          header={
+            <span className="flex flex-wrap items-baseline gap-x-2">
+              {unActivated.length > 0
+                ? `${unActivated.length} declared spec${unActivated.length === 1 ? "" : "s"} not yet monitored`
+                : "All declared specs are monitored"}
+              <CatalogStamp probedAt={catalog.probed_at} />
+            </span>
+          }
+          subtitle="Git-declared specs that aren’t live monitors yet — set one up here (identity locked to Git)"
+        >
+          {unActivated.length > 0 ? (
+            <SpecTable items={unActivated} onActivate={setActivating} testId="new-monitors-table" />
+          ) : (
+            <p className="text-sm text-[var(--color-ink-dim)]">
+              Every declared spec has a monitor. New specs appear here after the next reconcile snapshot.
+            </p>
+          )}
+
+          {/* Coverage answer, inline: the full "All" catalog (Coverage / Runnable / Linked-monitor → /checks/{id}
+              / Health, with sort + tags). `hidden` keeps it in the DOM (a11y target) — permanently mounted at
+              ~37 specs; confirmed acceptable in the measure pass. */}
+          <div className="mt-3">
+            <button
+              type="button"
+              data-testid="browse-catalog"
+              aria-expanded={showAllSpecs}
+              aria-controls="full-catalog"
+              onClick={() => setShowAllSpecs((v) => !v)}
+              className="text-[12px] text-[var(--color-brand)] hover:underline"
+            >
+              {showAllSpecs
+                ? "Hide the full spec catalog"
+                : `Browse the full spec catalog (${catalogItems.length} spec${catalogItems.length === 1 ? "" : "s"}) →`}
+            </button>
+            <div id="full-catalog" hidden={!showAllSpecs} className="mt-2 space-y-2" data-testid="full-catalog">
+              <CatalogControls filters={catalogFilters} items={catalogItems} />
+              <SpecTable items={allFiltered} onActivate={setActivating} testId="full-catalog-table" />
+            </div>
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* ── 3 · CURRENT MONITORS — the live fleet (verbatim). Not collapsible; the page's primary content. ── */}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="sw-eyebrow">Configuration</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Monitors</h1>
+          <h1 className="mt-1 flex flex-wrap items-baseline gap-x-2 text-2xl font-semibold tracking-tight">
+            Monitors
+            <span data-testid="monitors-live-stamp" className="sw-mono text-[10px] font-normal text-[var(--color-ink-faint)]">
+              · live
+            </span>
+          </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Run the CURRENT filtered set in one click — editor-only, capped fan-out, live aggregate progress. */}
@@ -306,18 +456,6 @@ export default function MonitorsPage() {
         </div>
       )}
 
-      {/* ── Demoted below the active monitors: monitors-as-code drift (new/changed/missing vs Git) + the
-          catalog cross-link. The manage page LEADS with current monitors; what differs from Git / isn't set
-          up yet is secondary context (set-up lives on the Catalog page). Gated on `drift` so an absent
-          reconcile endpoint shows no empty labeled block — but an ERROR (read-gate 401 / real failure)
-          keeps the section so the surface's SignInToView / ErrorState renders instead of vanishing. */}
-      {(drift || driftError) && (
-        <section className="border-t border-[var(--color-border)] pt-6" aria-label="Monitors as code" data-testid="drift-section">
-          <p className="sw-eyebrow mb-3">Monitors as code</p>
-          <ReconcileDriftSurface />
-        </section>
-      )}
-
       <CreateMonitorModal {...create.modal} />
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title={`Edit · ${editing?.name ?? ""}`}>
@@ -327,6 +465,23 @@ export default function MonitorsPage() {
       </Modal>
 
       {deleting && <DeleteDialog check={deleting} onClose={() => setDeleting(null)} />}
+
+      {/* Activation (from the New monitors section): MonitorForm in activation mode — prefilled + IDENTITY-LOCKED
+          spec_path + source_key (never a free-form create). On success the catalog re-reads and the row leaves
+          the un-activated set. */}
+      <Modal
+        open={activating !== null}
+        onClose={() => setActivating(null)}
+        title={`Set up monitor · ${activating?.name ?? ""}`}
+      >
+        {activating && (
+          <MonitorForm
+            activation={activationFrom(activating)}
+            onDone={() => setActivating(null)}
+            onCancel={() => setActivating(null)}
+          />
+        )}
+      </Modal>
     </div>
   );
 }
