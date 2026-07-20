@@ -362,6 +362,19 @@ export async function mockApi(
     return route.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 });
   });
 
+  // ★ SAME-ORIGIN preview artifact proxies (app/preview-screenshot/[token], app/preview-trace/[token]) — the
+  //   Tests scratchpad's equivalents of the above. WITHOUT these the <img> hits the real Next route, which
+  //   server-side fetches the unreachable mock host, 404s, and the component's onError swaps in the
+  //   "unavailable" block. A test asserting the screenshot RENDERS then passes or fails on a race — it was
+  //   green only because the assertion usually beat the failed fetch. Serving them makes "the screenshot is
+  //   shown" mean what it says.
+  await page.route("**/preview-screenshot/**", async (route) =>
+    route.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 }),
+  );
+  await page.route("**/preview-trace/**", async (route) =>
+    route.fulfill({ status: 200, contentType: "application/zip", body: Buffer.from("PK") }),
+  );
+
   await page.route(`${API_ORIGIN}/**`, async (route) => {
     const req = route.request();
     const url = new URL(req.url());

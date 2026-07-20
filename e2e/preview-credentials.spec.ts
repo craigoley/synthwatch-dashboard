@@ -118,7 +118,14 @@ test.describe("Tests scratchpad — optional per-run credentials", () => {
 
     // ★ The screenshot survives and the suppression explanation never appears.
     await expect(page.getByTestId("preview-screenshot-suppressed")).toHaveCount(0);
-    await expect(page.getByAltText("Preview failure screenshot")).toBeVisible();
+    const shot = page.getByAltText("Preview failure screenshot");
+    await expect(shot).toBeVisible();
+    // ★ And it actually LOADED. `toBeVisible` alone passes on an <img> whose fetch is still in flight — the
+    //   component swaps in an "unavailable" block on error, so a visible-but-unloaded img is exactly the race
+    //   that made this test pass for the wrong reason. naturalWidth is only non-zero once decoded.
+    await expect
+      .poll(() => shot.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+      .toBeGreaterThan(0);
     await expect(page.getByTestId("preview-done-footer")).toContainText("unauthenticated");
 
     // ★ And the request carries NO credentials node at all — an untouched form must not send empty strings,
