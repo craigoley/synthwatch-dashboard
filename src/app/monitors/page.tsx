@@ -148,7 +148,9 @@ export default function MonitorsPage() {
   // The spec catalog (git-declared specs) — a ~24h reconcile-cron SNAPSHOT (unlike the live checks above). Its
   // own SWR key ["spec-catalog"] → deduped, and /specs (which fetched it) now redirects here, so NET-ZERO new
   // fetches. undefined = loading, null = 404 (feature absent), object = data.
-  const { data: catalog } = useSpecCatalog();
+  // error matters: a real 500/network failure must go LOUD (specs-load-error), never a blank that reads as
+  // "no new monitors" (the silent-swallow #175/#177 forbid). A 404 stays data=null → the section hides.
+  const { data: catalog, error: catalogError } = useSpecCatalog();
   const { canWrite } = useAuth();
   const { selected, toggle, clear } = useTagFilter();
   const create = useCreateMonitor();
@@ -214,10 +216,14 @@ export default function MonitorsPage() {
 
   return (
     <div className="space-y-6">
-      {/* ── 1 · RECONCILE / DRIFT — moved to the TOP, wrapped in a disclosure. #299 flow UNCHANGED inside the
-          surface. Drift → auto-expanded + "⚠ N differ"; in-sync → auto-collapsed + "In sync with Git". The
-          header signal is ALWAYS visible, so a pinned-closed section still announces new drift. ── */}
-      {(drift || driftError) && (
+      {/* ── 1 · RECONCILE / DRIFT — moved to the TOP. #299 flow UNCHANGED inside the surface. When the drift
+          read SUCCEEDS it's a disclosure: drift → auto-expanded + "⚠ N differ"; in-sync → auto-collapsed +
+          "In sync with Git" (the header signal is ALWAYS visible, so a pinned-closed section still warns).
+          But a FAILED/gated read is attention-demanding — its SignInToView (401) / ErrorState (#175) must
+          never be collapse-hidden, so on driftError we render the surface DIRECTLY (no disclosure to shut). */}
+      {driftError ? (
+        <ReconcileDriftSurface />
+      ) : drift ? (
         <CollapsibleSection
           id="reconcile"
           label="Reconcile drift"
@@ -233,7 +239,7 @@ export default function MonitorsPage() {
               ) : (
                 "In sync with Git"
               )}
-              {drift?.detected_at && (
+              {drift.detected_at && (
                 <span
                   data-testid="reconcile-stamp"
                   className="sw-mono whitespace-nowrap text-[10px] font-normal text-[var(--color-ink-faint)]"
@@ -247,11 +253,14 @@ export default function MonitorsPage() {
         >
           <ReconcileDriftSurface />
         </CollapsibleSection>
-      )}
+      ) : null}
 
       {/* ── 2 · NEW MONITORS — the un-activated SET-DIFFERENCE (git-declared, no check yet). Empties to zero
-          when healthy. Stamped "as of <snapshot>" (a ~24h cron, unlike the live fleet below). ── */}
-      {catalog && (
+          when healthy. Stamped "as of <snapshot>" (a ~24h cron, unlike the live fleet below). A failed catalog
+          read goes LOUD here (never a silent hide that reads as "no new monitors"). ── */}
+      {catalogError ? (
+        <ErrorState testId="specs-load-error" message="Couldn’t load the spec catalog — the API is unreachable. Retry shortly." />
+      ) : catalog && (
         <CollapsibleSection
           id="new-monitors"
           label="New monitors"
