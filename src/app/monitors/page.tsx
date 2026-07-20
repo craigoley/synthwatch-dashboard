@@ -13,6 +13,7 @@ import { MonitorChatInput } from "@/components/monitor-chat-input";
 import { useCreateMonitor, CreateMonitorModal } from "@/components/create-monitor";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { ReconcileDriftSurface } from "@/components/reconcile-drift";
+import { ReconcileNowButton } from "@/components/reconcile-now-button";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { SpecTable, CatalogControls, coverageOf, useSpecFilters, compareSpec } from "@/components/spec-catalog";
 import { RunAllControl } from "@/components/run-all";
@@ -167,6 +168,9 @@ export default function MonitorsPage() {
   // ── Section signals (computed at page level so the collapsed HEADER can always announce them) ──
   // Reconcile: distinct non-orphan source_keys that differ from Git (matches ReconcileDriftSurface's configMonitors).
   const driftCount = drift ? new Set(drift.items.filter((r) => r.drift_type !== "orphan").map((r) => r.source_key)).size : 0;
+  // Orphans (Git defines a monitor the runner can't run yet) are a KNOWN GAP, not config drift — but still
+  // something, so they keep the reconcile PANEL rather than fold into the "in sync" line.
+  const orphanCount = drift ? new Set(drift.items.filter((r) => r.drift_type === "orphan").map((r) => r.source_key)).size : 0;
   // New monitors: the set-difference — git-declared specs with no check yet. Empties to zero when healthy.
   const catalogItems = catalog?.items ?? [];
   const unActivated = catalogItems.filter((s) => coverageOf(s) === "unmonitored").sort((a, b) => a.name.localeCompare(b.name));
@@ -175,11 +179,22 @@ export default function MonitorsPage() {
     .slice()
     .sort((a, b) => compareSpec(a, b, catalogFilters.sort.col, catalogFilters.sort.dir));
 
-  // Collapse state (tri-state, per-browser localStorage). "auto" default = OPEN when there's something to show;
-  // an explicit toggle pins it. The BODY collapses; the header signal never does (a pinned-closed section still
-  // announces new drift / new specs). ★ per-browser, not per-user — the same open question as the sticky
-  // filters; decide them together later.
-  const reconcile = usePersistedCollapse("synthwatch:monitors-reconcile", driftCount > 0);
+  // ── Loud PANEL vs thin STATUS-LINE (the #304 healthy state was two collapsed-but-chromed panels, ~290px+
+  //    of "nothing to do" above the table). A section earns a real panel only when it has WORK or errored;
+  //    otherwise its state folds into a single thin status row just above the Monitors table. ──
+  const driftReady = !!drift && !driftError; // the read succeeded (data, not a 404-null or an error)
+  const catalogReady = !!catalog && !catalogError;
+  const driftItemCount = drift?.items.length ?? 0; // config drift + orphans
+  const showReconcilePanel = !!driftError || driftItemCount > 0; // error (loud) or anything to reconcile
+  const showNewMonitorsPanel = !!catalogError || unActivated.length > 0;
+  const driftClean = driftReady && driftItemCount === 0; // reconcile ran, nothing differs → the thin line
+  const catalogClean = catalogReady && unActivated.length === 0; // every declared spec is monitored → thin line
+
+  // Collapse state (tri-state, per-browser localStorage) for the WORK panels only. autoOpen = OPEN when there's
+  // something to show; an explicit toggle pins it. The BODY collapses; the header signal never does (a pinned-
+  // closed section still announces the count). Healthy sections don't render a panel at all, so no stale pin can
+  // resurrect one. ★ per-browser, not per-user — same open question as the sticky filters; decide together later.
+  const reconcile = usePersistedCollapse("synthwatch:monitors-reconcile", driftCount > 0 || orphanCount > 0);
   const newMonitors = usePersistedCollapse("synthwatch:monitors-new-monitors", unActivated.length > 0);
 
   // /specs → /monitors?from=catalog: force-expand + scroll to the new-monitors section (an explicit intent
@@ -216,14 +231,13 @@ export default function MonitorsPage() {
 
   return (
     <div className="space-y-6">
-      {/* ── 1 · RECONCILE / DRIFT — moved to the TOP. #299 flow UNCHANGED inside the surface. When the drift
-          read SUCCEEDS it's a disclosure: drift → auto-expanded + "⚠ N differ"; in-sync → auto-collapsed +
-          "In sync with Git" (the header signal is ALWAYS visible, so a pinned-closed section still warns).
-          But a FAILED/gated read is attention-demanding — its SignInToView (401) / ErrorState (#175) must
-          never be collapse-hidden, so on driftError we render the surface DIRECTLY (no disclosure to shut). */}
+      {/* ── 1 · RECONCILE / DRIFT — LOUD only when there's work. #299 flow UNCHANGED inside the surface.
+          driftError → the surface renders DIRECTLY (its SignInToView (401) / ErrorState (#175) must never be
+          collapse-hidden). Drift/orphans → a disclosure: auto-expanded, header carries the count (a pinned-
+          closed body still announces it). In-sync → NO panel; it folds into the thin status line below. ── */}
       {driftError ? (
         <ReconcileDriftSurface />
-      ) : drift ? (
+      ) : showReconcilePanel ? (
         <CollapsibleSection
           id="reconcile"
           label="Reconcile drift"
@@ -237,9 +251,11 @@ export default function MonitorsPage() {
                   ⚠ {driftCount} monitor{driftCount === 1 ? "" : "s"} differ from Git
                 </span>
               ) : (
-                "In sync with Git"
+                <span className="text-[var(--color-ink-dim)]">
+                  {orphanCount} monitor{orphanCount === 1 ? "" : "s"} Git defines the runner can’t run yet
+                </span>
               )}
-              {drift.detected_at && (
+              {drift?.detected_at && (
                 <span
                   data-testid="reconcile-stamp"
                   className="sw-mono whitespace-nowrap text-[10px] font-normal text-[var(--color-ink-faint)]"
@@ -249,18 +265,17 @@ export default function MonitorsPage() {
               )}
             </span>
           }
-          subtitle="Review & apply differences between Git and live monitors"
         >
           <ReconcileDriftSurface />
         </CollapsibleSection>
       ) : null}
 
-      {/* ── 2 · NEW MONITORS — the un-activated SET-DIFFERENCE (git-declared, no check yet). Empties to zero
-          when healthy. Stamped "as of <snapshot>" (a ~24h cron, unlike the live fleet below). A failed catalog
-          read goes LOUD here (never a silent hide that reads as "no new monitors"). ── */}
+      {/* ── 2 · NEW MONITORS — the un-activated SET-DIFFERENCE (git-declared, no check yet). LOUD only when
+          there's at least one to set up (or the catalog read failed → specs-load-error, never a silent hide).
+          When every declared spec is monitored → NO panel; it folds into the thin status line below. ── */}
       {catalogError ? (
         <ErrorState testId="specs-load-error" message="Couldn’t load the spec catalog — the API is unreachable. Retry shortly." />
-      ) : catalog && (
+      ) : showNewMonitorsPanel ? (
         <CollapsibleSection
           id="new-monitors"
           label="New monitors"
@@ -269,44 +284,78 @@ export default function MonitorsPage() {
           onToggle={newMonitors.toggle}
           header={
             <span className="flex flex-wrap items-baseline gap-x-2">
-              {unActivated.length > 0
-                ? `${unActivated.length} declared spec${unActivated.length === 1 ? "" : "s"} not yet monitored`
-                : "All declared specs are monitored"}
-              <CatalogStamp probedAt={catalog.probed_at} />
+              {`${unActivated.length} declared spec${unActivated.length === 1 ? "" : "s"} not yet monitored`}
+              <CatalogStamp probedAt={catalog?.probed_at ?? null} />
             </span>
           }
-          subtitle="Git-declared specs that aren’t live monitors yet — set one up here (identity locked to Git)"
         >
-          {unActivated.length > 0 ? (
-            <SpecTable items={unActivated} onActivate={setActivating} testId="new-monitors-table" />
-          ) : (
-            <p className="text-sm text-[var(--color-ink-dim)]">
-              Every declared spec has a monitor. New specs appear here after the next reconcile snapshot.
-            </p>
-          )}
-
-          {/* Coverage answer, inline: the full "All" catalog (Coverage / Runnable / Linked-monitor → /checks/{id}
-              / Health, with sort + tags). `hidden` keeps it in the DOM (a11y target) — permanently mounted at
-              ~37 specs; confirmed acceptable in the measure pass. */}
-          <div className="mt-3">
-            <button
-              type="button"
-              data-testid="browse-catalog"
-              aria-expanded={showAllSpecs}
-              aria-controls="full-catalog"
-              onClick={() => setShowAllSpecs((v) => !v)}
-              className="text-[12px] text-[var(--color-brand)] hover:underline"
-            >
-              {showAllSpecs
-                ? "Hide the full spec catalog"
-                : `Browse the full spec catalog (${catalogItems.length} spec${catalogItems.length === 1 ? "" : "s"}) →`}
-            </button>
-            <div id="full-catalog" hidden={!showAllSpecs} className="mt-2 space-y-2" data-testid="full-catalog">
-              <CatalogControls filters={catalogFilters} items={catalogItems} />
-              <SpecTable items={allFiltered} onActivate={setActivating} testId="full-catalog-table" />
-            </div>
-          </div>
+          <SpecTable items={unActivated} onActivate={setActivating} testId="new-monitors-table" />
         </CollapsibleSection>
+      ) : null}
+
+      {/* ── STATUS LINE — the HEALTHY state collapses BOTH sections into ONE thin row (no panel chrome): the
+          clean signals that didn't earn a panel above, the "as of" snapshot stamp, [Reconcile now], and the
+          always-available coverage entry (the full-catalog reveal). Fully in-sync + all-monitored ⇒ this is the
+          only thing between the page top and the Monitors table (~40px, not ~450px of stacked panels). ── */}
+      {(driftClean || catalogClean || catalogReady) && (
+        // The #new-monitors scroll anchor (for /specs?from=catalog) lives on the setup PANEL when it renders,
+        // else here on the status line — never both (no duplicate id).
+        <div id={showNewMonitorsPanel ? undefined : "new-monitors"} className="scroll-mt-4">
+          <div
+            data-testid="monitors-status-line"
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[var(--color-ink-dim)]"
+          >
+            {driftClean && (
+              <span className="inline-flex items-center gap-1.5 text-[var(--color-ink)]">
+                <span className="sw-dot sw-dot-pass" aria-hidden />
+                In sync with Git
+              </span>
+            )}
+            {catalogClean && (
+              <>
+                {driftClean && <span aria-hidden className="text-[var(--color-ink-faint)]">·</span>}
+                <span>
+                  {catalogItems.length} declared spec{catalogItems.length === 1 ? "" : "s"}, all monitored
+                </span>
+              </>
+            )}
+            {catalogClean && catalog?.probed_at && (
+              <>
+                <span aria-hidden className="text-[var(--color-ink-faint)]">·</span>
+                <CatalogStamp probedAt={catalog.probed_at} />
+              </>
+            )}
+            {driftClean && (
+              <>
+                <span aria-hidden className="text-[var(--color-ink-faint)]">·</span>
+                <ReconcileNowButton />
+              </>
+            )}
+            {catalogReady && (
+              <>
+                <span aria-hidden className="text-[var(--color-ink-faint)]">·</span>
+                <button
+                  type="button"
+                  data-testid="browse-catalog"
+                  aria-expanded={showAllSpecs}
+                  aria-controls="full-catalog"
+                  onClick={() => setShowAllSpecs((v) => !v)}
+                  className="text-[12px] text-[var(--color-brand)] hover:underline"
+                >
+                  {showAllSpecs
+                    ? "Hide the full spec catalog"
+                    : `Browse the full spec catalog (${catalogItems.length} spec${catalogItems.length === 1 ? "" : "s"}) →`}
+                </button>
+              </>
+            )}
+          </div>
+          {/* The full "All" catalog (Coverage / Runnable / Linked-monitor → /checks/{id} / Health, sort + tags).
+              `hidden` keeps it in the DOM (a11y target). */}
+          <div id="full-catalog" hidden={!showAllSpecs} className="mt-2 space-y-2" data-testid="full-catalog">
+            <CatalogControls filters={catalogFilters} items={catalogItems} />
+            <SpecTable items={allFiltered} onActivate={setActivating} testId="full-catalog-table" />
+          </div>
+        </div>
       )}
 
       {/* ── 3 · CURRENT MONITORS — the live fleet (verbatim). Not collapsible; the page's primary content. ── */}

@@ -31,9 +31,8 @@ test.describe("read-gated GETs — bearer forwarding", () => {
     });
     await mockApi(page, gatedWorld()); // seeds the editor session by default
     await page.goto("/monitors");
-    // authed → gate passed → the reconcile disclosure renders; in-sync auto-collapses to a quiet header
-    // (the surface body is present but hidden by design — the header carries the "In sync" signal).
-    await expect(page.getByTestId("reconcile-section-toggle")).toContainText("In sync with Git");
+    // authed → gate passed → the drift read succeeds; in-sync folds into the thin status line (no panel).
+    await expect(page.getByTestId("monitors-status-line")).toContainText("In sync with Git");
     await page.goto("/notifications");
     await expect(page.getByText("Ops email").first()).toBeVisible();
 

@@ -123,13 +123,15 @@ test.describe("phase 6b — reconcile drift surface", () => {
     await expect(page.getByTestId("reconcile-drift")).not.toContainText("differ from Git");
   });
 
-  test("empty snapshot → positive 'in sync with Git' state (not an error)", async ({ page }) => {
+  test("empty snapshot → positive 'in sync with Git' state (the thin status line, not a panel)", async ({ page }) => {
     const w = defaultWorld();
     w.reconcileDrift = { items: [] };
     await mockApi(page, w);
     await page.goto("/monitors");
 
-    await expect(page.getByTestId("drift-insync")).toContainText("In sync with Git");
+    // In-sync no longer renders the surface panel — it folds into the one-line status row.
+    await expect(page.getByTestId("monitors-status-line")).toContainText("In sync with Git");
+    await expect(page.getByTestId("reconcile-section")).toHaveCount(0);
     await expect(page.getByTestId("drift-config")).toHaveCount(0);
     await expect(page.getByTestId("drift-orphans")).toHaveCount(0);
   });
@@ -160,11 +162,11 @@ test.describe("phase 6b — reconcile drift surface", () => {
     // the off-cron job completes: it re-runs and rewrites the snapshot (now in sync, detected_at advanced)
     w.reconcileDrift = { items: [], detectedAt: new Date().toISOString() };
 
-    // the scoped fast-poll catches the re-synced snapshot → button re-enables + the surface shows in-sync,
-    // WITHOUT a reload (the runCheckNow live-progress pattern, keyed on detected_at advancing)
-    await expect(btn).toHaveText("Reconcile now", { timeout: 8000 });
-    await expect(page.getByTestId("drift-insync")).toContainText("In sync with Git");
+    // the scoped fast-poll catches the re-synced snapshot → drift clears, so the loud panel gives way to the
+    // thin in-sync status line WITHOUT a reload (the runCheckNow live-progress pattern, keyed on detected_at).
+    await expect(page.getByTestId("monitors-status-line")).toContainText("In sync with Git", { timeout: 8000 });
     await expect(page.getByTestId("drift-config")).toHaveCount(0);
+    await expect(page.getByTestId("reconcile-section")).toHaveCount(0);
   });
 
   test("a failed reconcile trigger surfaces a clear error and re-enables (no silent failure)", async ({ page }) => {

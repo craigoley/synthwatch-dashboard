@@ -8,12 +8,12 @@ import { mockApi } from "./mock";
 // ("Catalog" rendered as "atalog") — hidden navigation, the failure #253 fixed on the Reports sub-tabs.
 // The nav now WRAPS on mobile, so EVERY item must sit fully inside the viewport at rest.
 test.describe("header (phone width)", () => {
-  test("★ ALL seven nav tabs fully inside the viewport (none clipped, none off-screen) + fleet badges at 390px", async ({ page }) => {
+  test("★ ALL six nav tabs fully inside the viewport (none clipped, none off-screen) + fleet badges at 390px", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockApi(page);
     await page.goto("/");
 
-    for (const name of ["Status", "Incidents", "Monitors", "Catalog", "Notifications", "Reports", "Environments"]) {
+    for (const name of ["Status", "Incidents", "Monitors", "Notifications", "Reports", "Environments"]) {
       const link = page.getByRole("link", { name, exact: true }).first();
       await expect(link).toBeVisible();
       const box = await link.boundingBox();
@@ -39,11 +39,11 @@ test.describe("header (phone width)", () => {
   // header with NO scroll and NO wrap (measured: 496px over at 640, 287px at 768, 112px at lg/1024) —
   // the same hidden-content failure, relocated to tablet. The wrap now stays engaged until xl (1280).
   for (const width of [640, 768, 1024]) {
-    test(`tablet band (${width}px): all seven nav tabs fully visible — wrapped, no header overflow`, async ({ page }) => {
+    test(`tablet band (${width}px): all six nav tabs fully visible — wrapped, no header overflow`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await mockApi(page);
       await page.goto("/");
-      for (const name of ["Status", "Incidents", "Monitors", "Catalog", "Notifications", "Reports", "Environments"]) {
+      for (const name of ["Status", "Incidents", "Monitors", "Notifications", "Reports", "Environments"]) {
         const box = (await page.getByRole("link", { name, exact: true }).first().boundingBox())!;
         expect(box.x, `${name} left edge`).toBeGreaterThanOrEqual(0);
         expect(box.x + box.width, `${name} right edge`).toBeLessThanOrEqual(width + 1);
