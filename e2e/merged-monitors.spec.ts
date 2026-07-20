@@ -69,17 +69,17 @@ test.describe("merged /monitors — reconcile section (state-dependent, pinned-c
     await expect(page.getByTestId("reconcile-drift")).toBeVisible();
   });
 
-  test("no drift → section COLLAPSED with a quiet 'In sync with Git' header", async ({ page }) => {
+  test("no drift → NO reconcile panel; 'In sync with Git' folds into the thin status line", async ({ page }) => {
     const w = defaultWorld();
     w.reconcileDrift = { items: [], detectedAt: "2026-06-25T12:00:00Z" };
     w.specCatalog = { items: CATALOG, probedAt: "2026-06-25T12:00:00Z" };
     await mockApi(page, w);
     await page.goto("/monitors");
 
-    await expect(reconcileToggle(page)).toContainText("In sync with Git");
-    await expect(reconcileToggle(page)).toHaveAttribute("aria-expanded", "false");
-    // body collapsed → the surface is hidden (in the DOM, not visible)
-    await expect(page.getByTestId("reconcile-drift")).toBeHidden();
+    // ★ Healthy = a thin status row, NOT a collapsed-but-chromed panel. No reconcile panel renders at all.
+    await expect(page.getByTestId("reconcile-section")).toHaveCount(0);
+    await expect(page.getByTestId("reconcile-drift")).toHaveCount(0);
+    await expect(page.getByTestId("monitors-status-line")).toContainText("In sync with Git");
   });
 
   test("★ pinned CLOSED + drift → the header STILL warns (the body collapses, the signal never does)", async ({ page }) => {
@@ -181,5 +181,94 @@ test.describe("merged /monitors — freshness, routing, persistence", () => {
     await expect(reconcileToggle(page)).toHaveAttribute("aria-expanded", "false");
     await page.reload();
     await expect(reconcileToggle(page)).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+// The HEALTHY state (no drift, every declared spec monitored) must be a single thin status row above the
+// Monitors table — NOT two stacked panels of "nothing to do". This is the #304 follow-up: collapsed-with-
+// panel-chrome was still ~290px+ of weight; the healthy state must be nearly invisible.
+function healthyWorld() {
+  const w = defaultWorld();
+  w.reconcileDrift = { items: [], detectedAt: "2026-07-20T12:00:00Z" };
+  w.specCatalog = {
+    probedAt: "2026-07-20T12:00:00Z",
+    items: Array.from({ length: 20 }, (_, i) => ({
+      sourceKey: `spec-${i}`, name: `Monitor ${i}`, specPath: `monitors/x/spec-${i}.spec.ts`, kind: "browser",
+      target: "https://x.example", suggestedIntervalSeconds: 600, tags: [], runnable: true, notRunnableReason: null,
+      monitored: true, checkId: 100 + i, checkName: `Monitor ${i}`, enabled: true,
+      health: { currentStatus: "pass", p95Ms: 1000, openIncidentCount: 0, lastRunAt: "2026-07-20T11:00:00Z" },
+    })),
+  };
+  return w;
+}
+
+test.describe("merged /monitors — healthy state is ONE thin status line, not two panels", () => {
+  test("no drift + all monitored → a single status row, ZERO section panels", async ({ page }) => {
+    await mockApi(page, healthyWorld());
+    await page.goto("/monitors");
+
+    // ★ Neither section renders as a panel — no CollapsibleSection chrome at all.
+    await expect(page.getByTestId("reconcile-section")).toHaveCount(0);
+    await expect(page.getByTestId("new-monitors-section")).toHaveCount(0);
+    await expect(page.getByTestId("reconcile-drift")).toHaveCount(0);
+
+    // ★ One thin line carries every clean signal + the coverage entry + [Reconcile now].
+    const line = page.getByTestId("monitors-status-line");
+    await expect(line).toContainText("In sync with Git");
+    await expect(line).toContainText("20 declared specs, all monitored");
+    await expect(line).toContainText("as of");
+    await expect(line.getByTestId("reconcile-now")).toBeVisible();
+    await expect(line.getByTestId("browse-catalog")).toBeVisible();
+  });
+
+  test("★ the healthy line's footprint is ~one row, not a stack of panels (< 80px)", async ({ page }) => {
+    await mockApi(page, healthyWorld());
+    await page.goto("/monitors");
+    await expect(page.getByTestId("monitors-status-line")).toBeVisible();
+
+    // Space from the top of the reconcile/catalog region (the status line) to the Monitors header — the
+    // #304 acceptance number. Two collapsed panels were ~150px; two expanded were ~450px. Target: one row.
+    const footprint = await page.evaluate(() => {
+      const line = document.querySelector('[data-testid="monitors-status-line"]')!.getBoundingClientRect();
+      const hdr = document.querySelector(".sw-eyebrow")!.getBoundingClientRect();
+      return Math.round(hdr.top - line.top);
+    });
+    expect(footprint, `reconcile/catalog region footprint ${footprint}px must be ~one row`).toBeLessThan(80);
+  });
+
+  test("★ a STALE 'open' pin does NOT resurrect a panel in the healthy state", async ({ page }) => {
+    // A pin set while there WAS work (user opened a section during review) must not make the healthy state loud:
+    // healthy renders no panel to honor the pin against.
+    await page.addInitScript(() => {
+      localStorage.setItem("synthwatch:monitors-reconcile", "open");
+      localStorage.setItem("synthwatch:monitors-new-monitors", "open");
+    });
+    await mockApi(page, healthyWorld());
+    await page.goto("/monitors");
+
+    await expect(page.getByTestId("reconcile-section")).toHaveCount(0);
+    await expect(page.getByTestId("new-monitors-section")).toHaveCount(0);
+    await expect(page.getByTestId("monitors-status-line")).toContainText("In sync with Git");
+  });
+
+  test("work returns → the panels come back (drift → reconcile panel expanded with the count)", async ({ page }) => {
+    await mockApi(page, worldWithDrift());
+    await page.goto("/monitors");
+
+    // With drift, the loud panel is present + expanded (the healthy thin line does not apply).
+    await expect(page.getByTestId("reconcile-section-toggle")).toContainText("3 monitors differ from Git");
+    await expect(page.getByTestId("reconcile-section-toggle")).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByTestId("reconcile-drift")).toBeVisible();
+  });
+});
+
+test.describe("nav — Catalog tab removed (its /specs redirect kept for bookmarks)", () => {
+  test("no 'Catalog' nav item; the coverage entry is on the Monitors page", async ({ page }) => {
+    await mockApi(page, healthyWorld());
+    await page.goto("/monitors");
+
+    await expect(page.getByRole("navigation").getByRole("link", { name: "Catalog" })).toHaveCount(0);
+    // /specs still redirects (bookmarks), and the on-page coverage entry is the browse reveal.
+    await expect(page.getByTestId("monitors-status-line").getByTestId("browse-catalog")).toBeVisible();
   });
 });

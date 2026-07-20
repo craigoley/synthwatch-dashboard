@@ -9,8 +9,10 @@ import { useAuth } from "@/components/auth-provider";
 const NAV: { href: string; label: string; match: (p: string) => boolean; adminOnly?: boolean; editorOnly?: boolean }[] = [
   { href: "/", label: "Status", match: (p: string) => p === "/" || p.startsWith("/checks") },
   { href: "/incidents", label: "Incidents", match: (p: string) => p.startsWith("/incidents") },
-  { href: "/monitors", label: "Monitors", match: (p: string) => p.startsWith("/monitors") },
-  { href: "/specs", label: "Catalog", match: (p: string) => p.startsWith("/specs") },
+  // ★ The spec catalog was consolidated INTO /monitors (#304); "Browse the full spec catalog (N) →" on that
+  //   page is the coverage entry point. No "Catalog" nav item — /specs still redirects to /monitors for
+  //   bookmarks, but a nav tab that dead-ends into the page you're already on is worse than no tab.
+  { href: "/monitors", label: "Monitors", match: (p: string) => p.startsWith("/monitors") || p.startsWith("/specs") },
   { href: "/notifications", label: "Notifications", match: (p: string) => p.startsWith("/notifications") },
   { href: "/reports", label: "Reports", match: (p: string) => p.startsWith("/reports") || p.startsWith("/trust") },
   { href: "/settings/environments", label: "Environments", match: (p: string) => p.startsWith("/settings/environments") },
@@ -118,7 +120,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-dvh">
       <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_82%,transparent)] backdrop-blur-md">
         {/* Mobile AND tablet: wraps to two rows — logo + fleet pulse on row 1, the full nav on row 2 (so
-            every tab stays tappable). The single h-14 row engages at xl: — MEASURED: seven nav items +
+            every tab stays tappable). The single h-14 row engages at xl: — MEASURED: the operator nav items +
             logo + the right cluster only fit one row from ~1150px (at lg/1024 the row still overflows
             112px), so the nowrap transition sits at xl (1280), not sm. */}
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:px-6 xl:h-14 xl:flex-nowrap xl:py-0">

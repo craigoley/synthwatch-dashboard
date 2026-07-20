@@ -114,13 +114,15 @@ test.describe("phase 13 — spec catalog (in the merged /monitors)", () => {
     await expect(cat.getByTestId("spec-row-unmon-spec")).toHaveCount(0);
   });
 
-  test("empty not-set-up → the New monitors header reads 'All declared specs are monitored'", async ({ page }) => {
+  test("empty not-set-up → NO panel; 'all monitored' folds into the thin status line", async ({ page }) => {
     const w = worldWithCatalog();
     w.specCatalog!.items = w.specCatalog!.items.map((it) => ({ ...it, monitored: true, checkId: 9, enabled: true }));
     await mockApi(page, w);
     await page.goto("/monitors");
 
-    await expect(page.getByTestId("new-monitors-section-toggle")).toContainText("All declared specs are monitored");
+    // Every declared spec monitored → no setup panel; the coverage summary is one thin line.
+    await expect(page.getByTestId("new-monitors-section")).toHaveCount(0);
+    await expect(page.getByTestId("monitors-status-line")).toContainText("declared specs, all monitored");
     await expect(page.getByTestId("new-monitors-table")).toHaveCount(0);
   });
 
