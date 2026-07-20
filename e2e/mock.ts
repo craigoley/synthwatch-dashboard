@@ -192,6 +192,15 @@ export interface World {
   validCode?: string;
   editors?: RawObj[];
   accessRequests?: RawObj[];
+  /**
+   * Sandbox preview (the Tests scratchpad). The handler is STATEFUL enough to drive the real UI loop:
+   * POST /api/preview records the body in `previewRequests` and returns a token; the next GET returns
+   * `previewResult` as the `trace` string. `previewHasScreenshot` drives the screenshot block — set it
+   * FALSE to model a credentialed (sensitive) run, where the runner suppresses the screenshot.
+   */
+  previewRequests?: { url: string; body: RawObj }[];
+  previewResult?: RawObj;
+  previewHasScreenshot?: boolean;
 }
 
 export function defaultWorld(): World {
@@ -377,6 +386,35 @@ export async function mockApi(
       return world.accounts?.[email] ?? "anonymous";
     };
     const UNAUTH_WRITES = ["/api/auth/request-code", "/api/auth/verify", "/api/auth/request-access"];
+
+    // ── Sandbox preview (Tests scratchpad) ───────────────────────────────────────────────────────
+    if (path === "/api/preview/quota" && method === "GET")
+      return json(route, { running: 0, maxConcurrent: 3, hourly: 0, maxPerHour: 20 });
+    if (path === "/api/preview" && method === "POST") {
+      // ★ Record the FULL URL alongside the body so a test can assert credentials never reach the query
+      //   string — the leak that would put them in history / referrers / proxy logs.
+      (world.previewRequests ??= []).push({ url: req.url(), body: JSON.parse(req.postData() || "{}") });
+      return json(route, { token: "0".repeat(32) }, 202);
+    }
+    if (/^\/api\/preview\/[0-9a-f]{32}$/.test(path) && method === "GET") {
+      const result = {
+        ok: false,
+        tests: ["login"],
+        status: "fail",
+        error: "login rejected",
+        failedStep: "sign in",
+        steps: [{ index: 0, name: "sign in", status: "fail", durationMs: 120, errorMessage: "no match" }],
+        traceSignals: null,
+        stdout: "",
+        stderr: "",
+        timedOut: false,
+        exitCode: 1,
+        hasTrace: true,
+        hasScreenshot: world.previewHasScreenshot ?? true,
+        ...(world.previewResult ?? {}),
+      };
+      return json(route, { token: path.split("/").pop(), status: "done", trace: JSON.stringify(result) });
+    }
 
     if (path === "/api/auth/request-code" && method === "POST")
       return json(route, { message: "If your email is registered, a sign-in code has been sent." }, 202);

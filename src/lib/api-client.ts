@@ -2949,12 +2949,42 @@ export interface PreviewQuota {
   maxPerHour: number;
 }
 
-/** POST /preview — enqueue + start a sandbox preview. Throws ApiRequestError(429) when a bound is hit. */
-export async function createPreview(spec: string, targetUrl?: string): Promise<{ token: string }> {
+/**
+ * OPTIONAL per-run credentials so a preview can drive a login-gated flow.
+ * ★ Used for ONE run and never stored: the API seals these into an ephemeral encrypted blob the sandbox
+ * deletes on read. They are absent from the DB, the audit trail, and the ARM job-start body.
+ */
+export interface PreviewCredentials {
+  username?: string;
+  password?: string;
+  vercelBypassToken?: string;
+}
+
+/**
+ * POST /preview — enqueue + start a sandbox preview. Throws ApiRequestError(429) when a bound is hit.
+ *
+ * ★ Credentials travel in the POST BODY ONLY — never as query params. A query string would land in browser
+ * history, the referrer header, and any proxy/access log between here and the API. `request()` builds the URL
+ * from the path alone, so there is no code path that could put them there; the e2e asserts it on the wire.
+ */
+export async function createPreview(
+  spec: string,
+  targetUrl?: string,
+  credentials?: PreviewCredentials,
+): Promise<{ token: string }> {
+  // Drop empty/whitespace-only fields so an untouched form sends NO credentials node at all — the API keys
+  // its whole sensitive treatment off "did any credential arrive?", and an empty string is not a credential.
+  const creds = credentials
+    ? Object.fromEntries(Object.entries(credentials).filter(([, v]) => typeof v === "string" && v.length > 0))
+    : {};
   return request<{ token: string }>("/preview", undefined, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ spec, ...(targetUrl ? { targetUrl } : {}) }),
+    body: JSON.stringify({
+      spec,
+      ...(targetUrl ? { targetUrl } : {}),
+      ...(Object.keys(creds).length > 0 ? { credentials: creds } : {}),
+    }),
   });
 }
 

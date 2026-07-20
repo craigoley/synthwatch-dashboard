@@ -7,8 +7,10 @@
  *
  * Three roles hold: the repo is truth, this area is a scratchpad, the PR is the only path to prod. So:
  *   • EDITOR/ADMIN-gated on the ROUTE (a preview is code-execution), not merely hidden in nav.
- *   • PASS-1 is UNAUTHENTICATED against a public/non-prod target — an authed monitor's login step fails
- *     VISIBLY (the safe default, said out loud below, not a confusing failure).
+ *   • Credentials are OPTIONAL and EPHEMERAL — typed here, used for ONE run, never stored. Without them a
+ *     preview runs unauthenticated and a login-gated step fails visibly; with them the fleet's
+ *     sensitive-monitor policy applies (see CredentialsPanel) and the screenshot is suppressed. Both
+ *     behaviours are stated inline, so neither reads as a bug.
  *   • Bounds (rate + concurrency) are surfaced HONESTLY so a 429 is explained, never a mystery.
  */
 
@@ -47,11 +49,14 @@ test('homepage loads', async ({ page }) => {
 const POLL_MS = 2000;
 const MAX_SPEC_BYTES = 256 * 1024;
 
+// ★ `credentialed` is captured AT SUBMIT and carried through the run, because the credential fields are
+//   cleared the moment the run finishes — so by the time the result renders, the form can no longer tell us
+//   whether this run was authenticated. The result view needs it to explain a suppressed screenshot.
 type RunState =
   | { phase: "idle" }
   | { phase: "starting" }
-  | { phase: "polling"; token: string; poll: PreviewPoll | null }
-  | { phase: "done"; token: string; poll: PreviewPoll }
+  | { phase: "polling"; token: string; poll: PreviewPoll | null; credentialed: boolean }
+  | { phase: "done"; token: string; poll: PreviewPoll; credentialed: boolean }
   | { phase: "error"; message: string; status?: number };
 
 export default function TestsPage() {
@@ -101,6 +106,13 @@ function Header() {
 function TestsWorkbench() {
   const [spec, setSpec] = useState("");
   const [targetUrl, setTargetUrl] = useState("");
+  // ── OPTIONAL, EPHEMERAL credentials. Held in component state for the duration of ONE run and wiped on the
+  //    terminal tick (see clearCredentials). Never persisted to localStorage / sessionStorage / a URL / SWR
+  //    cache — this state and the POST body are the only places they ever exist in the browser.
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [bypassToken, setBypassToken] = useState("");
+  const [showSecrets, setShowSecrets] = useState(false);
   const [run, setRun] = useState<RunState>({ phase: "idle" });
   // ★ The poll effect keys on this STABLE token, NOT the whole `run` object — else every 'running' tick's
   //   setRun mints a new `run`, tearing down + re-running the effect and firing GET back-to-back (a hot loop
@@ -118,6 +130,19 @@ function TestsWorkbench() {
   const specBytes = new TextEncoder().encode(spec).length;
   const tooLarge = specBytes > MAX_SPEC_BYTES;
   const canRun = spec.trim().length > 0 && !tooLarge && run.phase !== "starting" && run.phase !== "polling";
+  // Any non-empty credential makes this a CREDENTIALED (sensitive) run — the same "did anything arrive?"
+  // test the API and runner apply, so the inline warning matches what actually happens downstream.
+  const credentialed = [username, password, bypassToken].some((v) => v.length > 0);
+
+  // ★ "Used for this run only" is enforced HERE, not just promised in the copy: the moment a run reaches a
+  //   terminal state the fields are wiped. A re-run requires retyping — deliberate, and the honest cost of
+  //   never holding a credential longer than the run that needed it.
+  const clearCredentials = useCallback(() => {
+    setUsername("");
+    setPassword("");
+    setBypassToken("");
+    setShowSecrets(false);
+  }, []);
 
   // ── Poll loop: keyed on the STABLE pollToken, so it sets up ONCE per preview and paces at POLL_MS. Each
   //    tick's setRun updates the display WITHOUT re-running this effect (pollToken is unchanged); the terminal
@@ -130,16 +155,28 @@ function TestsWorkbench() {
         const poll = await getPreview(pollToken);
         if (cancelled) return;
         if (poll.status === "running") {
-          setRun({ phase: "polling", token: pollToken, poll });
+          setRun((prev) => ({
+            phase: "polling",
+            token: pollToken,
+            poll,
+            credentialed: prev.phase === "polling" ? prev.credentialed : false,
+          }));
         } else {
-          setRun({ phase: "done", token: pollToken, poll });
+          setRun((prev) => ({
+            phase: "done",
+            token: pollToken,
+            poll,
+            credentialed: prev.phase === "polling" ? prev.credentialed : false,
+          }));
           setPollToken(null);
+          clearCredentials(); // ★ terminal → the credential is gone from the browser
           void refreshQuota();
         }
       } catch (e) {
         if (cancelled) return;
         setRun({ phase: "error", message: errMessage(e), status: errStatus(e) });
         setPollToken(null);
+        clearCredentials(); // ★ a failed poll is terminal too — never leave a credential sitting in state
       }
     };
     const id = setInterval(tick, POLL_MS);
@@ -148,20 +185,28 @@ function TestsWorkbench() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [pollToken, refreshQuota]);
+  }, [pollToken, refreshQuota, clearCredentials]);
 
   const onRun = useCallback(async () => {
     setRun({ phase: "starting" });
+    // Snapshot before the await: the fields are wiped on completion, and `credentialed` must describe the run
+    // that was actually submitted.
+    const wasCredentialed = credentialed;
     try {
-      const { token } = await createPreview(spec, targetUrl.trim() || undefined);
-      setRun({ phase: "polling", token, poll: null });
+      const { token } = await createPreview(spec, targetUrl.trim() || undefined, {
+        username,
+        password,
+        vercelBypassToken: bypassToken,
+      });
+      setRun({ phase: "polling", token, poll: null, credentialed: wasCredentialed });
       setPollToken(token); // starts the poll effect
       void refreshQuota();
     } catch (e) {
       setRun({ phase: "error", message: errMessage(e), status: errStatus(e) });
+      clearCredentials(); // ★ the run never started — do not keep the credential around for a retry
       void refreshQuota();
     }
-  }, [spec, targetUrl, refreshQuota]);
+  }, [spec, targetUrl, username, password, bypassToken, credentialed, refreshQuota, clearCredentials]);
 
   const onFile = useCallback((file: File | undefined) => {
     if (!file) return;
@@ -235,7 +280,17 @@ function TestsWorkbench() {
             </span>
           </label>
 
-          <UnauthNotice />
+          <CredentialsPanel
+            username={username}
+            password={password}
+            bypassToken={bypassToken}
+            showSecrets={showSecrets}
+            credentialed={credentialed}
+            onUsername={setUsername}
+            onPassword={setPassword}
+            onBypassToken={setBypassToken}
+            onToggleShow={() => setShowSecrets((s) => !s)}
+          />
 
           <div className="flex items-center gap-3">
             <button
@@ -302,15 +357,120 @@ function Meter({ label, value, max, hint }: { label: string; value: number | und
   );
 }
 
-/** Set expectations: pass-1 is UNAUTHENTICATED. An authed monitor's login step will fail — say so. */
-function UnauthNotice() {
+/**
+ * OPTIONAL credentials — the honest contract, stated where the typing happens.
+ *
+ * ★ Every claim in this copy is enforced somewhere real, not aspirational:
+ *   "used for this run only"  → cleared from React state on the terminal tick (clearCredentials)
+ *   "never stored"            → the API writes only spec_sha256; the credential lives in an encrypted blob
+ *                               the sandbox deletes on read
+ *   "never logged"            → redacted out of stdout / trace / errors by the runner's makeRedactor
+ *   "no screenshot"           → tracePersistPlan suppresses it for any credentialed run
+ * If one of those stops being true, this copy becomes a lie — so they change together.
+ */
+function CredentialsPanel({
+  username,
+  password,
+  bypassToken,
+  showSecrets,
+  credentialed,
+  onUsername,
+  onPassword,
+  onBypassToken,
+  onToggleShow,
+}: {
+  username: string;
+  password: string;
+  bypassToken: string;
+  showSecrets: boolean;
+  credentialed: boolean;
+  onUsername: (v: string) => void;
+  onPassword: (v: string) => void;
+  onBypassToken: (v: string) => void;
+  onToggleShow: () => void;
+}) {
+  // ★ Masked by default. The reveal toggle exists because a mistyped credential otherwise fails the login
+  //   and reads as a broken selector — in a diagnostic tool that is the expensive failure mode.
+  const type = showSecrets ? "text" : "password";
   return (
-    <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-panel-2)] p-3 text-[12px] leading-relaxed text-[var(--color-ink-dim)]">
-      <span aria-hidden="true">ℹ️ </span>
-      <span className="font-medium text-[var(--color-ink)]">Runs unauthenticated.</span> A monitor that logs
-      in will <span className="font-medium">fail at its login step</span> here — that&apos;s expected. You&apos;re
-      testing flow structure, selectors, and assertions, not authenticated behavior. (Authenticated testing is
-      a separate, gated capability — no credentials are ever entered here.)
+    <div className="space-y-3 rounded-md border border-[var(--color-border)] bg-[var(--color-panel-2)] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="sw-label">Credentials (optional)</span>
+        <button
+          type="button"
+          className="sw-btn sw-btn-sm"
+          onClick={onToggleShow}
+          data-testid="preview-toggle-secrets"
+          aria-pressed={showSecrets}
+        >
+          {showSecrets ? "Hide" : "Show"}
+        </button>
+      </div>
+
+      <p className="text-[12px] leading-relaxed text-[var(--color-ink-dim)]" data-testid="preview-cred-contract">
+        Leave these empty to run <span className="font-medium text-[var(--color-ink)]">unauthenticated</span> —
+        a login-gated step will then fail at the login, which is expected. Fill them in to test a real
+        authenticated flow.{" "}
+        <span className="font-medium text-[var(--color-ink)]">
+          Used for this run only. Never stored, never logged.
+        </span>
+      </p>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <label className="block">
+          <span className="sw-label">Username</span>
+          <input
+            className="sw-input mt-1 w-full"
+            type={type}
+            value={username}
+            onChange={(e) => onUsername(e.target.value)}
+            autoComplete="off"
+            data-testid="preview-username"
+          />
+        </label>
+        <label className="block">
+          <span className="sw-label">Password</span>
+          <input
+            className="sw-input mt-1 w-full"
+            type={type}
+            value={password}
+            onChange={(e) => onPassword(e.target.value)}
+            autoComplete="off"
+            data-testid="preview-password"
+          />
+        </label>
+        <label className="block">
+          <span className="sw-label">Vercel bypass token</span>
+          <input
+            className="sw-input mt-1 w-full"
+            type={type}
+            value={bypassToken}
+            onChange={(e) => onBypassToken(e.target.value)}
+            autoComplete="off"
+            data-testid="preview-bypass-token"
+          />
+          <span className="mt-1 block text-[11px] text-[var(--color-ink-dim)]">
+            For a protected Vercel preview deployment. Paste your own — it is never injected for you.
+          </span>
+        </label>
+      </div>
+
+      {/* ★ Say what CHANGES before the run, so a missing screenshot afterwards reads as policy, not breakage. */}
+      {credentialed && (
+        <div
+          className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-[12px] leading-relaxed text-[var(--color-ink-dim)]"
+          style={{ borderLeft: "3px solid var(--color-warn)" }}
+          data-testid="preview-sensitive-notice"
+        >
+          <span aria-hidden="true">🔒 </span>
+          <span className="font-medium text-[var(--color-ink)]">
+            This run is treated as sensitive, so no screenshot is kept.
+          </span>{" "}
+          That is the same policy the fleet applies to credentialed monitors — a rendered logged-in page
+          can&apos;t be redacted, so it is never stored rather than stored and masked. You still get the full
+          trace: the failing step, its timing, and the error.
+        </div>
+      )}
     </div>
   );
 }
@@ -334,7 +494,7 @@ function ResultView({ run }: { run: RunState }) {
     return <ErrorRow message={run.message} status={run.status} />;
   }
   // done
-  return <DoneView poll={run.poll} />;
+  return <DoneView poll={run.poll} credentialed={run.credentialed} />;
 }
 
 function RunningRow({ label }: { label: string }) {
@@ -362,7 +522,7 @@ function ErrorRow({ message, status }: { message: string; status?: number }) {
   );
 }
 
-function DoneView({ poll }: { poll: PreviewPoll }) {
+function DoneView({ poll, credentialed }: { poll: PreviewPoll; credentialed: boolean }) {
   const result: PreviewResult | null = poll.result;
 
   if (poll.status === "timeout") {
@@ -415,14 +575,25 @@ function DoneView({ poll }: { poll: PreviewPoll }) {
       {/* ★ The REAL trace, rendered with the SAME components a check's detail view uses — steps + timings,
           failure screenshot, and network/console signals. Anything the preview can't fill is honestly-absent
           (a dashed "unavailable" block), never a fabricated zero. */}
-      {ranBrowser && <TraceView result={result} token={poll.token} />}
+      {ranBrowser && <TraceView result={result} token={poll.token} credentialed={credentialed} />}
 
       {result.stdout.trim() && <OutputBlock label="Console output" text={result.stdout} />}
       {result.stderr.trim() && <OutputBlock label="Errors" text={result.stderr} tone="fail" />}
 
-      <p className="text-[11px] text-[var(--color-ink-dim)]">
-        This is the same trace a real check produces. A login-gated step will show as a failure here because the
-        preview runs unauthenticated (see the note above).
+      <p className="text-[11px] text-[var(--color-ink-dim)]" data-testid="preview-done-footer">
+        This is the same trace a real check produces.{" "}
+        {credentialed ? (
+          <>
+            This run used the credentials you supplied — they were used for this run only and have already been
+            cleared. Anything they touched is redacted out of the trace and console output, and no screenshot
+            was kept.
+          </>
+        ) : (
+          <>
+            This run was unauthenticated, so a login-gated step shows as a failure here — that&apos;s expected.
+            Add credentials above to test the authenticated flow.
+          </>
+        )}
       </p>
     </div>
   );
@@ -442,7 +613,15 @@ function toRunStep(s: PreviewStep): RunStep {
 }
 
 /** The trace panels — the SAME FunnelBarStatic / SummaryBody / TraceViewer a real check's detail renders. */
-function TraceView({ result, token }: { result: PreviewResult; token: string }) {
+function TraceView({
+  result,
+  token,
+  credentialed,
+}: {
+  result: PreviewResult;
+  token: string;
+  credentialed: boolean;
+}) {
   const steps = (result.steps ?? []).map(toRunStep);
   const didFail = result.status === "fail" || result.status === "error";
   return (
@@ -461,6 +640,14 @@ function TraceView({ result, token }: { result: PreviewResult; token: string }) 
           <div className="sw-label mb-1">Screenshot at failure</div>
           {result.hasScreenshot ? (
             <PreviewScreenshot token={token} />
+          ) : credentialed ? (
+            // ★ INTENTIONAL, not broken. Without this the user sees the generic "none was captured" and
+            //   reasonably concludes the preview is buggy — the exact misread this copy exists to prevent.
+            <Unavailable
+              what="failure screenshot"
+              why="this run used credentials, so it's treated as sensitive and no screenshot is kept — a rendered logged-in page can't be redacted. The step timeline, timings, and the Playwright trace below are unaffected."
+              testId="preview-screenshot-suppressed"
+            />
           ) : (
             <Unavailable what="failure screenshot" why="none was captured for this run" />
           )}
@@ -500,11 +687,12 @@ function TraceView({ result, token }: { result: PreviewResult; token: string }) 
 }
 
 /** Honest-absent (the cost-panel dashed pattern): absent ≠ empty ≠ zero — say what's missing and why. */
-function Unavailable({ what, why }: { what: string; why: string }) {
+function Unavailable({ what, why, testId }: { what: string; why: string; testId?: string }) {
   return (
     <div
       className="rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2"
       style={{ borderLeft: "3px solid var(--color-warn)" }}
+      data-testid={testId}
     >
       <div className="text-[13px] text-[var(--color-ink-dim)]">No {what}</div>
       <div className="text-[11px] text-[var(--color-ink-dim)]">{why}</div>
