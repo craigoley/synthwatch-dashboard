@@ -6,7 +6,8 @@ import { mockApi, defaultWorld } from "./mock";
  * The Tests scratchpad's OPTIONAL credentials. Three properties carry the UI half of this feature:
  *   1. Credentials reach the API in the POST BODY ONLY — never a URL/query param (which would land in
  *      browser history, referrer headers, and every proxy log in between).
- *   2. A credentialed run's missing screenshot is EXPLAINED as policy, so it doesn't read as breakage.
+ *   2. A credentialed run's OUTPUT is redacted, and the copy never claims the screenshot is withheld —
+ *      previewPersistPlan keeps it for credentialed previews too.
  *   3. An uncredentialed run is completely unchanged — screenshot and all.
  * Plus the promise the copy makes: the fields are cleared once the run finishes.
  */
@@ -55,31 +56,37 @@ test.describe("Tests scratchpad — optional per-run credentials", () => {
     });
   });
 
-  test("★ a credentialed run explains the suppressed screenshot instead of looking broken", async ({ page }) => {
+  test("★ a credentialed run says its OUTPUT is redacted — and never claims the screenshot is suppressed", async ({ page }) => {
     const w = defaultWorld();
-    w.previewHasScreenshot = false; // what the runner actually does for a sensitive run
+    // ★ STUB UNCHANGED (deliberately — swapping it for a real captured fixture is its own concern). What it
+    //   now represents is a failing run that simply produced NO screenshot, which is a legitimate state.
+    //   It no longer represents "suppressed because sensitive": previewPersistPlan keeps the screenshot for
+    //   a credentialed preview, so that explanation would be a false statement about sensitive-data handling.
+    w.previewHasScreenshot = false;
     await mockApi(page, w);
     await page.goto("/tests");
 
     await page.getByTestId("preview-password").fill(SENTINEL_PW);
     // The warning appears BEFORE the run — the user knows what they're trading away as they type.
-    await expect(page.getByTestId("preview-sensitive-notice")).toContainText("no screenshot is kept");
+    const notice = page.getByTestId("preview-sensitive-notice");
+    await expect(notice).toContainText("its output is redacted");
+    // ★ The regression this test now guards: the notice must NOT claim the screenshot is withheld.
+    await expect(notice).not.toContainText("no screenshot is kept");
 
     await page.locator("textarea").first().fill(SPEC);
     await page.getByRole("button", { name: "Run preview" }).click();
 
-    // ★ The missing screenshot is attributed to policy, and says what IS still available.
-    const suppressed = page.getByTestId("preview-screenshot-suppressed");
-    await expect(suppressed).toBeVisible();
-    await expect(suppressed).toContainText("treated as sensitive");
-    await expect(suppressed).toContainText("can't be redacted");
-    await expect(suppressed).toContainText("Playwright trace below are unaffected");
-    // The generic "none was captured" wording must NOT be what a credentialed user sees.
-    await expect(suppressed).not.toContainText("none was captured for this run");
+    // ★ The suppression explanation must be GONE — there is no policy reason to attribute it to any more.
+    await expect(page.getByTestId("preview-screenshot-suppressed")).toHaveCount(0);
+    // A credentialed run with no screenshot now reads the SAME as an uncredentialed one, because the
+    // retention rule is the same for both.
+    await expect(page.getByText("none was captured for this run")).toBeVisible();
 
-    // The trace itself is still offered — the claim "you still get the full trace" has to be true.
+    // And the done-footer states the true rule rather than the old "no screenshot was kept".
+    const footer = page.getByTestId("preview-done-footer");
+    await expect(footer).toContainText("screenshot is kept");
+    await expect(footer).not.toContainText("no screenshot");
     await expect(page.getByTestId("view-preview-trace")).toBeVisible();
-    await expect(page.getByTestId("preview-done-footer")).toContainText("no screenshot was kept");
   });
 
   test("★ the fields are CLEARED once the run finishes — 'used for this run only', enforced", async ({ page }) => {
@@ -116,7 +123,8 @@ test.describe("Tests scratchpad — optional per-run credentials", () => {
     await page.getByRole("button", { name: "Run preview" }).click();
     await expect(page.getByTestId("preview-done-footer")).toBeVisible();
 
-    // ★ The screenshot survives and the suppression explanation never appears.
+    // ★ The screenshot survives and the suppression explanation never appears (that test-id no longer
+    //   exists anywhere in the app — this keeps the assertion honest if it were ever reintroduced).
     await expect(page.getByTestId("preview-screenshot-suppressed")).toHaveCount(0);
     const shot = page.getByAltText("Preview failure screenshot");
     await expect(shot).toBeVisible();

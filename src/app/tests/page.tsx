@@ -9,8 +9,9 @@
  *   • EDITOR/ADMIN-gated on the ROUTE (a preview is code-execution), not merely hidden in nav.
  *   • Credentials are OPTIONAL and EPHEMERAL — typed here, used for ONE run, never stored. Without them a
  *     preview runs unauthenticated and a login-gated step fails visibly; with them the fleet's
- *     sensitive-monitor policy applies (see CredentialsPanel) and the screenshot is suppressed. Both
- *     behaviours are stated inline, so neither reads as a bug.
+ *     sensitive-monitor REDACTION applies (see CredentialsPanel) — trace text, stdout and errors are
+ *     scrubbed. The failure screenshot is KEPT either way (runner previewPersistPlan). Both behaviours
+ *     are stated inline, so neither reads as a bug.
  *   • Bounds (rate + concurrency) are surfaced HONESTLY so a 429 is explained, never a mystery.
  */
 
@@ -51,7 +52,7 @@ const MAX_SPEC_BYTES = 256 * 1024;
 
 // ★ `credentialed` is captured AT SUBMIT and carried through the run, because the credential fields are
 //   cleared the moment the run finishes — so by the time the result renders, the form can no longer tell us
-//   whether this run was authenticated. The result view needs it to explain a suppressed screenshot.
+//   whether this run was authenticated. The result view needs it to explain that the output was REDACTED.
 type RunState =
   | { phase: "idle" }
   | { phase: "starting" }
@@ -365,7 +366,9 @@ function Meter({ label, value, max, hint }: { label: string; value: number | und
  *   "never stored"            → the API writes only spec_sha256; the credential lives in an encrypted blob
  *                               the sandbox deletes on read
  *   "never logged"            → redacted out of stdout / trace / errors by the runner's makeRedactor
- *   "no screenshot"           → tracePersistPlan suppresses it for any credentialed run
+ * ★ There is deliberately NO "no screenshot" claim here any more: previewPersistPlan keeps the failure
+ *   screenshot for a credentialed preview (a password field renders MASKED, and the Tests area is
+ *   editor/admin-only). Claiming otherwise was a false statement about how sensitive data is handled.
  * If one of those stops being true, this copy becomes a lie — so they change together.
  */
 function CredentialsPanel({
@@ -455,7 +458,8 @@ function CredentialsPanel({
         </label>
       </div>
 
-      {/* ★ Say what CHANGES before the run, so a missing screenshot afterwards reads as policy, not breakage. */}
+      {/* ★ Say what CHANGES before the run. What changes is REDACTION of the text channels — the failure
+          screenshot is kept exactly as it is for an uncredentialed run (runner previewPersistPlan). */}
       {credentialed && (
         <div
           className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-[12px] leading-relaxed text-[var(--color-ink-dim)]"
@@ -464,11 +468,12 @@ function CredentialsPanel({
         >
           <span aria-hidden="true">🔒 </span>
           <span className="font-medium text-[var(--color-ink)]">
-            This run is treated as sensitive, so no screenshot is kept.
+            This run is treated as sensitive, so its output is redacted.
           </span>{" "}
-          That is the same policy the fleet applies to credentialed monitors — a rendered logged-in page
-          can&apos;t be redacted, so it is never stored rather than stored and masked. You still get the full
-          trace: the failing step, its timing, and the error.
+          The credentials you type are scrubbed out of the trace text, console output and error messages. The
+          failure screenshot is still kept — a password field renders masked, so suppressing it cost the
+          primary diagnostic and bought little. You get the full trace: the failing step, its timing, and the
+          error.
         </div>
       )}
     </div>
@@ -575,7 +580,7 @@ function DoneView({ poll, credentialed }: { poll: PreviewPoll; credentialed: boo
       {/* ★ The REAL trace, rendered with the SAME components a check's detail view uses — steps + timings,
           failure screenshot, and network/console signals. Anything the preview can't fill is honestly-absent
           (a dashed "unavailable" block), never a fabricated zero. */}
-      {ranBrowser && <TraceView result={result} token={poll.token} credentialed={credentialed} />}
+      {ranBrowser && <TraceView result={result} token={poll.token} />}
 
       {result.stdout.trim() && <OutputBlock label="Console output" text={result.stdout} />}
       {result.stderr.trim() && <OutputBlock label="Errors" text={result.stderr} tone="fail" />}
@@ -585,8 +590,8 @@ function DoneView({ poll, credentialed }: { poll: PreviewPoll; credentialed: boo
         {credentialed ? (
           <>
             This run used the credentials you supplied — they were used for this run only and have already been
-            cleared. Anything they touched is redacted out of the trace and console output, and no screenshot
-            was kept.
+            cleared. Anything they touched is redacted out of the trace and console output. The failure
+            screenshot is kept, the same as an uncredentialed run.
           </>
         ) : (
           <>
@@ -616,11 +621,9 @@ function toRunStep(s: PreviewStep): RunStep {
 function TraceView({
   result,
   token,
-  credentialed,
 }: {
   result: PreviewResult;
   token: string;
-  credentialed: boolean;
 }) {
   const steps = (result.steps ?? []).map(toRunStep);
   const didFail = result.status === "fail" || result.status === "error";
@@ -640,15 +643,10 @@ function TraceView({
           <div className="sw-label mb-1">Screenshot at failure</div>
           {result.hasScreenshot ? (
             <PreviewScreenshot token={token} />
-          ) : credentialed ? (
-            // ★ INTENTIONAL, not broken. Without this the user sees the generic "none was captured" and
-            //   reasonably concludes the preview is buggy — the exact misread this copy exists to prevent.
-            <Unavailable
-              what="failure screenshot"
-              why="this run used credentials, so it's treated as sensitive and no screenshot is kept — a rendered logged-in page can't be redacted. The step timeline, timings, and the Playwright trace below are unaffected."
-              testId="preview-screenshot-suppressed"
-            />
           ) : (
+            // ★ ONE branch now, because credentials no longer change screenshot retention. A missing
+            //   screenshot means the run simply did not produce one — it is NOT policy, and the old
+            //   credentialed-only "suppressed" explanation was false once previewPersistPlan landed.
             <Unavailable what="failure screenshot" why="none was captured for this run" />
           )}
         </div>
