@@ -195,13 +195,25 @@ export interface World {
   /**
    * Sandbox preview (the Tests scratchpad). The handler is STATEFUL enough to drive the real UI loop:
    * POST /api/preview records the body in `previewRequests` and returns a token; the next GET returns
-   * `previewResult` as the `trace` string. `previewHasScreenshot` drives the screenshot block — set it
-   * FALSE to model a failing run that produced NO screenshot. ★ NOT "a credentialed run": the runner no
-   * longer suppresses screenshots for credentialed previews (previewPersistPlan keeps them).
+   * `previewResult` as the `trace` string.
+   *
+   * ★ `previewScreenshot` models the THREE outcomes the runner actually reports, not two. In
+   *   sandboxMain.ts `hasScreenshot` is the RETURN VALUE of uploadSandboxArtifact, so it means
+   *   "captured AND within SCREENSHOT_CAP_BYTES AND the upload succeeded":
+   *     "none"             — a PASSING run; no screenshot is ever captured        → hasScreenshot false
+   *     "uploaded"         — a failing run, under the cap, uploaded               → hasScreenshot true
+   *     "dropped-over-cap" — a failing run that DID capture one, over the 4 MiB
+   *                          cap, so sandboxMain skipped the upload               → hasScreenshot false
+   *   A single boolean collapsed the last two into one value: same representation, two different
+   *   causes. Verified against the runner's three-arm golden (synthwatch
+   *   runner/test-fixtures/preview-result-golden/) and against sandboxMain.ts itself.
+   *
+   * ★ NOT "a credentialed run": the runner no longer suppresses screenshots for credentialed
+   *   previews (previewPersistPlan keeps them).
    */
   previewRequests?: { url: string; body: RawObj }[];
   previewResult?: RawObj;
-  previewHasScreenshot?: boolean;
+  previewScreenshot?: "none" | "uploaded" | "dropped-over-cap";
 }
 
 export function defaultWorld(): World {
@@ -424,7 +436,9 @@ export async function mockApi(
         timedOut: false,
         exitCode: 1,
         hasTrace: true,
-        hasScreenshot: world.previewHasScreenshot ?? true,
+        // Only "uploaded" yields true — both "none" and "dropped-over-cap" are false, for different
+        // reasons the wire format cannot tell apart (see the WorldSpec comment).
+        hasScreenshot: (world.previewScreenshot ?? "uploaded") === "uploaded",
         ...(world.previewResult ?? {}),
       };
       return json(route, { token: path.split("/").pop(), status: "done", trace: JSON.stringify(result) });
