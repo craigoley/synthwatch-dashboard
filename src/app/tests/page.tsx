@@ -114,6 +114,10 @@ function TestsWorkbench() {
   const [password, setPassword] = useState("");
   const [bypassToken, setBypassToken] = useState("");
   const [showSecrets, setShowSecrets] = useState(false);
+  // ★ DEFAULT TRUE = redact, which is byte-for-byte today's behaviour: the API treats absent and true
+  //   identically (`body.redactCredentials != false`), so a user who never touches this control gets
+  //   exactly what they got before this existed.
+  const [redactCredentials, setRedactCredentials] = useState(true);
   const [run, setRun] = useState<RunState>({ phase: "idle" });
   // ★ The poll effect keys on this STABLE token, NOT the whole `run` object — else every 'running' tick's
   //   setRun mints a new `run`, tearing down + re-running the effect and firing GET back-to-back (a hot loop
@@ -194,11 +198,12 @@ function TestsWorkbench() {
     // that was actually submitted.
     const wasCredentialed = credentialed;
     try {
-      const { token } = await createPreview(spec, targetUrl.trim() || undefined, {
-        username,
-        password,
-        vercelBypassToken: bypassToken,
-      });
+      const { token } = await createPreview(
+        spec,
+        targetUrl.trim() || undefined,
+        { username, password, vercelBypassToken: bypassToken },
+        redactCredentials,
+      );
       setRun({ phase: "polling", token, poll: null, credentialed: wasCredentialed });
       setPollToken(token); // starts the poll effect
       void refreshQuota();
@@ -207,7 +212,7 @@ function TestsWorkbench() {
       clearCredentials(); // ★ the run never started — do not keep the credential around for a retry
       void refreshQuota();
     }
-  }, [spec, targetUrl, username, password, bypassToken, credentialed, refreshQuota, clearCredentials]);
+  }, [spec, targetUrl, username, password, bypassToken, credentialed, redactCredentials, refreshQuota, clearCredentials]);
 
   const onFile = useCallback((file: File | undefined) => {
     if (!file) return;
@@ -287,6 +292,8 @@ function TestsWorkbench() {
             bypassToken={bypassToken}
             showSecrets={showSecrets}
             credentialed={credentialed}
+            redactCredentials={redactCredentials}
+            onRedactCredentials={setRedactCredentials}
             onUsername={setUsername}
             onPassword={setPassword}
             onBypassToken={setBypassToken}
@@ -377,6 +384,8 @@ function CredentialsPanel({
   bypassToken,
   showSecrets,
   credentialed,
+  redactCredentials,
+  onRedactCredentials,
   onUsername,
   onPassword,
   onBypassToken,
@@ -387,6 +396,8 @@ function CredentialsPanel({
   bypassToken: string;
   showSecrets: boolean;
   credentialed: boolean;
+  redactCredentials: boolean;
+  onRedactCredentials: (v: boolean) => void;
   onUsername: (v: string) => void;
   onPassword: (v: string) => void;
   onBypassToken: (v: string) => void;
@@ -475,6 +486,40 @@ function CredentialsPanel({
           primary diagnostic and bought little. You get the full trace: the failing step, its timing, and the
           error.
         </div>
+      )}
+
+      {/* ★ THE OPT-OUT. Only meaningful on a credentialed run — with no credentials there is nothing to
+          redact, so the control is shown only when it can actually do something. DEFAULT ON: unchecking is
+          an explicit, audited choice (the API records it in sandbox_preview + audit_log). */}
+      {credentialed && (
+        <label className="flex items-start gap-2 text-[12px] leading-relaxed" data-testid="preview-redact-toggle-label">
+          <input
+            type="checkbox"
+            className="mt-[3px]"
+            checked={redactCredentials}
+            onChange={(e) => onRedactCredentials(e.target.checked)}
+            data-testid="preview-redact-toggle"
+          />
+          <span>
+            <span className="font-medium text-[var(--color-ink)]">Redact credentials from output</span>{" "}
+            <span className="text-[var(--color-ink-dim)]">
+              {redactCredentials ? (
+                <>On — the default. Your credentials are scrubbed from the trace text, console output and errors.</>
+              ) : (
+                /* ★ Every claim here is what the code does, checked against the runner and API:
+                     - text only: runner swaps makeRedactor for IDENTITY_REDACTOR and keeps the RAW trace zip
+                     - the screenshot is NOT affected (previewPersistPlan → failureScreenshot: true always)
+                     - artifact lifetime IS shortened (API deletes on view; ~5-min timer sweep otherwise) */
+                <>
+                  <span className="font-medium text-[var(--color-warn)]">Off — raw output.</span> Your credentials
+                  will appear in the trace text, console output and errors. This does not change the failure
+                  screenshot, which is kept either way. Artifacts are deleted as soon as you view the result, or
+                  within about 5 minutes if you never open it. The choice is recorded against your account.
+                </>
+              )}
+            </span>
+          </span>
+        </label>
       )}
     </div>
   );

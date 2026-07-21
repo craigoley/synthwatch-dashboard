@@ -87,6 +87,59 @@ test.describe("Tests scratchpad — optional per-run credentials", () => {
     });
   }
 
+  // ── ★ THE REDACTION OPT-OUT — reachable, defaulted safe, and actually sent ────────────────────────
+  test("★ default sends redactCredentials TRUE — identical behaviour to sending nothing", async ({ page }) => {
+    const w = defaultWorld();
+    await mockApi(page, w);
+    await page.goto("/tests");
+    await page.getByTestId("preview-password").fill(SENTINEL_PW);
+    await page.locator("textarea").first().fill(SPEC);
+    await page.getByRole("button", { name: "Run preview" }).click();
+    await expect(page.getByTestId("preview-done-footer")).toBeVisible();
+
+    // ★ The safety property. The API computes `RedactCredentials = body.redactCredentials != false`, so
+    //   `true` and ABSENT are the same value to it — a user who never touches the control gets exactly
+    //   today's behaviour. This pins that we send the SAFE value, not merely "some value".
+    const [first] = w.previewRequests ?? [];
+    expect(first, "the POST must have been recorded").toBeDefined();
+    expect((first!.body as { redactCredentials?: boolean }).redactCredentials).toBe(true);
+  });
+
+  test("★ unchecking the toggle actually SENDS redactCredentials false", async ({ page }) => {
+    const w = defaultWorld();
+    await mockApi(page, w);
+    await page.goto("/tests");
+    await page.getByTestId("preview-password").fill(SENTINEL_PW);
+
+    const toggle = page.getByTestId("preview-redact-toggle");
+    await expect(toggle).toBeChecked(); // default ON
+    await toggle.uncheck();
+
+    // The copy must state what OFF does — and must NOT claim any effect on the screenshot.
+    const label = page.getByTestId("preview-redact-toggle-label");
+    await expect(label).toContainText("Off — raw output.");
+    await expect(label).toContainText("does not change the failure screenshot");
+    await expect(label).toContainText("within about 5 minutes");
+
+    await page.locator("textarea").first().fill(SPEC);
+    await page.getByRole("button", { name: "Run preview" }).click();
+    await expect(page.getByTestId("preview-done-footer")).toBeVisible();
+
+    const [first] = w.previewRequests ?? [];
+    expect(first, "the POST must have been recorded").toBeDefined();
+    expect((first!.body as { redactCredentials?: boolean }).redactCredentials).toBe(false);
+  });
+
+  test("the toggle appears only when there is something to redact", async ({ page }) => {
+    // With no credentials there is nothing to scrub, so the control would be a no-op — and a no-op
+    // control on a security surface invites the belief that it did something.
+    await mockApi(page, defaultWorld());
+    await page.goto("/tests");
+    await expect(page.getByTestId("preview-redact-toggle")).toHaveCount(0);
+    await page.getByTestId("preview-password").fill(SENTINEL_PW);
+    await expect(page.getByTestId("preview-redact-toggle")).toHaveCount(1);
+  });
+
   test("★ a credentialed run says its OUTPUT is redacted — and never claims the screenshot is suppressed", async ({ page }) => {
     const w = defaultWorld();
     // ★ STUB UNCHANGED (deliberately — swapping it for a real captured fixture is its own concern). What it
