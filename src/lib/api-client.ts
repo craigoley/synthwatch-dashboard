@@ -2971,6 +2971,24 @@ export async function createPreview(
   spec: string,
   targetUrl?: string,
   credentials?: PreviewCredentials,
+  /**
+   * "Redact credentials from output" — DEFAULT TRUE, matching the API's contract exactly.
+   *
+   * ★ The API computes `RedactCredentials = body.redactCredentials != false`, so ABSENT, `null` and `true`
+   *   are all the same value to it: only an explicit `false` opts out. Sending `true` is therefore
+   *   behaviourally identical to sending nothing, which is what makes defaulting it here safe — a caller
+   *   that never touches the control gets today's behaviour.
+   * ★ It gates TEXT redaction only (trace text, stdout, error, trace_signals — the runner swaps
+   *   makeRedactor for IDENTITY_REDACTOR and keeps the raw trace zip). It does NOT affect the screenshot:
+   *   previewPersistPlan returns failureScreenshot: true unconditionally.
+   * ★ It DOES shorten artifact life: the API deletes an unredacted run's artifacts once you view the
+   *   result, and sweeps abandoned ones on a ~5-minute timer.
+   */
+  redactCredentials = true,
+  // ★ COVERAGE NOTE: this DEFAULT is not exercised by the e2e — the Tests UI always passes the value
+  //   explicitly from its own `useState(true)`, which is the real control point and IS pinned (flipping
+  //   it reds two tests). This default only protects a future non-UI caller. Verified by perturbation:
+  //   flipping it alone changes nothing observable today.
 ): Promise<{ token: string }> {
   // Drop empty/whitespace-only fields so an untouched form sends NO credentials node at all — the API keys
   // its whole sensitive treatment off "did any credential arrive?", and an empty string is not a credential.
@@ -2984,6 +3002,7 @@ export async function createPreview(
       spec,
       ...(targetUrl ? { targetUrl } : {}),
       ...(Object.keys(creds).length > 0 ? { credentials: creds } : {}),
+      redactCredentials,
     }),
   });
 }
