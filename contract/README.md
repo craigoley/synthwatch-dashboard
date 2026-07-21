@@ -85,7 +85,7 @@ concept of. Option B works for ai-insights precisely because the api owns that D
 
 ### What the coverage actually is
 
-Unanchored, **not incorrect**. `e2e/mock.ts:427` serves `hasScreenshot: world.previewHasScreenshot ?? true`,
+Unanchored, **not incorrect**. `e2e/mock.ts` serves `hasScreenshot: (world.previewScreenshot ?? "uploaded") === "uploaded"`,
 and `e2e/preview-credentials.spec.ts:65` sets it `false` to model *a failing run that produced no
 screenshot* — a legitimate state. `contract/seams.contract.ts` has **no preview entry**, and `contract/real/`
 holds **36** captured fixtures, none of them preview. So the preview seam is currently verified by

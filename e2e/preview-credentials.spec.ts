@@ -56,13 +56,44 @@ test.describe("Tests scratchpad — optional per-run credentials", () => {
     });
   });
 
+  // ── ★ THE THREE SCREENSHOT ARMS ────────────────────────────────────────────────────────────────────
+  // hasScreenshot is the RETURN VALUE of uploadSandboxArtifact in the runner's sandboxMain.ts, so it means
+  // "captured AND within SCREENSHOT_CAP_BYTES AND uploaded". That is THREE outcomes, and the wire format
+  // carries only a boolean — so "dropped-over-cap" and "none" are indistinguishable ON THE WIRE while
+  // being different events. The mock now models all three; these pin each one.
+  for (const [arm, shows] of [
+    ["uploaded", true],
+    ["none", false],
+    ["dropped-over-cap", false],
+  ] as const) {
+    test(`★ screenshot arm "${arm}" → image ${shows ? "rendered" : "absent"}`, async ({ page }) => {
+      const w = defaultWorld();
+      w.previewScreenshot = arm;
+      await mockApi(page, w);
+      await page.goto("/tests");
+      await page.locator("textarea").first().fill(SPEC);
+      await page.getByRole("button", { name: "Run preview" }).click();
+      await expect(page.getByTestId("preview-done-footer")).toBeVisible();
+
+      const shot = page.getByAltText("Preview failure screenshot");
+      await expect(shot).toHaveCount(shows ? 1 : 0);
+      if (!shows) {
+        // ★ FINDING, pinned deliberately: the UI shows the SAME copy for both false arms. For
+        //   "dropped-over-cap" that copy is inaccurate — the screenshot WAS captured, then dropped over
+        //   the 4 MiB cap. Distinguishing them needs a wire change (the boolean cannot carry the cause),
+        //   so this asserts today's truth rather than pretending the gap is closed.
+        await expect(page.getByText("none was captured for this run")).toBeVisible();
+      }
+    });
+  }
+
   test("★ a credentialed run says its OUTPUT is redacted — and never claims the screenshot is suppressed", async ({ page }) => {
     const w = defaultWorld();
     // ★ STUB UNCHANGED (deliberately — swapping it for a real captured fixture is its own concern). What it
     //   now represents is a failing run that simply produced NO screenshot, which is a legitimate state.
     //   It no longer represents "suppressed because sensitive": previewPersistPlan keeps the screenshot for
     //   a credentialed preview, so that explanation would be a false statement about sensitive-data handling.
-    w.previewHasScreenshot = false;
+    w.previewScreenshot = "none";
     await mockApi(page, w);
     await page.goto("/tests");
 
