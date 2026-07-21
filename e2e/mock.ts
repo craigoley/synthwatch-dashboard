@@ -196,7 +196,8 @@ export interface World {
    * Sandbox preview (the Tests scratchpad). The handler is STATEFUL enough to drive the real UI loop:
    * POST /api/preview records the body in `previewRequests` and returns a token; the next GET returns
    * `previewResult` as the `trace` string. `previewHasScreenshot` drives the screenshot block — set it
-   * FALSE to model a credentialed (sensitive) run, where the runner suppresses the screenshot.
+   * FALSE to model a failing run that produced NO screenshot. ★ NOT "a credentialed run": the runner no
+   * longer suppresses screenshots for credentialed previews (previewPersistPlan keeps them).
    */
   previewRequests?: { url: string; body: RawObj }[];
   previewResult?: RawObj;
