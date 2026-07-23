@@ -80,6 +80,23 @@ test.describe("API contract — real-response shape vs client mappers", () => {
     }
   });
 
+  test("GET /incidents (resolved) — resolution_reason maps camel→snake, incl. a non-null run-less close", async () => {
+    // The list DTO carries resolutionReason since api #286 (runner 0095): null = genuine recovery, a value =
+    // closed because the monitor stopped running. Anchor that the list mapper threads it through 1:1.
+    const raw = real("incidents_resolved");
+    const page = await withRealResponse(raw, () => getIncidents({ status: "resolved" }));
+    for (const r of raw.items) {
+      const m = page.incidents.find((x) => x.id === r.id);
+      expect(m, `incident ${r.id} present after mapping`).toBeTruthy();
+      expect(m!.resolution_reason).toBe(r.resolutionReason ?? null);
+    }
+    // ★ the fixture MUST include ≥1 run-less (administrative) close, or this anchors nothing about the non-null
+    //   path — the whole point of re-capturing this fixture (incident 178 = monitor_paused).
+    const reasons = page.incidents.map((i) => i.resolution_reason).filter(Boolean);
+    expect(reasons.length, "fixture has ≥1 resolved-without-recovery incident").toBeGreaterThan(0);
+    expect(reasons).toContain("monitor_paused");
+  });
+
   test("GET /sla — client maps up_runs/down_runs from the real upRuns/downRuns", async () => {
     const raw = real("sla_7d");
     expect(Array.isArray(raw.items)).toBe(true);

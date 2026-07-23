@@ -391,6 +391,17 @@ export interface IncidentRca {
   signature?: string;
 }
 
+/**
+ * Why a RESOLVED incident was closed. `null` = a genuine cross-location recovery (a green run cleared it —
+ * the normal case). A non-null value means the monitor STOPPED running — an operator paused, archived, or
+ * git-removed it — so the incident could no longer resolve on its own and the runner's per-tick
+ * `closeStrandedIncidents` sweep closed it administratively (resolved_run_id NULL, NO recovery notification
+ * fired). It is NOT a recovery: the underlying failure was never confirmed fixed. (runner migration 0095;
+ * api #286 exposes it as camelCase `resolutionReason`.) The value space mirrors the runner CHECK constraint
+ * `incidents_resolution_reason_chk` — an off-taxonomy/unknown value is coerced to null (renders as recovery,
+ * the fail-safe: no misleading "closed" badge on a value we don't understand). */
+export type IncidentResolutionReason = "monitor_paused" | "monitor_archived" | "monitor_removed";
+
 export interface IncidentWithCheck {
   id: number;
   check_id: number;
@@ -406,6 +417,8 @@ export interface IncidentWithCheck {
   check_kind: CheckKind;
   /** Runner root-cause analysis; null when not computed. */
   rca: IncidentRca | null;
+  /** Non-null ⇒ closed WITHOUT a recovery run (monitor stopped running). null ⇒ genuine recovery. */
+  resolution_reason: IncidentResolutionReason | null;
 }
 
 /** One run in an incident's evidence timeline (GET /api/incidents/{id}). */
@@ -471,6 +484,9 @@ export interface IncidentDetail {
   recurrence: IncidentRecurrence[];
   // Deploys detected near this incident (empty when none — the UI renders absence, never a fabricated row).
   nearby_deploys: NearbyDeploy[];
+  /** Non-null ⇒ closed WITHOUT a recovery run (monitor stopped running). null ⇒ genuine recovery.
+   *  See {@link IncidentResolutionReason}. */
+  resolution_reason: IncidentResolutionReason | null;
 }
 
 /**

@@ -4,7 +4,14 @@
  * Returns CSS-variable-backed token names defined in globals.css.
  */
 
-import type { CheckWithStatus, IncidentSeverity, RunStatus, RunStepStatus, SparkPoint } from "@/lib/types";
+import type {
+  CheckWithStatus,
+  IncidentResolutionReason,
+  IncidentSeverity,
+  RunStatus,
+  RunStepStatus,
+  SparkPoint,
+} from "@/lib/types";
 import { isNonProd } from "@/lib/env";
 
 export interface StatusMeta {
@@ -70,6 +77,33 @@ export function stepStatusToken(status: RunStepStatus | string): StatusMeta["tok
     default:
       return "idle"; // skip / pending
   }
+}
+
+// ── Incident resolution reason (runner 0095 / api #286 → resolutionReason) ───────────────────────────────
+// A resolved incident's resolution_reason is null for a genuine cross-location recovery (a green run cleared
+// it). A NON-null value means the monitor STOPPED running — an operator paused, archived, or git-removed it —
+// so the incident could no longer resolve on its own, and the runner's closeStrandedIncidents sweep closed it
+// administratively (resolved_run_id null, NO recovery notification). This is NOT a recovery: the underlying
+// failure was never confirmed fixed. These helpers name the cause so no surface reads such a close as green.
+const RESOLUTION_REASON_VERB: Record<IncidentResolutionReason, string> = {
+  monitor_paused: "paused",
+  monitor_archived: "archived",
+  monitor_removed: "removed",
+};
+
+/** Short neutral chip label for a run-less close, e.g. "Monitor archived". */
+export function resolutionReasonLabel(reason: IncidentResolutionReason): string {
+  return `Monitor ${RESOLUTION_REASON_VERB[reason]}`;
+}
+
+/** Plain-language explanation for the incident detail — names the cause, states it is NOT a recovery, and that
+ *  the underlying failure was never confirmed fixed. One sentence template covers all three reason values. */
+export function resolutionReasonExplanation(reason: IncidentResolutionReason): string {
+  return (
+    `This incident was closed because the monitor was ${RESOLUTION_REASON_VERB[reason]} — it stopped running, ` +
+    `so the incident could no longer resolve on its own. This is not a recovery: the underlying failure was ` +
+    `never confirmed fixed.`
+  );
 }
 
 export function severityMeta(sev: IncidentSeverity): StatusMeta {
