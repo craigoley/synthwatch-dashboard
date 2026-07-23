@@ -56,6 +56,7 @@ import type {
   DiffConsoleLine,
   Check,
   RedactionHealth,
+  IncidentResolutionReason,
   CheckAuth,
   CheckDetail,
   CheckKind,
@@ -377,6 +378,10 @@ interface RawCheck {
 }
 
 const REDACTION_HEALTHS: readonly string[] = ["ok", "misconfigured", "n/a"];
+// incidents.resolution_reason (runner 0095) — the value space of the runner CHECK. An unknown/off-taxonomy
+// value coerces to null (renders as a genuine recovery — the fail-safe: never a misleading close-reason badge
+// for a value we don't understand). Same validate-then-cast pattern as REDACTION_HEALTHS above.
+const RESOLUTION_REASONS: readonly string[] = ["monitor_paused", "monitor_archived", "monitor_removed"];
 
 interface RawCheckListItem extends RawCheck {
   currentStatus: RunStatus | null;
@@ -477,6 +482,7 @@ interface RawIncident {
   checkName: string;
   checkKind: CheckKind;
   rca: IncidentRca | null;
+  resolutionReason?: string | null; // optional → tolerant of a pre-#286 API (absent → null = genuine recovery)
 }
 
 interface RawSlaItem {
@@ -655,6 +661,9 @@ function mapIncident(raw: RawIncident): IncidentWithCheck {
     check_name: raw.checkName,
     check_kind: raw.checkKind,
     rca: raw.rca ?? null,
+    resolution_reason: RESOLUTION_REASONS.includes(raw.resolutionReason ?? "")
+      ? (raw.resolutionReason as IncidentResolutionReason)
+      : null,
   };
 }
 
@@ -1387,6 +1396,7 @@ interface RawIncidentDetail {
   timelineTotal?: number | null; // optional → tolerant of a pre-timeline-cap API (absent → null, UI unchanged)
   recurrence: RawRecurrence[] | null;
   nearbyDeploys?: RawNearbyDeploy[] | null; // optional → tolerant of the pre-#157 API (absent → [])
+  resolutionReason?: string | null; // optional → tolerant of a pre-#286 API (absent → null = genuine recovery)
 }
 
 interface RawNearbyDeploy {
@@ -1464,6 +1474,9 @@ export async function getIncident(id: number): Promise<IncidentDetail> {
       fingerprint: d.fingerprint,
       offset_minutes: d.offsetMinutes,
     })),
+    resolution_reason: RESOLUTION_REASONS.includes(raw.resolutionReason ?? "")
+      ? (raw.resolutionReason as IncidentResolutionReason)
+      : null,
   };
 }
 

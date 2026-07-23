@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 import { mockApi, defaultWorld } from "./mock";
-import { incident } from "./fixtures";
+import { incident, incidentDetail } from "./fixtures";
 
 test.describe("incidents — RCA render", () => {
   test("a populated rca shows the badge, confidence, and observed-vs-inferred", async ({ page }) => {
@@ -185,5 +185,91 @@ test.describe("incident detail page", () => {
     // ★ the steady poll refetches page 0 (via the safe-default revalidateFirstPage) → it shows up, NO reload.
     // (timeout > the 15s idle cadence; fails if the default is false because page 0 is never refetched.)
     await expect(page.getByText("FRESH OUTAGE on payments")).toBeVisible({ timeout: 20000 });
+  });
+});
+
+// ★ Resolution reason (runner 0095 closeStrandedIncidents / api #286 → resolutionReason). A resolved incident
+// with resolution_reason set was NOT recovered — the monitor stopped running, so it was closed administratively
+// (no green recovery run, resolved_run_id NULL). The detail must SAY SO and the red final run must be explained,
+// never faked green. A null-reason (genuine recovery) incident must render exactly as before.
+test.describe("incident — resolution reason (run-less resolve)", () => {
+  const failRun = (runId: number) => ({
+    runId, status: "fail", startedAt: "2026-06-22T17:50:00Z", durationMs: 120,
+    httpStatus: 500, errorMessage: "500 from origin", failedStep: null,
+    screenshotUrl: null, traceUrl: null, location: "eastus2",
+  });
+
+  // ITEM 7 — an incident with resolutionReason set renders the explanation (and the timeline explains the red
+  // terminal). The prove-can-fail (drop the field from the mapper → this reds) is demonstrated in the PR.
+  test("★ a run-less resolve (monitor archived) explains itself; the red timeline is expected, not a recovery", async ({ page }) => {
+    const w = defaultWorld();
+    // resolved + monitor_archived + an ALL-FAIL timeline (no recovery run) — a real administrative close.
+    w.incidentDetails[50] = incidentDetail({
+      id: 50, checkName: "Archived monitor", resolutionReason: "monitor_archived",
+      timeline: [failRun(5001), failRun(5000)], rca: null,
+    });
+    await mockApi(page, w);
+    await page.goto("/incidents/50");
+
+    const note = page.getByTestId("resolution-reason-note");
+    await expect(note).toBeVisible();
+    await expect(note).toContainText("Closed without recovery");
+    await expect(note).toContainText("archived"); // names WHICH cause
+    await expect(note).toContainText("not a recovery"); // explicitly NOT a recovery
+    await expect(note).toContainText("never confirmed fixed"); // the failure was not fixed
+    await expect(note).not.toContainText("recovered");
+
+    // the timeline explains the (correct) red final run — not faked green, not suppressed.
+    const tnote = page.getByTestId("timeline-no-recovery-note");
+    await expect(tnote).toBeVisible();
+    await expect(tnote).toContainText("No recovery run");
+    await expect(page.getByText("500 from origin").first()).toBeVisible(); // the red run is still shown, not hidden
+  });
+
+  // ITEM 9 — cover MORE THAN ONE reason value. paused + removed here, archived above → all three exercised.
+  for (const { reason, word } of [
+    { reason: "monitor_paused", word: "paused" },
+    { reason: "monitor_removed", word: "removed" },
+  ] as const) {
+    test(`★ a run-less resolve (${reason}) names its cause in the explanation`, async ({ page }) => {
+      const w = defaultWorld();
+      w.incidentDetails[51] = incidentDetail({
+        id: 51, checkName: "Stopped monitor", resolutionReason: reason,
+        timeline: [failRun(5101)], rca: null,
+      });
+      await mockApi(page, w);
+      await page.goto("/incidents/51");
+      const note = page.getByTestId("resolution-reason-note");
+      await expect(note).toBeVisible();
+      await expect(note).toContainText(word);
+      await expect(note).toContainText("not a recovery");
+    });
+  }
+
+  // ITEM 8 — NEGATIVE: a genuinely-recovered incident (resolutionReason absent → null) renders EXACTLY as today:
+  // no close-reason banner, no timeline note, and its green recovery run still shows.
+  test("★ a genuinely-recovered incident (null reason) shows no close-reason UI (unchanged)", async ({ page }) => {
+    await mockApi(page); // default world: incident 1 is a fail→PASS recovery, resolutionReason absent → null
+    await page.goto("/incidents/1");
+    await expect(page.getByRole("heading", { name: "Incident #1" })).toBeVisible();
+    await expect(page.getByTestId("resolution-reason-note")).toHaveCount(0);
+    await expect(page.getByTestId("timeline-no-recovery-note")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Run timeline" })).toBeVisible();
+    await expect(page.getByText("503 Service Unavailable from westus2")).toBeVisible(); // unchanged
+  });
+
+  // ITEM 5 — the LIST marks a run-less resolve with a neutral chip; a genuine recovery gets none.
+  test("★ the incidents LIST chips a run-less resolve, not a genuine recovery", async ({ page }) => {
+    const w = defaultWorld();
+    const at = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+    w.incidents = [
+      incident({ id: 70, status: "resolved", severity: "warning", openedAt: at(1), resolvedAt: at(0.5), checkName: "Paused monitor", summary: "was failing", resolutionReason: "monitor_paused", rca: null }),
+      incident({ id: 71, status: "resolved", severity: "warning", openedAt: at(1), resolvedAt: at(0.5), checkName: "Recovered monitor", summary: "blip", rca: null }),
+    ];
+    await mockApi(page, w);
+    await page.goto("/incidents");
+    const chip = page.getByTestId("resolution-reason-chip");
+    await expect(chip).toHaveCount(1); // only the run-less close, never the genuine recovery
+    await expect(chip).toContainText("Monitor paused");
   });
 });

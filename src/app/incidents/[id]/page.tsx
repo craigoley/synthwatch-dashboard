@@ -10,9 +10,15 @@ import { RcaPanel } from "@/components/rca-panel";
 import { TagChips } from "@/components/tag-chips";
 import { EnvBadge } from "@/components/env-badge";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
-import { runStatusMeta, severityMeta } from "@/lib/status";
+import { runStatusMeta, severityMeta, resolutionReasonLabel, resolutionReasonExplanation } from "@/lib/status";
 import { formatDuration, formatLocalDateTime, formatRelative, formatSpan } from "@/lib/format";
-import type { IncidentDetail, IncidentTimelineRun, LocationStatus, NearbyDeploy } from "@/lib/types";
+import type {
+  IncidentDetail,
+  IncidentResolutionReason,
+  IncidentTimelineRun,
+  LocationStatus,
+  NearbyDeploy,
+} from "@/lib/types";
 
 const isDown = (s: string) => s === "fail" || s === "error";
 
@@ -53,7 +59,17 @@ function PerLocation({ locations }: { locations: LocationStatus[] }) {
  *  with links out to the screenshot + trace proxy when present — and a deep link into the
  *  check's run history (`/checks/{id}#run-{runId}`, the anchor run-history already serves),
  *  where the run's funnel, AI insights, baseline-diff, and embedded trace viewer live. */
-function Timeline({ runs, checkId, total }: { runs: IncidentTimelineRun[]; checkId: number; total: number | null }) {
+function Timeline({
+  runs,
+  checkId,
+  total,
+  resolutionReason,
+}: {
+  runs: IncidentTimelineRun[];
+  checkId: number;
+  total: number | null;
+  resolutionReason: IncidentResolutionReason | null;
+}) {
   // The API caps a long incident's timeline server-side (the 2,309-run/765KB payload lesson). When the
   // cap bit and the API says so (timeline_total > rows served), caption it honestly; a pre-cap API sends
   // no total (null) → the plain count renders exactly as before (forward-compatible).
@@ -66,6 +82,16 @@ function Timeline({ runs, checkId, total }: { runs: IncidentTimelineRun[]; check
           {truncated ? `showing newest ${runs.length} of ${total}` : `(${runs.length})`}
         </span>
       </div>
+      {/* A run-less (administrative) close leaves NO green recovery run, so the newest run is red. That is
+          CORRECT here, not a rendering bug — explain it so the all-red timeline under a "resolved" incident
+          isn't misread as still-broken-yet-closed. We never fake a green terminal or hide the red run. */}
+      {resolutionReason && (
+        <p className="mb-3 text-[12px] text-[var(--color-ink-dim)]" data-testid="timeline-no-recovery-note">
+          No recovery run: this incident was closed because the monitor stopped running (see “Closed without
+          recovery” above). The final run is red because the failure was never confirmed fixed — not because the
+          incident is still open.
+        </p>
+      )}
       {runs.length === 0 ? (
         <EmptyState title="No runs recorded for this incident." />
       ) : (
@@ -275,6 +301,25 @@ export default function IncidentDetailPage() {
         <TagChips tags={checkTags ?? []} className="mt-2" />
       </header>
 
+      {/* ★ Run-less resolve (runner 0095 closeStrandedIncidents): a resolved incident with resolution_reason set
+          was NOT recovered — the monitor stopped running, so it was closed administratively. State that plainly,
+          name the cause, and make clear it is not a recovery. null (genuine recovery) → nothing renders. */}
+      {incident.resolution_reason && (
+        <div
+          className="sw-panel border-l-2 p-4"
+          style={{ borderLeftColor: TONE_VAR.warn }}
+          data-testid="resolution-reason-note"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-sm font-semibold text-[var(--color-ink)]">Closed without recovery</h2>
+            <ToneBadge label={resolutionReasonLabel(incident.resolution_reason)} token="idle" />
+          </div>
+          <p className="mt-1.5 text-sm text-[var(--color-ink-dim)]">
+            {resolutionReasonExplanation(incident.resolution_reason)}
+          </p>
+        </div>
+      )}
+
       <PerLocation locations={incident.per_location ?? []} />
 
       {/* deploy-proximity annotation — correlation, not causation; absent when none (honest-empty) */}
@@ -283,7 +328,12 @@ export default function IncidentDetailPage() {
       {/* rca null → no panel (graceful, exactly like the list) */}
       {incident.rca && <RcaPanel rca={incident.rca} />}
 
-      <Timeline runs={incident.timeline ?? []} checkId={incident.check_id} total={incident.timeline_total} />
+      <Timeline
+        runs={incident.timeline ?? []}
+        checkId={incident.check_id}
+        total={incident.timeline_total}
+        resolutionReason={incident.resolution_reason}
+      />
 
       <Recurrence items={incident.recurrence ?? []} currentId={incident.id} />
     </div>

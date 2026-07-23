@@ -95,6 +95,12 @@ test.describe("API contract — high-risk seam anchors", () => {
     expect(res.consecutive_failures).toBe(raw.consecutiveFailures);
     expect(res.per_location).toEqual(raw.perLocation ?? []);
 
+    // ★ resolution_reason (runner 0095 / api #286) — the run-less-close reason maps camel→snake. This fixture
+    //   is the REAL monitor_archived close of incident 34 (resolved, NO recovery run — an all-fail timeline), so
+    //   it anchors the NON-null path; a future re-capture that lost the archived close would red the guard below.
+    expect(raw.resolutionReason, "fixture must be the run-less (archived) close").toBe("monitor_archived");
+    expect(res.resolution_reason).toBe(raw.resolutionReason ?? null);
+
     // ★ nested timeline[] (10 renamed fields) — the multi-field nested DTO drift bugs target:
     expect(res.timeline.length).toBe(raw.timeline.length);
     const t = res.timeline[0]!;

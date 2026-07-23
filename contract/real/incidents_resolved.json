@@ -1,6 +1,547 @@
 {
   "items": [
     {
+      "id": 185,
+      "checkId": 355,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-23T05:12:46.207212+00:00",
+      "resolvedAt": "2026-07-23T05:44:03.014981+00:00",
+      "openedRunId": 1038061,
+      "resolvedRunId": 1038227,
+      "consecutiveFailures": 1,
+      "summary": "Check \"Wegmans: full authenticated pickup shopping flow\" down (error) 1 consecutive times (died at step: add-bread).",
+      "checkName": "Wegmans: full authenticated pickup shopping flow",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "selector-drift",
+        "confidence": "medium",
+        "observed": [
+          "Failed step in run was 'add-bread' (step error) [cite: step:add-bread]",
+          "Error message states no staple \"bread\" in the search results and that the search boost changed (pinned SKU absent; first result was \"(none)\") [cite: error_message]",
+          "Step 'add-milk' completed successfully in the same run [cite: step:add-milk]",
+          "Step 'add-eggs' completed successfully in the same run [cite: step:add-eggs]",
+          "Recent run history is intermittent (errors and passes interleaved) [cite: history]"
+        ],
+        "inferred": [
+          "Because milk and eggs additions succeeded but bread search returned no expected SKU, the problem is likely specific to the bread search/results (content or merchandising change) rather than a full site outage",
+          "The monitor's expectation (a pinned/anchored 'bread' result) appears stale due to a search boost or merchandising change — the monitor's selector/selection logic should be updated",
+          "Console/network errors were captured in the run and may be noise; they do not prove a global outage since earlier steps completed, but they remain an alternative contributory factor",
+          "Intermittent history suggests this will recur when merchandising or product availability changes; consider making the check more tolerant (fallbacks or different selector)"
+        ],
+        "summary": "The add-bread step failed because the expected bread SKU was not present in search results (search boost/pinning changed), while other item adds succeeded; update the monitor's bread selection logic or make the check tolerant to merchandising changes.",
+        "signature": "355|[full-shop-flow] STEP-FAIL add-bread url=www.wegmans.com/shop/search f=li1sgn0cart0chk0ful1slot0oos0 c=[‹control›,‹greeting›,Pickup] :: add-bread: no staple \"bread\" in the search results (pinned SKU (none) absent; first result was \"(none)\") — only boosted/merchandised look-alikes. The search boost c|add-bread",
+        "model": "gpt-5-mini",
+        "cached": true,
+        "generated_at": "2026-07-23T05:12:49.441Z"
+      },
+      "resolutionReason": null
+    },
+    {
+      "id": 184,
+      "checkId": 355,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-22T20:27:41.846134+00:00",
+      "resolvedAt": "2026-07-22T20:59:11.902639+00:00",
+      "openedRunId": 1035129,
+      "resolvedRunId": 1035305,
+      "consecutiveFailures": 1,
+      "summary": "Check \"Wegmans: full authenticated pickup shopping flow\" down (error) 1 consecutive times (died at step: add-bread).",
+      "checkName": "Wegmans: full authenticated pickup shopping flow",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "selector-drift",
+        "confidence": "medium",
+        "observed": [
+          "Failed step in run was 'add-bread' (step error) [cite: step:add-bread]",
+          "Error message states no staple \"bread\" in the search results and that the search boost changed (pinned SKU absent; first result was \"(none)\") [cite: error_message]",
+          "Step 'add-milk' completed successfully in the same run [cite: step:add-milk]",
+          "Step 'add-eggs' completed successfully in the same run [cite: step:add-eggs]",
+          "Recent run history is intermittent (errors and passes interleaved) [cite: history]"
+        ],
+        "inferred": [
+          "Because milk and eggs additions succeeded but bread search returned no expected SKU, the problem is likely specific to the bread search/results (content or merchandising change) rather than a full site outage",
+          "The monitor's expectation (a pinned/anchored 'bread' result) appears stale due to a search boost or merchandising change — the monitor's selector/selection logic should be updated",
+          "Console/network errors were captured in the run and may be noise; they do not prove a global outage since earlier steps completed, but they remain an alternative contributory factor",
+          "Intermittent history suggests this will recur when merchandising or product availability changes; consider making the check more tolerant (fallbacks or different selector)"
+        ],
+        "summary": "The add-bread step failed because the expected bread SKU was not present in search results (search boost/pinning changed), while other item adds succeeded; update the monitor's bread selection logic or make the check tolerant to merchandising changes.",
+        "signature": "355|[full-shop-flow] STEP-FAIL add-bread url=www.wegmans.com/shop/search f=li1sgn0cart0chk0ful1slot0oos0 c=[‹control›,‹greeting›,Pickup] :: add-bread: no staple \"bread\" in the search results (pinned SKU (none) absent; first result was \"(none)\") — only boosted/merchandised look-alikes. The search boost c|add-bread",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-07-22T20:28:11.136Z"
+      },
+      "resolutionReason": null
+    },
+    {
+      "id": 183,
+      "checkId": 355,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-21T19:32:30.419006+00:00",
+      "resolvedAt": "2026-07-21T20:03:59.768212+00:00",
+      "openedRunId": 1026774,
+      "resolvedRunId": 1026940,
+      "consecutiveFailures": 1,
+      "summary": "Check \"Wegmans: full authenticated pickup shopping flow\" down (error) 1 consecutive times (died at step: add-bread).",
+      "checkName": "Wegmans: full authenticated pickup shopping flow",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "selector-drift",
+        "confidence": "medium",
+        "observed": [
+          "Failed step is add-bread in the funnel [cite: step:add-bread]",
+          "Error message: no staple \"bread\" in the search results; search boost changed; re-recon bread selection [cite: error_message]",
+          "Step add-milk passed earlier in the same run [cite: step:add-milk]",
+          "Step add-eggs passed earlier in the same run [cite: step:add-eggs]",
+          "Recent run history shows mostly passes with occasional errors [cite: history]"
+        ],
+        "inferred": [
+          "The monitor's product-selection logic expected a pinned/known \"bread\" SKU that is no longer returned by search (a merchandising/search boost change) rather than a generic page-render failure",
+          "Because add-milk and add-eggs succeeded in the same run, authentication, store selection, and add-to-cart mechanics are likely functioning and the failure appears product-specific",
+          "Captured console/network errors exist in the trace but have no timestamps; they may be unrelated noise or a concurrent backend/catalog issue — causal link is unproven",
+          "Immediate remediation: update the check to target a stable SKU or broaden the bread-selection heuristic (re-recon per the error) rather than treating this as a site outage"
+        ],
+        "summary": "The bread search returned no expected SKU (error message indicates a search/merchandising change) while other add-to-cart steps passed, so this is likely selector-drift — update the monitor's product selector or use a stable SKU. Console/network errors were recorded but are not proven to have caused this failure.",
+        "signature": "355|[full-shop-flow] STEP-FAIL add-bread url=www.wegmans.com/shop/search f=li1sgn0cart0chk0ful1slot0oos0 c=[‹control›,‹greeting›,Pickup] :: add-bread: no staple \"bread\" in the search results (pinned SKU (none) absent; first result was \"(none)\") — only boosted/merchandised look-alikes. The search boost c|add-bread",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-07-21T19:32:58.582Z"
+      },
+      "resolutionReason": null
+    },
+    {
+      "id": 182,
+      "checkId": 355,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-21T16:28:58.127391+00:00",
+      "resolvedAt": "2026-07-21T16:58:56.221787+00:00",
+      "openedRunId": 1025743,
+      "resolvedRunId": 1025914,
+      "consecutiveFailures": 1,
+      "summary": "Check \"Wegmans: full authenticated pickup shopping flow\" down (error) 1 consecutive times (died at step: clear-cart (teardown)).",
+      "checkName": "Wegmans: full authenticated pickup shopping flow",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "flaky-transient",
+        "confidence": "medium",
+        "observed": [
+          "Funnel shows step 0 \"login\" [error], step 1 \"clear-cart (teardown)\" [error], and step 2 \"logout (teardown)\" [pass]. [cite: run_steps]",
+          "Error message: page.goto: Timeout 30000ms exceeded when navigating to https://www.wegmans.com/ (navigation waited for domcontentloaded). [cite: error_message]",
+          "Network trace includes www.wegmans.com returning a 504 and additional www.wegmans.com requests with status -1. [cite: network:www.wegmans.com]",
+          "Console captured site errors from www.wegmans.com during the run. [cite: console:www.wegmans.com]",
+          "Recent run history is mostly passing with an intermittent error pattern (history: error, pass, pass, pass, pass, pass, pass, error, ...). [cite: history]"
+        ],
+        "inferred": [
+          "The browser timed out waiting for the page to load, which points to site unavailability or network slowness rather than a DOM selector mismatch.",
+          "The observed 504 and console site errors correlate with the navigation timeout and indicate a server-side or upstream failure at www.wegmans.com during this run.",
+          "Because the check usually passes (history shows mostly passes) this appears intermittent and likely self-resolves rather than a persistent regression.",
+          "Third-party tracker request failures may be collateral noise or secondary to the site-side outage and are unlikely the root cause of the navigation timeout."
+        ],
+        "summary": "The run timed out loading the site (page.goto timeout) with a 504 and site console errors present; given the mostly-green history this looks like an intermittent site-side or network blip rather than a selector change or sustained outage.",
+        "signature": "355|[full-shop-flow] STEP-FAIL login url=www.wegmans.com/ f=li0sgn0cart0chk0ful0slot0oos0 c=[] :: page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://www.wegmans.com/\", waiting until \"domcontentloaded\"|clear-cart (teardown)",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-07-21T16:29:28.730Z"
+      },
+      "resolutionReason": null
+    },
+    {
+      "id": 181,
+      "checkId": 80,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-21T02:19:28.835356+00:00",
+      "resolvedAt": "2026-07-21T02:22:11.516451+00:00",
+      "openedRunId": 1021009,
+      "resolvedRunId": 1021038,
+      "consecutiveFailures": 2,
+      "summary": "Check \"Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)\" down (fail) from 2 of 2 locations (died at step: navigate takeout menu -> Pizza).",
+      "checkName": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "real-outage",
+        "confidence": "high",
+        "observed": [
+          "Step 'navigate takeout menu -> Pizza' failed: Pizza category not found (expected element to be visible within 20000ms) [cite: step:navigate takeout menu -> Pizza]",
+          "Run funnel shows earlier steps in this run passed and the failure occurred at the Pizza navigation step [cite: run_steps]",
+          "Site console captured a wegapi.azure-api.net 500 Internal Server Error during the run [cite: console:wegapi.azure-api.net]",
+          "Network trace shows failed request to wegapi.azure-api.net (status 500) [cite: network:wegapi.azure-api.net]",
+          "Check is failing from 2 of 2 locations and the recent history shows multiple consecutive failures (fail, fail, fail, pass, ...) [cite: locations] [cite: history]"
+        ],
+        "inferred": [
+          "The site’s backend/menu API (wegapi) is likely returning errors or not delivering menu data, causing the Pizza category element to never render",
+          "Because earlier steps in the same run succeeded (store selection) but the menu step failed, the failure is occurring after store selection during menu data load",
+          "Widespread failures across locations and repeated recent failures indicate a systemic outage rather than a transient blip",
+          "Third-party LaunchDarkly network failures observed may worsen client behavior but the primary signal points to the wegapi 500 as the root cause"
+        ],
+        "summary": "The pizza category never rendered because the site’s menu API (wegapi) returned 500s; the synthetic check timed out waiting for the Pizza element. Investigate wegapi.azure-api.net 500s (and related LaunchDarkly errors) as the likely root cause.",
+        "signature": "80|STEP c: Pizza category not found. — expected element to be visible within 20000ms|navigate takeout menu -> Pizza",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-07-21T02:19:53.606Z"
+      },
+      "resolutionReason": null
+    },
+    {
+      "id": 180,
+      "checkId": 221,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-21T02:18:09.40728+00:00",
+      "resolvedAt": "2026-07-21T02:36:02.142283+00:00",
+      "openedRunId": 1020999,
+      "resolvedRunId": 1021108,
+      "consecutiveFailures": 1,
+      "summary": "Check \"Meals 2 Go: browse a cuisine menu (anon)\" down (fail) from 2 of 3 locations (died at step: assert the menu API loaded the menu).",
+      "checkName": "Meals 2 Go: browse a cuisine menu (anon)",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "real-outage",
+        "confidence": "high",
+        "observed": [
+          "Failed step: assert the menu API loaded the menu [cite: step:assert the menu API loaded the menu]",
+          "Console captured wegapi.azure-api.net: Failed to load resource — server responded with status 503 (Site Unavailable) [cite: console:wegapi.azure-api.net]",
+          "Network trace: request to wegapi.azure-api.net → status 503 [cite: network:wegapi.azure-api.net]",
+          "Console captured www.meals2go.com: Server returned code 503 with body \"The service is unavailable.\" [cite: console:www.meals2go.com]",
+          "Check: run failed from 2 of 3 locations (partial/multi-location impact) [cite: locations]"
+        ],
+        "inferred": [
+          "The menus backend (wegapi.azure-api.net) is returning 5xx errors, which directly prevents the menu API assertion from succeeding.",
+          "The initial page open step passed, so the page rendered but the API call failed at runtime — this points to a backend/API failure rather than a stale page selector.",
+          "Failures from 2 of 3 locations suggest the issue may be regional or affecting some edge/instance group rather than a global code regression.",
+          "Recent intermittent pass/fail history implies availability is unstable; treat as an active backend outage until the 503s stop."
+        ],
+        "summary": "The menus API (wegapi.azure-api.net) is returning 503s and caused the menu-load assertion to time out; because the page open succeeded, this is a backend/service outage (partial/regionally impacting) rather than a selector drift. Investigate the wegapi service health/instances and regional edge availability. ",
+        "signature": "221|Meals2Go browse: the menus API (wegapi.azure-api.net/kitting/.../menus) did not return 200 within 30s -- the menu discovery journey is broken, OR the entry slug (/browse-menu/pizza-wings) has rotted. Suspect ENTRY-ROT first (re-derive a live slug from meals2go.com/browse-menu) BEFORE concluding the |assert the menu API loaded the menu",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-07-21T02:18:42.237Z"
+      },
+      "resolutionReason": null
+    },
+    {
+      "id": 179,
+      "checkId": 352,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-21T02:17:09.169246+00:00",
+      "resolvedAt": "2026-07-21T02:30:42.528773+00:00",
+      "openedRunId": 1020991,
+      "resolvedRunId": 1021070,
+      "consecutiveFailures": 2,
+      "summary": "Check \"Meals 2 Go: browse a catering menu (anon)\" down (fail) from 2 of 3 locations (died at step: assert the catering menus API loaded the menu).",
+      "checkName": "Meals 2 Go: browse a catering menu (anon)",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "environment-regional",
+        "confidence": "high",
+        "observed": [
+          "Failed step: assert the catering menus API loaded the menu [cite: failed_step]",
+          "Error message: the catering menus API did not return 200 within 30s (timeout) [cite: error_message]",
+          "Console shows wegapi.azure-api.net responded with 500 Internal Server Error [cite: console:wegapi.azure-api.net]",
+          "Network trace shows wegapi.azure-api.net → status 500 / some requests to that host show unreachable (-1) [cite: network:wegapi.azure-api.net]",
+          "Check is failing from 2 of 3 locations (partial/multi-location failure) [cite: locations]"
+        ],
+        "inferred": [
+          "The catering backend (wegapi.azure-api.net) is returning server errors or is unreachable, causing the UI to surface a generic error and the API assertion to time out.",
+          "Because the page open step succeeded, the problem is unlikely to be a selector drift or missing element in the browser check; the failure is at the API/network layer.",
+          "Partial location failures (2/3) point to a regional or network/infra issue affecting certain edge locations or an upstream dependency rather than a universal code regression.",
+          "Repeated recent failures (multiple fails in run history) make a transient blip less likely and indicate an ongoing outage in the affected region or service."
+        ],
+        "summary": "The catering menus API (wegapi.azure-api.net) is returning 500/unreachable from some locations, causing the monitoring assertion to time out; this appears to be a regional/infra outage of the API rather than a stale selector or client-side change.",
+        "signature": "352|Meals2Go catering browse: the catering menus API (wegapi.azure-api.net/kitting/.../menus?catering=true) did not return 200 within 30s -- the catering discovery journey is broken, OR the entry slug (https://www.meals2go.com/browse-catering/custom-cakes?cuisine=1985) has rotted (re-derive a live cater|assert the catering menus API loaded the menu",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-07-21T02:17:36.704Z"
+      },
+      "resolutionReason": null
+    },
+    {
+      "id": 178,
+      "checkId": 396,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-17T18:58:24.152544+00:00",
+      "resolvedAt": "2026-07-23T14:05:20.648384+00:00",
+      "openedRunId": 994195,
+      "resolvedRunId": null,
+      "consecutiveFailures": 3,
+      "summary": "Check \"Wegmans Authorized User Add to Cart\" down (error) 3 consecutive times.",
+      "checkName": "Wegmans Authorized User Add to Cart",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "flaky-transient",
+        "confidence": "low",
+        "observed": [
+          "Error message: \"test.step is not a function\" [cite: error_message]"
+        ],
+        "inferred": [],
+        "summary": "insufficient evidence to attribute a cause",
+        "signature": "396|test.step is not a function|",
+        "model": null,
+        "cached": false,
+        "generated_at": "2026-07-17T18:58:31.040Z"
+      },
+      "resolutionReason": "monitor_paused"
+    },
+    {
+      "id": 177,
+      "checkId": 77,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-17T17:57:26.923562+00:00",
+      "resolvedAt": "2026-07-17T18:10:59.17586+00:00",
+      "openedRunId": 993846,
+      "resolvedRunId": 993913,
+      "consecutiveFailures": 2,
+      "summary": "Check \"Wegmans: recipe navigation\" down (fail) from 2 of 2 locations (died at step: open the first dinner recipe).",
+      "checkName": "Wegmans: recipe navigation",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "real-outage",
+        "confidence": "high",
+        "observed": [
+          "Step 3 'open the first dinner recipe' failed in the run_steps list [cite: step:open the first dinner recipe]",
+          "Error recorded: expected element to be visible within 15000ms [cite: error_message]",
+          "Console captured GraphQL / server 500/503 errors from api.digitaldevelopment.wegmans.cloud [cite: console:api.digitaldevelopment.wegmans.cloud]",
+          "Multiple image asset requests to images.wegmans.com failed to load during the run [cite: network:images.wegmans.com]",
+          "Check failed from all configured locations (2 of 2) for this run [cite: locations]"
+        ],
+        "inferred": [
+          "The backend API (GraphQL) is likely returning 5xx errors, preventing recipe list data from loading so the first-recipe element never rendered",
+          "Failed asset and websocket requests suggest a broader service or CDN/back-end degradation rather than a brittle selector on the page",
+          "Because failures are observed from all locations and recent history shows consecutive failures, this is more likely a genuine outage than a transient blip",
+          "Selector drift is less likely given the presence of server-side 5xx errors and multiple network failures"
+        ],
+        "summary": "The recipe-open step timed out because upstream API/asset requests are failing (server 5xx and image/wss load failures) across all locations; investigate api.digitaldevelopment.wegmans.cloud and CDN/edge/service availability rather than the monitor selector.",
+        "signature": "77|expected element to be visible within 15000ms|open the first dinner recipe",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-07-17T17:57:52.196Z"
+      },
+      "resolutionReason": null
+    },
+    {
+      "id": 176,
+      "checkId": 355,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-17T07:36:32.271125+00:00",
+      "resolvedAt": "2026-07-17T08:09:20.322948+00:00",
+      "openedRunId": 990346,
+      "resolvedRunId": 990518,
+      "consecutiveFailures": 1,
+      "summary": "Check \"Wegmans: full authenticated pickup shopping flow\" down (error) 1 consecutive times (died at step: select-store-mckinley).",
+      "checkName": "Wegmans: full authenticated pickup shopping flow",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "flaky-transient",
+        "confidence": "medium",
+        "observed": [
+          "Step failed with message: Pickup option not found in the fulfillment dialog; expected element to be visible within 20000ms [cite: error_message]",
+          "Funnel shows: login passed, select-store-mckinley errored, clear-cart and logout teardown steps passed [cite: run_steps]",
+          "Console captured site errors on www.wegmans.com during the run [cite: console:www.wegmans.com]",
+          "A network request to www.wegmans.com returned status -1 in the trace [cite: network:www.wegmans.com]",
+          "Recent run history: mostly passes with occasional errors (intermittent failures present) [cite: history]"
+        ],
+        "inferred": [
+          "The failure is caused by the monitor not finding the Pickup element in the fulfillment dialog (selector did not match an element that was expected to be visible).",
+          "Because the login step in the same run passed, the site itself was reachable and a full outage is unlikely for this run.",
+          "Captured network/site errors could have prevented the fulfillment picker from rendering, causing an intermittent non-render rather than a permanent DOM change.",
+          "Given mostly passing history with sporadic errors, this behavior is consistent with an intermittent/flaky issue (transient load or UI-variant) though a drifting selector or A/B variant remains possible."
+        ],
+        "summary": "The check failed because the Pickup option element was not found in the fulfillment dialog; login still succeeded and history shows mostly passes, so this looks like an intermittent (flaky) failure possibly caused by a transient render/network issue or a UI variant rather than a total outage.",
+        "signature": "355|[full-shop-flow] STEP-FAIL select-store-mckinley url=www.wegmans.com/shop/search f=li1sgn0cart0chk0ful1slot0oos0 c=[‹control›,‹greeting›,Pickup] :: select-store-mckinley: Pickup option not found in the fulfillment dialog (picker DOM may have changed — verify from the diag). — expected element to be |select-store-mckinley",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-07-17T07:36:58.013Z"
+      },
+      "resolutionReason": null
+    },
+    {
+      "id": 175,
+      "checkId": 355,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-12T21:44:35.672547+00:00",
+      "resolvedAt": "2026-07-12T21:49:47.30838+00:00",
+      "openedRunId": 954615,
+      "resolvedRunId": 954645,
+      "consecutiveFailures": 2,
+      "summary": "Check \"Wegmans: full authenticated pickup shopping flow\" down (error) from 2 of 2 locations (died at step: verify-cart-4).",
+      "checkName": "Wegmans: full authenticated pickup shopping flow",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "real-outage",
+        "confidence": "medium",
+        "observed": [
+          "failed step: verify-cart-4",
+          "url=www.wegmans.com/cart",
+          "cart has 8 item(s) (>4)",
+          "baseline-clear-cart [pass]",
+          "clear-cart (teardown) [pass]"
+        ],
+        "inferred": [
+          "The pre-check clear-cart did not actually remove items from the cart (cart still shows 8) so state reset failed for this run",
+          "This looks like a server-side/state issue (cart persistence or cart-clear endpoint) rather than a location-specific network problem, since 2/2 locations failed",
+          "A shared account or concurrent sessions may be leaving leftover items between runs, causing the unexpected item count",
+          "Less likely: the verification step's selector/logic is miscounting items (test-side assertion) and reporting 8 when the UI is different"
+        ],
+        "summary": "The checkout flow failed because the cart unexpectedly contains 8 items even though the baseline clear-cart step reported success. Check the cart-clearing path (API/DB) and the test account state for leftover items or concurrent sessions; if those look fine, verify the test's item-count selector logic.",
+        "signature": "355|[full-shop-flow] STEP-FAIL verify-cart-4 url=www.wegmans.com/cart f=li1sgn0cart0chk0ful1slot0oos0 c=[‹control›,‹greeting›,Pickup] :: verify-cart-4: cart has 8 item(s) (>4) — baseline clear-cart did not empty leftover items; clearing failed — expected 8 to be <= 4|verify-cart-4",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-07-12T21:44:57.001Z"
+      },
+      "resolutionReason": null
+    },
+    {
+      "id": 174,
+      "checkId": 395,
+      "status": "resolved",
+      "severity": "warning",
+      "openedAt": "2026-07-12T16:17:54.151108+00:00",
+      "resolvedAt": "2026-07-12T16:26:44.864414+00:00",
+      "openedRunId": 952638,
+      "resolvedRunId": 952703,
+      "consecutiveFailures": 1,
+      "summary": "Check \"synthwatch-canary-confirmation-retry\" down (error) 1 consecutive times (died at step: open homepage).",
+      "checkName": "synthwatch-canary-confirmation-retry",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "flaky-transient",
+        "confidence": "medium",
+        "observed": [
+          "page.goto: net::ERR_NAME_NOT_RESOLVED at https://synthwatch-canary-does-not-resolve.invalid/",
+          "Run status: error",
+          "Failed step: open homepage",
+          "duration: 1353ms",
+          "Recent run history (newest first): error, pass, error, pass"
+        ],
+        "inferred": [
+          "The probe failed to resolve the target hostname (DNS lookup failure) at the time of this run.",
+          "The alternating error/pass history suggests the DNS resolution problem is intermittent rather than a sustained site outage.",
+          "Likely causes include transient DNS/provider/resolver problems or a network path issue from the probe location to DNS servers.",
+          "Further checks should target DNS (resolver logs, TTLs, provider status) and re-running the check from the same location to confirm transient behavior."
+        ],
+        "summary": "The browser check failed because the hostname could not be resolved (net::ERR_NAME_NOT_RESOLVED). The recent alternating error/pass runs point to an intermittent DNS or network resolver issue rather than a continuous site outage; investigate DNS/resolver health and rerun the check from the same probe to confirm.",
+        "signature": "395|page.goto: net::ERR_NAME_NOT_RESOLVED at https://synthwatch-canary-does-not-resolve.invalid/\nCall log:\n  - navigating to \"https://synthwatch-canary-does-not-resolve.invalid/\", waiting until \"load\"\n|open homepage",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-07-12T16:18:13.569Z"
+      },
+      "resolutionReason": null
+    },
+    {
+      "id": 167,
+      "checkId": 221,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-08T02:29:23.021451+00:00",
+      "resolvedAt": "2026-07-08T03:01:11.643344+00:00",
+      "openedRunId": 907523,
+      "resolvedRunId": 907768,
+      "consecutiveFailures": 2,
+      "summary": "Check \"Meals 2 Go: browse a cuisine menu (anon)\" down (error) from 2 of 3 locations.",
+      "checkName": "Meals 2 Go: browse a cuisine menu (anon)",
+      "checkKind": "browser",
+      "rca": null,
+      "resolutionReason": null
+    },
+    {
+      "id": 166,
+      "checkId": 352,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-08T02:27:16.641815+00:00",
+      "resolvedAt": "2026-07-08T02:55:36.517938+00:00",
+      "openedRunId": 907498,
+      "resolvedRunId": 907721,
+      "consecutiveFailures": 2,
+      "summary": "Check \"Meals 2 Go: browse a catering menu (anon)\" down (error) from 2 of 3 locations (died at step: assert the catering menus API loaded the menu).",
+      "checkName": "Meals 2 Go: browse a catering menu (anon)",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "environment-regional",
+        "confidence": "medium",
+        "observed": [
+          "catering menus API did not return 200 within 30s",
+          "Failed step: assert the catering menus API loaded the menu",
+          "Step 0 \"open the Custom Cakes catering menu\" [pass]; Step 1 [error]",
+          "Recent run history: error, pass, pass, pass, pass, pass, pass, pass, pass, pass, pass, pass, pass, pass, pass",
+          "Failing from 2 of 3 location(s)"
+        ],
+        "inferred": [
+          "The browser page itself can load (step 0 passed) while the backend API call to wegapi.azure-api.net is timing out or unreachable",
+          "Partial/location-dependent failures (2 of 3 locations) point to a regional infra or network issue rather than a globally-broken selector or persistent site-wide outage",
+          "Single recent error among many passes suggests this is likely transient (a brief outage or network blip) rather than a permanent regression",
+          "Investigate the API gateway/azure region logs and network paths for the failing locations; retrying the check may recover service"
+        ],
+        "summary": "The catering browse failed because the catering menus API (wegapi.azure-api.net/...) did not return 200 within 30s; the page loaded but the backend API timed out. The problem affected 2 of 3 probe locations and is a recent, otherwise-passing run — likely a regional/infrastructure blip; check API gateway/region logs and network connectivity for the failing locations.",
+        "signature": "352|Meals2Go catering browse: the catering menus API (wegapi.azure-api.net/kitting/.../menus?catering=true) did not return 200 within 30s -- the catering discovery journey is broken, OR the entry slug (https://www.meals2go.com/browse-catering/custom-cakes?cuisine=1985) has rotted (re-derive a live cater|assert the catering menus API loaded the menu",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-07-08T02:27:53.049Z"
+      },
+      "resolutionReason": null
+    },
+    {
+      "id": 165,
+      "checkId": 81,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-08T02:19:05.667402+00:00",
+      "resolvedAt": "2026-07-08T02:47:43.440745+00:00",
+      "openedRunId": 907453,
+      "resolvedRunId": 907671,
+      "consecutiveFailures": 2,
+      "summary": "Check \"Meals 2 Go: homepage load\" down (error) from 2 of 3 locations.",
+      "checkName": "Meals 2 Go: homepage load",
+      "checkKind": "browser",
+      "rca": null,
+      "resolutionReason": null
+    },
+    {
+      "id": 164,
+      "checkId": 80,
+      "status": "resolved",
+      "severity": "critical",
+      "openedAt": "2026-07-08T02:17:32.237543+00:00",
+      "resolvedAt": "2026-07-08T02:47:06.446713+00:00",
+      "openedRunId": 907437,
+      "resolvedRunId": 907648,
+      "consecutiveFailures": 2,
+      "summary": "Check \"Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)\" down (fail) from 2 of 3 locations (died at step: open meals2go.com landing).",
+      "checkName": "Meals2Go: cheese pizza carry-out cart (Buffalo/McKinley)",
+      "checkKind": "browser",
+      "rca": {
+        "classification": "environment-regional",
+        "confidence": "medium",
+        "observed": [
+          "STEP a: neither the \"Start an Order\" CTA nor the header store switcher rendered. — expected element to be visible within 20000ms",
+          "Run status: fail   HTTP status: n/a   duration: 27850ms",
+          "Recent run history (newest first): fail, pass, pass, pass, pass, pass, pass, pass, pass, pass, pass, pass, pass, pass, pass",
+          "Multi-location: failing from 2 of 3 location(s).",
+          "Failure screenshot shows modal text: \"We're Sorry! The website isn't available at the moment. We'll be back up shortly. Please check back soon!\""
+        ],
+        "inferred": [
+          "The site returned an application-level unavailable/maintenance modal that would block the monitored CTA from rendering",
+          "Because only 2 of 3 locations failed, the problem may be regional (CDN/edge, load-balancer pool, or regional deploy) rather than globally down",
+          "Baseline runs are mostly passing, so this looks like a recent, localized outage or deployment/infra change rather than permanent selector drift",
+          "Less likely: a client-side selector change — the screenshot shows an overlay error rather than a missing element on a successfully rendered page"
+        ],
+        "summary": "The page served an 'We're Sorry...website isn't available' modal in 2 of 3 locations, blocking the 'Start an Order' CTA. This appears to be a recent, regionally-scoped outage (edge/CDN or regional infra/deploy) rather than a stale selector; investigate regional edge pools, recent deployments, and maintenance windows.",
+        "signature": "80|STEP a: neither the \"Start an Order\" CTA nor the header store switcher rendered. — expected element to be visible within 20000ms|open meals2go.com landing",
+        "model": "gpt-5-mini",
+        "cached": false,
+        "generated_at": "2026-07-08T02:17:58.650Z"
+      },
+      "resolutionReason": null
+    },
+    {
       "id": 131,
       "checkId": 221,
       "status": "resolved",
@@ -34,7 +575,8 @@
         "model": "gpt-5-mini",
         "cached": false,
         "generated_at": "2026-06-30T19:31:30.589Z"
-      }
+      },
+      "resolutionReason": null
     },
     {
       "id": 130,
@@ -70,7 +612,8 @@
         "model": "gpt-5-mini",
         "cached": false,
         "generated_at": "2026-06-30T18:24:01.939Z"
-      }
+      },
+      "resolutionReason": null
     },
     {
       "id": 80,
@@ -106,7 +649,8 @@
         "model": "gpt-5-mini",
         "cached": false,
         "generated_at": "2026-06-29T18:58:41.326Z"
-      }
+      },
+      "resolutionReason": null
     },
     {
       "id": 37,
@@ -142,7 +686,8 @@
         "model": "gpt-5-mini",
         "cached": false,
         "generated_at": "2026-06-29T02:07:04.266Z"
-      }
+      },
+      "resolutionReason": null
     },
     {
       "id": 36,
@@ -178,7 +723,8 @@
         "model": "gpt-5-mini",
         "cached": false,
         "generated_at": "2026-06-26T13:41:50.055Z"
-      }
+      },
+      "resolutionReason": null
     },
     {
       "id": 35,
@@ -214,226 +760,8 @@
         "model": "gpt-5-mini",
         "cached": false,
         "generated_at": "2026-06-26T00:00:47.710Z"
-      }
-    },
-    {
-      "id": 33,
-      "checkId": 59,
-      "status": "resolved",
-      "severity": "critical",
-      "openedAt": "2026-06-25T01:50:20.078332+00:00",
-      "resolvedAt": "2026-06-25T02:10:58.096995+00:00",
-      "openedRunId": 842881,
-      "resolvedRunId": null,
-      "consecutiveFailures": 2,
-      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
-      "checkName": "rca-demo",
-      "checkKind": "http",
-      "rca": {
-        "classification": "real-outage",
-        "confidence": "high",
-        "observed": [
-          "HTTP status: 500",
-          "Error message: expected status eq 200, got 500",
-          "duration: 95ms",
-          "Recent run history: fail, fail",
-          "Multi-location: failing from 1 of 1 location(s)"
-        ],
-        "inferred": [
-          "The endpoint is returning 500 responses, which indicates a server-side error",
-          "Consecutive failures suggest this is not a single transient blip",
-          "Because the check is a simple HTTP check (no selectors), the problem is likely with the target service rather than the monitor",
-          "Investigate server logs, health checks, and recent deploys for the target endpoint"
-        ],
-        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
-        "signature": "59|expected status eq 200, got 500|",
-        "model": "gpt-5-mini",
-        "cached": true,
-        "generated_at": "2026-06-25T01:50:26.607Z"
-      }
-    },
-    {
-      "id": 32,
-      "checkId": 59,
-      "status": "resolved",
-      "severity": "critical",
-      "openedAt": "2026-06-24T16:15:18.447229+00:00",
-      "resolvedAt": "2026-06-25T01:47:34.191971+00:00",
-      "openedRunId": 842433,
-      "resolvedRunId": null,
-      "consecutiveFailures": 2,
-      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
-      "checkName": "rca-demo",
-      "checkKind": "http",
-      "rca": {
-        "classification": "real-outage",
-        "confidence": "high",
-        "observed": [
-          "HTTP status: 500",
-          "Error message: expected status eq 200, got 500",
-          "duration: 95ms",
-          "Recent run history: fail, fail",
-          "Multi-location: failing from 1 of 1 location(s)"
-        ],
-        "inferred": [
-          "The endpoint is returning 500 responses, which indicates a server-side error",
-          "Consecutive failures suggest this is not a single transient blip",
-          "Because the check is a simple HTTP check (no selectors), the problem is likely with the target service rather than the monitor",
-          "Investigate server logs, health checks, and recent deploys for the target endpoint"
-        ],
-        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
-        "signature": "59|expected status eq 200, got 500|",
-        "model": "gpt-5-mini",
-        "cached": true,
-        "generated_at": "2026-06-24T16:15:22.485Z"
-      }
-    },
-    {
-      "id": 31,
-      "checkId": 59,
-      "status": "resolved",
-      "severity": "critical",
-      "openedAt": "2026-06-24T15:00:19.615821+00:00",
-      "resolvedAt": "2026-06-24T16:13:42.669019+00:00",
-      "openedRunId": 842370,
-      "resolvedRunId": null,
-      "consecutiveFailures": 2,
-      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
-      "checkName": "rca-demo",
-      "checkKind": "http",
-      "rca": null
-    },
-    {
-      "id": 30,
-      "checkId": 59,
-      "status": "resolved",
-      "severity": "critical",
-      "openedAt": "2026-06-24T14:25:33.325541+00:00",
-      "resolvedAt": "2026-06-24T14:58:55.588446+00:00",
-      "openedRunId": 842343,
-      "resolvedRunId": null,
-      "consecutiveFailures": 2,
-      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
-      "checkName": "rca-demo",
-      "checkKind": "http",
-      "rca": null
-    },
-    {
-      "id": 29,
-      "checkId": 59,
-      "status": "resolved",
-      "severity": "critical",
-      "openedAt": "2026-06-24T13:40:18.123931+00:00",
-      "resolvedAt": "2026-06-24T14:24:27.620222+00:00",
-      "openedRunId": 842304,
-      "resolvedRunId": null,
-      "consecutiveFailures": 2,
-      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
-      "checkName": "rca-demo",
-      "checkKind": "http",
-      "rca": null
-    },
-    {
-      "id": 28,
-      "checkId": 59,
-      "status": "resolved",
-      "severity": "critical",
-      "openedAt": "2026-06-24T12:50:34.933849+00:00",
-      "resolvedAt": "2026-06-24T13:36:02.258031+00:00",
-      "openedRunId": 842269,
-      "resolvedRunId": null,
-      "consecutiveFailures": 2,
-      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
-      "checkName": "rca-demo",
-      "checkKind": "http",
-      "rca": null
-    },
-    {
-      "id": 26,
-      "checkId": 59,
-      "status": "resolved",
-      "severity": "critical",
-      "openedAt": "2026-06-24T00:10:18.675995+00:00",
-      "resolvedAt": "2026-06-24T12:47:04.984844+00:00",
-      "openedRunId": 841690,
-      "resolvedRunId": null,
-      "consecutiveFailures": 2,
-      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
-      "checkName": "rca-demo",
-      "checkKind": "http",
-      "rca": {
-        "classification": "real-outage",
-        "confidence": "high",
-        "observed": [
-          "HTTP status: 500",
-          "Error message: expected status eq 200, got 500",
-          "duration: 95ms",
-          "Recent run history: fail, fail",
-          "Multi-location: failing from 1 of 1 location(s)"
-        ],
-        "inferred": [
-          "The endpoint is returning 500 responses, which indicates a server-side error",
-          "Consecutive failures suggest this is not a single transient blip",
-          "Because the check is a simple HTTP check (no selectors), the problem is likely with the target service rather than the monitor",
-          "Investigate server logs, health checks, and recent deploys for the target endpoint"
-        ],
-        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
-        "signature": "59|expected status eq 200, got 500|",
-        "model": "gpt-5-mini",
-        "cached": true,
-        "generated_at": "2026-06-24T00:10:28.766Z"
-      }
-    },
-    {
-      "id": 25,
-      "checkId": 59,
-      "status": "resolved",
-      "severity": "critical",
-      "openedAt": "2026-06-23T21:10:20.717921+00:00",
-      "resolvedAt": "2026-06-24T00:07:41.951212+00:00",
-      "openedRunId": 841549,
-      "resolvedRunId": null,
-      "consecutiveFailures": 2,
-      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
-      "checkName": "rca-demo",
-      "checkKind": "http",
-      "rca": {
-        "classification": "real-outage",
-        "confidence": "high",
-        "observed": [
-          "HTTP status: 500",
-          "Error message: expected status eq 200, got 500",
-          "duration: 95ms",
-          "Recent run history: fail, fail",
-          "Multi-location: failing from 1 of 1 location(s)"
-        ],
-        "inferred": [
-          "The endpoint is returning 500 responses, which indicates a server-side error",
-          "Consecutive failures suggest this is not a single transient blip",
-          "Because the check is a simple HTTP check (no selectors), the problem is likely with the target service rather than the monitor",
-          "Investigate server logs, health checks, and recent deploys for the target endpoint"
-        ],
-        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
-        "signature": "59|expected status eq 200, got 500|",
-        "model": "gpt-5-mini",
-        "cached": true,
-        "generated_at": "2026-06-23T21:10:20.790Z"
-      }
-    },
-    {
-      "id": 24,
-      "checkId": 59,
-      "status": "resolved",
-      "severity": "critical",
-      "openedAt": "2026-06-23T20:05:20.442022+00:00",
-      "resolvedAt": "2026-06-23T21:08:33.763732+00:00",
-      "openedRunId": 841497,
-      "resolvedRunId": null,
-      "consecutiveFailures": 2,
-      "summary": "Check \"rca-demo\" down (fail) from 2 of 2 locations.",
-      "checkName": "rca-demo",
-      "checkKind": "http",
-      "rca": null
+      },
+      "resolutionReason": null
     },
     {
       "id": 23,
@@ -448,88 +776,8 @@
       "summary": "Check \"SynthWatch API health\" down (fail) from 2 of 2 locations.",
       "checkName": "SynthWatch API health",
       "checkKind": "http",
-      "rca": null
-    },
-    {
-      "id": 19,
-      "checkId": 59,
-      "status": "resolved",
-      "severity": "critical",
-      "openedAt": "2026-06-23T01:25:18.810434+00:00",
-      "resolvedAt": "2026-06-23T19:46:11.837749+00:00",
-      "openedRunId": 840840,
-      "resolvedRunId": 841485,
-      "consecutiveFailures": 3,
-      "summary": "Check \"rca-demo\" down (fail) 3 consecutive times.",
-      "checkName": "rca-demo",
-      "checkKind": "http",
-      "rca": {
-        "classification": "real-outage",
-        "confidence": "high",
-        "observed": [
-          "HTTP status: 500",
-          "Error message: expected status eq 200, got 500",
-          "duration: 95ms",
-          "Recent run history: fail, fail",
-          "Multi-location: failing from 1 of 1 location(s)"
-        ],
-        "inferred": [
-          "The endpoint is returning 500 responses, which indicates a server-side error",
-          "Consecutive failures suggest this is not a single transient blip",
-          "Because the check is a simple HTTP check (no selectors), the problem is likely with the target service rather than the monitor",
-          "Investigate server logs, health checks, and recent deploys for the target endpoint"
-        ],
-        "summary": "The target is returning HTTP 500 on consecutive runs, indicating a real outage on the service rather than a flaky selector or regional problem. Please review the service logs and recent changes to identify the server-side failure.",
-        "signature": "59|expected status eq 200, got 500|",
-        "model": "gpt-5-mini",
-        "cached": false,
-        "generated_at": "2026-06-23T01:25:29.799Z"
-      }
-    },
-    {
-      "id": 8,
-      "checkId": 4,
-      "status": "resolved",
-      "severity": "critical",
-      "openedAt": "2026-06-22T12:15:29.383239+00:00",
-      "resolvedAt": "2026-06-22T12:35:24.161835+00:00",
-      "openedRunId": 840484,
-      "resolvedRunId": 840489,
-      "consecutiveFailures": 2,
-      "summary": "Check \"SynthWatch API health\" down (error) 2 consecutive times.",
-      "checkName": "SynthWatch API health",
-      "checkKind": "http",
-      "rca": null
-    },
-    {
-      "id": 2,
-      "checkId": 2,
-      "status": "resolved",
-      "severity": "critical",
-      "openedAt": "2026-06-21T13:51:04.229749+00:00",
-      "resolvedAt": "2026-06-21T15:34:16.20549+00:00",
-      "openedRunId": 640145,
-      "resolvedRunId": 840164,
-      "consecutiveFailures": 3,
-      "summary": "Check \"homepage search funnel\" failed 3 consecutive times (died at step: focus search box).",
-      "checkName": "Wegmans homepage",
-      "checkKind": "browser",
-      "rca": null
-    },
-    {
-      "id": 1,
-      "checkId": 2,
-      "status": "resolved",
-      "severity": "critical",
-      "openedAt": "2026-06-20T22:26:05.01733+00:00",
-      "resolvedAt": "2026-06-21T12:13:12.841259+00:00",
-      "openedRunId": 10,
-      "resolvedRunId": 640129,
-      "consecutiveFailures": 3,
-      "summary": "Check \"homepage search funnel\" failed 3 consecutive times (died at step: focus search box).",
-      "checkName": "Wegmans homepage",
-      "checkKind": "browser",
-      "rca": null
+      "rca": null,
+      "resolutionReason": null
     }
   ],
   "nextCursor": null,

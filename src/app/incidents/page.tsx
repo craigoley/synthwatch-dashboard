@@ -8,7 +8,7 @@ import { ToneBadge } from "@/components/status-badge";
 import { DateRangeControl, useDateRange } from "@/components/date-range-control";
 import { EmptyState, ErrorState, Spinner } from "@/components/states";
 import { TagFilter, useTagFilter, matchesTags } from "@/components/tag-filter";
-import { severityMeta } from "@/lib/status";
+import { severityMeta, resolutionReasonLabel } from "@/lib/status";
 import { formatLocalDateTime, formatRelative, formatSpan } from "@/lib/format";
 import type { IncidentWithCheck, Tag } from "@/lib/types";
 import { RcaPanel } from "@/components/rca-panel";
@@ -51,6 +51,14 @@ function IncidentRow({ incident }: { incident: IncidentWithCheck }) {
           <span className="sw-mono rounded-full border border-[var(--color-border-strong)] px-1.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-dim)]">
             {incident.status}
           </span>
+          {/* A resolved-without-recovery close (monitor stopped running) reads as an ordinary "resolved" in the
+              list otherwise — indistinguishable from a genuine recovery. A neutral (idle, never green) chip marks
+              it so an operator scanning the list isn't misled. null (genuine recovery) → no chip. */}
+          {incident.resolution_reason && (
+            <span className="relative z-10" data-testid="resolution-reason-chip">
+              <ToneBadge label={resolutionReasonLabel(incident.resolution_reason)} token="idle" />
+            </span>
+          )}
         </div>
         {incident.summary && (
           // Historical snapshot captured at incident-open time — it may reference
