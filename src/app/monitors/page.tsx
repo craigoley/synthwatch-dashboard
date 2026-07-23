@@ -85,8 +85,9 @@ function DeleteDialog({
         <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
           <div className="text-sm font-medium text-[var(--color-ink)]">Soft delete (recommended)</div>
           <p className="mt-1 text-sm text-[var(--color-ink-dim)]">
-            Pauses the monitor by setting <span className="sw-mono">enabled = false</span>. All run history
-            and incidents are preserved and it can be resumed later.
+            Pauses the monitor by setting <span className="sw-mono">enabled = false</span>. Run history and
+            incident records are kept and it can be resumed later — but any open incident is closed (resolved,
+            marked “monitor paused”), because a paused monitor stops running and can no longer recover on its own.
           </p>
           <button
             onClick={() => run(false)}
