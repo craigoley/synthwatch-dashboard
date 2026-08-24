@@ -18,11 +18,11 @@
     "capture:contracts": "node contract/capture.mjs"
   },
   "dependencies": {
-    "next": "16.3.0",
+    "next": "16.3.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "recharts": "^3.10.1",
-    "swr": "^2.5.0",
+    "swr": "^2.5.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -33,11 +33,11 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "eslint": "^9.18.0",
-    "eslint-config-next": "16.3.0",
+    "eslint-config-next": "16.3.1",
     "eslint-plugin-security": "^4.0.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.66.0"
+    "typescript-eslint": "^8.67.0"
   },
   "pnpm": {
     "overrides": {
