@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 
 import {
   createCheck,
   updateCheck,
+  deleteCheck,
+  runCheckNow,
   setCheckLocations,
   setCheckTags,
   useFlows,
@@ -15,7 +17,7 @@ import {
   useTags,
   useCheckTags,
 } from "@/lib/client";
-import { ApiRequestError } from "@/lib/api-client";
+import { ApiRequestError, getRuns, setCredentials } from "@/lib/api-client";
 import { Combobox } from "@/components/combobox";
 import {
   AssertionBuilder,
@@ -55,6 +57,29 @@ interface Props {
 }
 
 type SeverityOpt = "warning" | "critical";
+
+/** One row of the inline credential editor (name + plaintext value the user is typing). */
+interface CredRow {
+  name: string;
+  value: string;
+}
+
+/**
+ * Result of a sandbox pre-save test. `pass`/`fail` mirror the settled Run.status (fail also covers
+ * "error"/"infra_error"); `aborted` = the test failed BEFORE the run started (create/write/run POST);
+ * `timeout` = the run didn't settle within the poll window (the run itself may still complete).
+ */
+type TestOutcome =
+  | {
+      kind: "pass" | "fail";
+      status: string;
+      runId: number;
+      errorMessage: string | null;
+      failedStep: string | null;
+      durationMs: number | null;
+    }
+  | { kind: "aborted"; message: string }
+  | { kind: "timeout" };
 
 interface FormState {
   name: string;
@@ -522,43 +547,66 @@ export function MonitorForm({ initial, activation, prefill, prefillErrors, onDon
       target_url: opt.entryUrl && f.target_url.trim() === "" ? opt.entryUrl : f.target_url,
     }));
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setFieldErrors({});
+  // ─── credentials at setup (login_credentials + secret_headers) ─────────────
+  // A NEW monitor often fails on its very first tick because its credentials aren't set yet, which
+  // burns an alert. Let the author enter them right here so the create sets both the row AND the
+  // secrets in one flow. Only rendered on CREATE — an existing monitor uses <CredentialsPanel>
+  // (whose "replace the whole column" semantics need pre-fill of stored slot names).
+  const [loginCredRows, setLoginCredRows] = useState<CredRow[]>([{ name: "", value: "" }]);
+  const [secretHeaderRows, setSecretHeaderRows] = useState<CredRow[]>([{ name: "", value: "" }]);
+  const credsToWrite = useMemo(() => {
+    const login: Record<string, string> = {};
+    for (const r of loginCredRows) if (r.name.trim() && r.value) login[r.name.trim()] = r.value;
+    const headers: Record<string, string> = {};
+    for (const r of secretHeaderRows) if (r.name.trim() && r.value) headers[r.name.trim()] = r.value;
+    return { login, headers, any: Object.keys(login).length + Object.keys(headers).length > 0 };
+  }, [loginCredRows, secretHeaderRows]);
 
-    if (form.name.trim() === "") {
-      setError("Name is required.");
-      return;
-    }
-    // Multistep has no single target (derived from step 1's URL); guard the chain
-    // is non-empty instead. Every other kind requires target_url (NOT NULL column).
+  // ─── sandbox pre-save test (draft-check lifecycle) ─────────────────────────
+  // The sandbox endpoint (/preview) only accepts raw Playwright specs, so to test an arbitrary check
+  // kind we borrow the runner's own sandbox path: createCheck(enabled=false) → setCredentials →
+  // runCheckNow(sandbox=true) → poll getRuns for the settled outcome. Save later flips enabled=true
+  // on the SAME draft (no second create); Cancel/unmount deletes it. Orphan risk on tab-crash is
+  // accepted; the paused check is visible + deletable from the monitors list.
+  const [draftCheckId, setDraftCheckId] = useState<number | null>(null);
+  const draftIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    draftIdRef.current = draftCheckId;
+  }, [draftCheckId]);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<TestOutcome | null>(null);
+
+  // Best-effort cleanup of the draft check on unmount (Cancel / modal close / navigation). If Save
+  // succeeded, draftIdRef is nulled first so this no-ops. A network failure here is silently
+  // swallowed — the user can delete the paused draft from the monitors list.
+  useEffect(() => {
+    return () => {
+      const id = draftIdRef.current;
+      if (id != null) void deleteCheck(id).catch(() => {});
+    };
+  }, []);
+
+  const validateForm = useCallback((): string | null => {
+    if (form.name.trim() === "") return "Name is required.";
     if (form.kind === "multistep") {
-      if (steps.length === 0) {
-        setError("Add at least one step to the chain.");
-        return;
-      }
-      if (steps[0]!.url.trim() === "") {
-        setError("The first step needs a URL.");
-        return;
-      }
+      if (steps.length === 0) return "Add at least one step to the chain.";
+      if (steps[0]!.url.trim() === "") return "The first step needs a URL.";
     } else if (form.target_url.trim() === "") {
-      setError("A target URL is required.");
-      return;
+      return "A target URL is required.";
     }
-    // Mirror the API's ≥1-location rule — never PUT an empty set it would 400 on.
     if (locationsActive && form.locations.length === 0) {
-      setError("Select at least one location for this check to run from.");
-      return;
+      return "Select at least one location for this check to run from.";
     }
+    return null;
+  }, [form, steps, locationsActive]);
 
+  // Build the create/update payload from the current form state — extracted so onSubmit AND onTest
+  // both call it (the Test writes an enabled=false draft; Save flips enabled=true on the same draft).
+  const buildPayload = useCallback((overrideEnabled?: boolean) => {
     const stepsPayload = form.kind === "multistep" ? buildStepsPayload(steps) : null;
-
-    const payload = {
+    return {
       name: form.name.trim(),
       kind: form.kind,
-      // Multistep has no single target — the chain's entry is step 1's URL. The
-      // column is NOT NULL, so derive it (the field is hidden for this kind).
       target_url:
         form.kind === "multistep"
           ? stepsPayload?.[0]?.url || "https://multistep.local"
@@ -567,14 +615,11 @@ export function MonitorForm({ initial, activation, prefill, prefillErrors, onDon
       method: form.method,
       expected_status: numOrNull(form.expected_status) ?? 200,
       body_must_contain: form.kind === "http" ? form.body_must_contain.trim() || null : null,
-      // minutes → seconds at the API boundary (5 min → 300s). Default 5 min when blank.
       interval_seconds: minutesToSeconds(numOrNull(form.interval_minutes) ?? 5),
-      // seconds → ms at the API boundary (30s → 30000ms); the stored unit + runner contract stay ms.
       timeout_ms: (numOrNull(form.timeout_seconds) ?? 30) * 1000,
       failure_threshold: numOrNull(form.failure_threshold) ?? 3,
       severity: form.severity,
-      enabled: form.enabled,
-      // Lighthouse + perf budgets are browser-only; force off for http/ssl.
+      enabled: overrideEnabled ?? form.enabled,
       lighthouse_enabled: form.kind === "browser" ? form.lighthouse_enabled : false,
       lighthouse_interval_seconds:
         form.kind === "browser" && form.lighthouse_enabled
@@ -584,9 +629,7 @@ export function MonitorForm({ initial, activation, prefill, prefillErrors, onDon
       perf_budget_lcp_ms: form.kind === "browser" ? numOrNull(form.perf_budget_lcp_ms) : null,
       perf_budget_transfer_bytes:
         form.kind === "browser" ? numOrNull(form.perf_budget_transfer_bytes) : null,
-      // SSL-only: warn window in days.
       cert_expiry_warn_days: form.kind === "ssl" ? numOrNull(form.cert_expiry_warn_days) ?? 30 : null,
-      // Network-only (dns/tcp/ping): per-kind config (camelCase nested, as the API expects).
       net_config:
         form.kind === "dns"
           ? { recordType: form.dns_record_type, expectedValue: form.dns_expected_value.trim() || null, port: null }
@@ -595,36 +638,151 @@ export function MonitorForm({ initial, activation, prefill, prefillErrors, onDon
             : form.kind === "ping"
               ? { recordType: null, expectedValue: null, port: numOrNull(form.ping_port) }
               : null,
-      // Multistep-only: the ordered step chain. Cleared for other kinds.
       steps: stepsPayload,
-      // HTTP-only: no-code assertions + request config. Cleared for other kinds.
       ...(form.kind === "http"
         ? buildHttpConfigPayload(http)
         : { assertions: [], request_headers: null, request_body: null, auth: null }),
-      // Spec binding. spec_path makes the runner fetch+run the Git spec (Option C); source_key links
-      // the catalog row (a duplicate → 409). flow_name above is the synthetic flowNameFor(spec_path)
-      // that satisfies browser_needs_flow. Two entry points converge on the SAME shape: catalog
-      // activation, and a free-form New-monitor that selected a manifest spec (create only — edit
-      // leaves the binding untouched, as PATCH omits unspecified fields).
       ...(activation
         ? { source_key: activation.sourceKey, spec_path: activation.specPath }
         : !isEdit && form.kind === "browser" && form.spec_path
           ? { source_key: form.source_key, spec_path: form.spec_path }
           : {}),
     };
+  }, [form, steps, http, activation, isEdit]);
+
+  // ── Test: create-or-update a paused draft, write creds, run in sandbox, poll for the settled run.
+  // Distinct from Save — never enables the monitor, never lets it alert, and reuses the same draft
+  // across re-tests. Only offered on CREATE; edit-mode already has runCheckNow(sandbox) in-page.
+  const onTest = useCallback(async () => {
+    if (isEdit) return;
+    setError(null);
+    setTestResult(null);
+    const gate = validateForm();
+    if (gate) {
+      setError(gate);
+      return;
+    }
+    setTesting(true);
+    try {
+      const payload = buildPayload(false); // Force enabled=false on the draft — testing never alerts.
+      let id = draftCheckId;
+      if (id == null) {
+        const created = await createCheck(payload);
+        id = created.id;
+        setDraftCheckId(id);
+        // Locations must be set for the runner to know where to fire the sandbox run.
+        if (locationsActive) await setCheckLocations(id, form.locations);
+      } else {
+        await updateCheck(id, payload);
+        if (locationsActive) await setCheckLocations(id, form.locations);
+      }
+      if (credsToWrite.any) {
+        await setCredentials(id, {
+          ...(Object.keys(credsToWrite.login).length ? { loginCredentials: credsToWrite.login } : {}),
+          ...(Object.keys(credsToWrite.headers).length ? { secretHeaders: credsToWrite.headers } : {}),
+        });
+      }
+      // Snapshot the pre-existing latest run id so we can spot the NEW sandbox run when it lands.
+      const before = await getRuns(id, { pageSize: 1 });
+      const priorRunId = before.runs[0]?.id ?? 0;
+      await runCheckNow(id, { sandbox: true });
+      // Poll ~90s (2s * 45). A settled run replaces "running"; a network hiccup aborts with a message.
+      const deadline = Date.now() + 90_000;
+      let outcome: TestOutcome = { kind: "timeout" };
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const page = await getRuns(id, { pageSize: 3 });
+        const fresh = page.runs.find((r) => r.id > priorRunId && r.status !== "running");
+        if (fresh) {
+          outcome = {
+            kind: fresh.status === "pass" ? "pass" : "fail",
+            status: fresh.status,
+            runId: fresh.id,
+            errorMessage: fresh.error_message,
+            failedStep: fresh.failed_step,
+            durationMs: fresh.duration_ms,
+          };
+          break;
+        }
+      }
+      setTestResult(outcome);
+    } catch (err) {
+      setTestResult({
+        kind: "aborted",
+        message: err instanceof Error ? err.message : "Test failed to start.",
+      });
+    } finally {
+      setTesting(false);
+    }
+  }, [isEdit, validateForm, buildPayload, draftCheckId, locationsActive, form.locations, credsToWrite]);
+
+  // Cancel wrapper: the unmount effect will delete a draft, but calling deleteCheck synchronously
+  // here lets the user see the modal close cleanly (and revalidates checks lists sooner).
+  const onCancelClick = useCallback(() => {
+    const id = draftIdRef.current;
+    if (id != null) {
+      draftIdRef.current = null;
+      void deleteCheck(id).catch(() => {});
+      setDraftCheckId(null);
+    }
+    onCancel();
+  }, [onCancel]);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setFieldErrors({});
+
+    const gate = validateForm();
+    if (gate) {
+      setError(gate);
+      return;
+    }
+
+    const payload = buildPayload();
 
     setSubmitting(true);
     try {
-      const saved =
-        isEdit && initial ? await updateCheck(initial.id, payload) : await createCheck(payload);
+      // Three paths converge here:
+      //   1. Edit: PATCH the existing check.
+      //   2. Create WITH a draft (user clicked Test earlier): update the paused draft to the final
+      //      state (enabled honoured), then promote it. Credentials were written at Test time.
+      //   3. Create WITHOUT a draft (Save straight): create + optional setCredentials, as before.
+      let savedId: number;
+      if (isEdit && initial) {
+        await updateCheck(initial.id, payload);
+        savedId = initial.id;
+      } else if (draftCheckId != null) {
+        await updateCheck(draftCheckId, payload);
+        savedId = draftCheckId;
+        // Re-write creds if the user edited them AFTER the last Test — cheap and idempotent.
+        if (credsToWrite.any) {
+          await setCredentials(savedId, {
+            ...(Object.keys(credsToWrite.login).length ? { loginCredentials: credsToWrite.login } : {}),
+            ...(Object.keys(credsToWrite.headers).length ? { secretHeaders: credsToWrite.headers } : {}),
+          });
+        }
+        // Clear the draft ref BEFORE onDone so the unmount effect can't delete the check we just saved.
+        draftIdRef.current = null;
+        setDraftCheckId(null);
+      } else {
+        const created = await createCheck(payload);
+        savedId = created.id;
+        if (credsToWrite.any) {
+          await setCredentials(savedId, {
+            ...(Object.keys(credsToWrite.login).length ? { loginCredentials: credsToWrite.login } : {}),
+            ...(Object.keys(credsToWrite.headers).length ? { secretHeaders: credsToWrite.headers } : {}),
+          });
+        }
+      }
       // The location assignment is a separate endpoint (PUT /checks/{id}/locations).
       // Skipped when the feature isn't live yet — the backend defaults to all.
       if (locationsActive) {
-        await setCheckLocations(saved.id, form.locations);
+        await setCheckLocations(savedId, form.locations);
       }
       // Tags are likewise a separate endpoint (PUT /checks/{id}/tags); skipped pre-API.
       if (tagsActive) {
-        await setCheckTags(saved.id, form.tags);
+        await setCheckTags(savedId, form.tags);
       }
       onDone();
     } catch (err) {
@@ -1078,18 +1236,292 @@ export function MonitorForm({ initial, activation, prefill, prefillErrors, onDon
       </div>
       )}
 
+      {/* Credentials at setup — CREATE only. An edit uses <CredentialsPanel> on the check page (its
+          "replace the whole column" semantics need pre-fill of stored slot names; here on CREATE
+          there is nothing to pre-fill, so a plain empty editor is safe). This lets a new monitor
+          reach its first tick already-credentialed instead of failing loud and burning an alert. */}
+      {!isEdit && (
+        <CredentialsSetup
+          loginRows={loginCredRows}
+          setLoginRows={setLoginCredRows}
+          headerRows={secretHeaderRows}
+          setHeaderRows={setSecretHeaderRows}
+        />
+      )}
+
+      {/* Pre-save sandbox test — CREATE only. Runs the not-yet-saved monitor via the runner's
+          sandbox path (paused draft check + runCheckNow(sandbox=true)); credentials just entered
+          above are used for the run, so login-gated flows surface real login failures BEFORE the
+          monitor goes live. The draft is deleted on Cancel and promoted on Save. */}
+      {!isEdit && (
+        <TestSandbox
+          testing={testing}
+          result={testResult}
+          onTest={onTest}
+          hasDraft={draftCheckId != null}
+        />
+      )}
+
       <div className="flex items-center justify-end gap-2 border-t border-[var(--color-border)] pt-4">
-        <button type="button" onClick={onCancel} className="sw-btn">
+        <button type="button" onClick={onCancelClick} className="sw-btn">
           Cancel
         </button>
         <button
           type="submit"
-          disabled={submitting || (locationsActive && form.locations.length === 0)}
+          disabled={submitting || testing || (locationsActive && form.locations.length === 0)}
           className="sw-btn sw-btn-primary"
         >
           {submitting ? "Saving…" : isActivation ? "Set up monitor" : isEdit ? "Save changes" : "Create monitor"}
         </button>
       </div>
     </form>
+  );
+}
+
+// ─── Credential setup editor (CREATE-only) ────────────────────────────────────────────────────
+// A simplified sibling of <CredentialsPanel> — no pre-fill/clobber machinery (a fresh check has
+// no stored slots), no masked "set" chips, no "replace the whole column" honesty note. Just two
+// name/value editors that hand their non-empty rows to the parent's setCredentials call.
+function CredentialsSetup({
+  loginRows,
+  setLoginRows,
+  headerRows,
+  setHeaderRows,
+}: {
+  loginRows: CredRow[];
+  setLoginRows: React.Dispatch<React.SetStateAction<CredRow[]>>;
+  headerRows: CredRow[];
+  setHeaderRows: React.Dispatch<React.SetStateAction<CredRow[]>>;
+}) {
+  const [open, setOpen] = useState(false);
+  const filledLogin = loginRows.filter((r) => r.name.trim() && r.value).length;
+  const filledHeaders = headerRows.filter((r) => r.name.trim() && r.value).length;
+  const filled = filledLogin + filledHeaders;
+
+  return (
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4" data-testid="setup-credentials">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <span className="flex items-center gap-2">
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden className={`text-[var(--color-ink-faint)] transition-transform ${open ? "rotate-90" : ""}`}>
+            <path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="sw-eyebrow">Credentials</span>
+          {filled > 0 && (
+            <span className="sw-mono text-[11px] text-[var(--color-ink-dim)]">· {filled} set</span>
+          )}
+        </span>
+        <span className="sw-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+          optional — encrypted on save
+        </span>
+      </button>
+      {open && (
+        <div className="mt-3 space-y-4">
+          <CredEditor
+            title="Login credentials"
+            keyLabel="Field"
+            keyPlaceholder="role (e.g. username)"
+            rows={loginRows}
+            setRows={setLoginRows}
+            testIdPrefix="setup-login"
+          />
+          <div className="border-t border-[var(--color-border)]" />
+          <CredEditor
+            title="Secret headers"
+            keyLabel="Header name"
+            keyPlaceholder="X-Api-Key"
+            rows={headerRows}
+            setRows={setHeaderRows}
+            testIdPrefix="setup-secret-header"
+          />
+          <p className="text-[11px] leading-relaxed text-[var(--color-ink-faint)]">
+            Encrypted at rest (AES-256-GCM). Values are <strong>write-only</strong> — never
+            displayed back after save. Leave the section empty if the monitor doesn&apos;t need them.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CredEditor({
+  title,
+  keyLabel,
+  keyPlaceholder,
+  rows,
+  setRows,
+  testIdPrefix,
+}: {
+  title: string;
+  keyLabel: string;
+  keyPlaceholder: string;
+  rows: CredRow[];
+  setRows: React.Dispatch<React.SetStateAction<CredRow[]>>;
+  testIdPrefix: string;
+}) {
+  const setRow = (i: number, patch: Partial<CredRow>) =>
+    setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const addRow = () => setRows((rs) => [...rs, { name: "", value: "" }]);
+  const removeRow = (i: number) =>
+    setRows((rs) => (rs.length === 1 ? [{ name: "", value: "" }] : rs.filter((_, j) => j !== i)));
+
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center gap-2">
+        <h4 className="text-[13px] font-medium text-[var(--color-ink)]">{title}</h4>
+      </div>
+      <div className="space-y-1.5">
+        {rows.map((r, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <input
+              type="text"
+              aria-label={`${title} ${keyLabel} ${i + 1}`}
+              data-testid={`${testIdPrefix}-name-${i}`}
+              placeholder={keyPlaceholder}
+              value={r.name}
+              onChange={(e) => setRow(i, { name: e.target.value })}
+              className="sw-mono w-2/5 rounded border border-[var(--color-border-strong)] bg-[var(--color-bg)] px-2 py-1 text-[12px] text-[var(--color-ink)]"
+            />
+            <input
+              type="password"
+              aria-label={`${title} value ${i + 1}`}
+              data-testid={`${testIdPrefix}-value-${i}`}
+              placeholder="value"
+              value={r.value}
+              onChange={(e) => setRow(i, { value: e.target.value })}
+              className="sw-mono flex-1 rounded border border-[var(--color-border-strong)] bg-[var(--color-bg)] px-2 py-1 text-[12px] text-[var(--color-ink)]"
+            />
+            <button
+              type="button"
+              onClick={() => removeRow(i)}
+              aria-label={`remove ${title} row ${i + 1}`}
+              className="sw-mono px-1.5 text-[13px] text-[var(--color-ink-faint)] transition hover:text-[var(--color-fail)]"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={addRow}
+        className="sw-mono mt-1.5 text-[11px] text-[var(--color-ink-faint)] transition hover:text-[var(--color-ink)]"
+      >
+        + add
+      </button>
+    </div>
+  );
+}
+
+// ─── Test in sandbox (CREATE-only) ────────────────────────────────────────────────────────────
+function TestSandbox({
+  testing,
+  result,
+  onTest,
+  hasDraft,
+}: {
+  testing: boolean;
+  result: TestOutcome | null;
+  onTest: () => void;
+  hasDraft: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4" data-testid="setup-sandbox-test">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="sw-eyebrow">Test before you save</div>
+          <p className="mt-0.5 text-[11px] text-[var(--color-ink-faint)]">
+            Runs the monitor in the low-privilege sandbox using the fields + credentials above. It
+            never alerts or affects SLO. {hasDraft ? "Re-test to run again with the latest values." : ""}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onTest}
+          disabled={testing}
+          data-testid="setup-test-run"
+          className="sw-btn sw-btn-sm"
+        >
+          {testing ? "Testing…" : hasDraft ? "Re-test" : "Test in sandbox"}
+        </button>
+      </div>
+      {result && <TestResultBanner result={result} />}
+    </div>
+  );
+}
+
+function TestResultBanner({ result }: { result: TestOutcome }) {
+  if (result.kind === "pass") {
+    return (
+      <div
+        className="mt-3 rounded-md px-3 py-2 text-[12px]"
+        data-testid="setup-test-result-pass"
+        style={{
+          background: "color-mix(in srgb, var(--color-pass) 12%, transparent)",
+          border: "1px solid color-mix(in srgb, var(--color-pass) 40%, transparent)",
+          color: "var(--color-pass)",
+        }}
+      >
+        Passed in the sandbox
+        {result.durationMs != null ? ` — ${Math.round(result.durationMs)}ms` : ""}. Save to enable the monitor.
+      </div>
+    );
+  }
+  if (result.kind === "fail") {
+    return (
+      <div
+        className="mt-3 rounded-md px-3 py-2 text-[12px]"
+        data-testid="setup-test-result-fail"
+        style={{
+          background: "color-mix(in srgb, var(--color-fail) 12%, transparent)",
+          border: "1px solid color-mix(in srgb, var(--color-fail) 40%, transparent)",
+          color: "var(--color-fail)",
+        }}
+      >
+        <div className="font-medium">Sandbox run ended {result.status}.</div>
+        {result.failedStep && (
+          <div className="mt-0.5 text-[11px] opacity-90">Step: {result.failedStep}</div>
+        )}
+        {result.errorMessage && (
+          <div className="sw-mono mt-1 whitespace-pre-wrap break-words text-[11px] opacity-90">
+            {result.errorMessage}
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (result.kind === "aborted") {
+    return (
+      <div
+        className="mt-3 rounded-md px-3 py-2 text-[12px]"
+        data-testid="setup-test-result-aborted"
+        style={{
+          background: "color-mix(in srgb, var(--color-warn) 12%, transparent)",
+          border: "1px solid color-mix(in srgb, var(--color-warn) 40%, transparent)",
+          color: "var(--color-warn)",
+        }}
+      >
+        Couldn&apos;t start the test — {result.message}
+      </div>
+    );
+  }
+  // timeout
+  return (
+    <div
+      className="mt-3 rounded-md px-3 py-2 text-[12px]"
+      data-testid="setup-test-result-timeout"
+      style={{
+        background: "color-mix(in srgb, var(--color-warn) 12%, transparent)",
+        border: "1px solid color-mix(in srgb, var(--color-warn) 40%, transparent)",
+        color: "var(--color-warn)",
+      }}
+    >
+      Test didn&apos;t settle in 90s. The sandbox run may still complete — the paused draft&apos;s run
+      history will show the outcome. Save anyway or re-test.
+    </div>
   );
 }
