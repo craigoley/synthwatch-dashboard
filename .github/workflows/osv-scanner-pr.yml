@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   scan-pr:
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.5.1
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.6.0
     with:
       # Non-blocking on PRs — surface findings without failing the check.
       fail-on-vuln: false
