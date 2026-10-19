@@ -62,7 +62,7 @@ jobs:
         # fails but does NOT fail the job — the enforce step (if: always()) then finds
         # no verdict and exits 0. A review error must never block a merge.
         continue-on-error: true
-        uses: anthropics/claude-code-action@6c690188da61cf16ee7debb28383ba67f02abb4c # v1
+        uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1
         env:
           # Authenticate the `gh` CLI used by the Bash tool (gh pr comment/diff/view).
           GH_TOKEN: ${{ github.token }}
